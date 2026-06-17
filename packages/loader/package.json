@@ -1,0 +1,29 @@
+{
+  "name": "@bankchat/loader",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/loader.mjs",
+  "module": "./dist/loader.mjs",
+  "types": "./dist/loader.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/loader.d.ts",
+      "import": "./dist/loader.mjs"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": true,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@bankchat/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^6.0.3"
+  }
+}
