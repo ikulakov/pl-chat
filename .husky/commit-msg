@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+BRANCH_NAME=$(git symbolic-ref --short HEAD)
+
+if [[ -z "$BRANCH_NAME" ]]; then
+  exit 0
+fi
+
+ISSUE_ID=$(echo "$BRANCH_NAME" | grep -o -E "[a-zA-Z]+-[0-9]+" || true)
+
+if [[ -z "$ISSUE_ID" ]]; then
+  exit 0
+fi
+
+echo "${ISSUE_ID}: $(cat "$1")" > "$1"
