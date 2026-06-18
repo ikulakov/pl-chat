@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+nvm use
+
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 REGEX="^(feature|bugfix|hotfix)/PLC-[0-9]+$|^release/[0-9]+\.[0-9]+\.[0-9]+$"
 
@@ -9,10 +13,10 @@ fi
 
 STAGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|md)$')
 if [ -n "$STAGED" ]; then
-  git stash --keep-index --include-untracked --quiet
-  echo "$STAGED" | xargs pnpm exec prettier --write
-  echo "$STAGED" | xargs git add
-  git stash pop --quiet
+  while IFS= read -r file; do
+    pnpm exec prettier --write "$file"
+    git add "$file"
+  done <<< "$STAGED"
 fi
 
 pnpm lint && pnpm typecheck
