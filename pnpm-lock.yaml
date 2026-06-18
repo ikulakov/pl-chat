@@ -42,22 +42,6 @@ importers:
         specifier: ^8.61.1
         version: 8.61.1(eslint@10.5.0)(typescript@6.0.3)
 
-  packages/host-demo:
-    dependencies:
-      '@bankchat/loader':
-        specifier: workspace:*
-        version: link:../loader
-      '@bankchat/protocol':
-        specifier: workspace:*
-        version: link:../protocol
-    devDependencies:
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-      vite:
-        specifier: ^8.0.16
-        version: 8.0.16(esbuild@0.27.7)
-
   packages/loader:
     dependencies:
       '@bankchat/protocol':
@@ -104,6 +88,24 @@ importers:
       vite:
         specifier: ^8.0.16
         version: 8.0.16(esbuild@0.27.7)
+
+  tools/host-demo:
+    dependencies:
+      '@bankchat/loader':
+        specifier: workspace:*
+        version: link:../../packages/loader
+      '@bankchat/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+    devDependencies:
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(esbuild@0.27.7)
+
+  tools/matrix-mock: {}
 
 packages:
 

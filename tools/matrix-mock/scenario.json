@@ -1,0 +1,63 @@
+{
+  "guest": {
+    "user_id": "@guest_dev:bank.ru",
+    "device_id": "DEV_MOCK",
+    "access_token": "tok_mock_opaque",
+    "refresh_token": "rft_mock",
+    "expires_in_ms": 3600000
+  },
+  "roomId": "!support_dev:bank.ru",
+  "operatorId": "@operatorkc:bank.ru",
+  "seed": [
+    {
+      "type": "m.room.member",
+      "state_key": "@guest_dev:bank.ru",
+      "sender": "@guest_dev:bank.ru",
+      "content": { "membership": "join" }
+    },
+    {
+      "type": "m.room.member",
+      "state_key": "@operatorkc:bank.ru",
+      "sender": "@operatorkc:bank.ru",
+      "content": { "membership": "join", "displayname": "Оля" }
+    },
+    {
+      "type": "kc.operator.joined",
+      "sender": "@operatorkc:bank.ru",
+      "content": { "operator_id": "olya42", "displayname": "Оля", "role": "human" }
+    },
+    {
+      "type": "kc.operator.current",
+      "state_key": "",
+      "sender": "@operatorkc:bank.ru",
+      "content": { "status": "ACTIVE", "operator_id": "olya42", "displayname": "Оля", "role": "human" }
+    },
+    {
+      "type": "m.room.message",
+      "sender": "@operatorkc:bank.ru",
+      "content": { "msgtype": "m.notice", "body": "Чат с банком начат" }
+    },
+    {
+      "type": "m.room.message",
+      "sender": "@operatorkc:bank.ru",
+      "content": { "msgtype": "m.text", "body": "Здравствуйте! Меня зовут Оля. Чем могу помочь?" }
+    }
+  ],
+  "autoReply": {
+    "msgtype": "m.text",
+    "body": "Принято, секунду — уточняю информацию…"
+  },
+  "card": {
+    "type": "AdaptiveCard",
+    "version": "1.5",
+    "body": [
+      { "type": "TextBlock", "text": "Заявка на карту «Кэшбэк»", "weight": "Bolder", "size": "Medium" },
+      { "type": "TextBlock", "text": "Проверьте данные и подтвердите оформление.", "wrap": true },
+      { "type": "Input.Text", "id": "code", "label": "Кодовое слово", "placeholder": "Введите кодовое слово" }
+    ],
+    "actions": [
+      { "type": "Action.Submit", "id": "confirm", "title": "Подтвердить", "data": { "action": "confirm" } },
+      { "type": "Action.Submit", "id": "edit", "title": "Изменить", "data": { "action": "edit" } }
+    ]
+  }
+}
