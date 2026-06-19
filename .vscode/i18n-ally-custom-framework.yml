@@ -1,0 +1,14 @@
+languageIds:
+  - typescript
+  - typescriptreact
+
+# Матчит: t('key'), t("key"), t(`key`)
+usageMatchRegex:
+  - "[^\\w\\d]t\\(['\"`]({key})['\"`]"
+
+# Шаблон при автоматическом извлечении строки в словарь
+refactorTemplates:
+  - "t(\"$1\")"
+
+# Отключить встроенные фреймворки (react-i18next и др.)
+monopoly: true

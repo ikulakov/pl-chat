@@ -1,0 +1,11 @@
+{
+  "input.placeholder": "Сообщение…",
+  "input.attachFile": "Прикрепить файл",
+
+  "chat.search": "Поиск",
+  "chat.menu": "Меню",
+
+  "status.connecting": "Подключение…",
+  "status.waiting": "Ожидание оператора…",
+  "status.ended": "Диалог завершён"
+}

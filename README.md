@@ -34,11 +34,41 @@ pnpm dev
 
 Запускает все пакеты одновременно:
 
-| Сервис | URL |
-|--------|-----|
-| host-demo (страница хоста) | http://localhost:5173 |
-| widget (SPA виджета) | http://localhost:5174/widget |
-| matrix-mock (Matrix API) | http://localhost:3001 |
+| Сервис                     | URL                          |
+| -------------------------- | ---------------------------- |
+| host-demo (страница хоста) | http://localhost:5173        |
+| widget (SPA виджета)       | http://localhost:5174/widget |
+| matrix-mock (Matrix API)   | http://localhost:3001        |
+
+## Локализация (i18n)
+
+Переводы лежат в `packages/widget/src/i18n/locale/`:
+
+```
+ru.json   — русский (основной, источник ключей)
+en.json   — английский
+```
+
+Ключи — flat с точечной группировкой: `"input.placeholder"`, `"chat.menu"`, `"status.connecting"`.
+
+### Добавить новый ключ
+
+1. Добавить в `ru.json` вручную или использовать плагин i18n Ally через выделение строки
+2. Добавить в `en.json` — TypeScript выдаст ошибку на сборке, если забыть
+3. Использовать в компоненте: `t('my.key')`
+
+### Использование в компонентах
+
+```tsx
+import { t } from '../i18n'
+
+// простой ключ
+<p>{t('status.waiting')}</p>
+
+// с плейсхолдером
+<p>{t('chat.typing', { name: 'Оператор' })}</p>
+
+```
 
 ## Сборка
 
