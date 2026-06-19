@@ -1,5 +1,5 @@
 import type { HostCommand } from '@bankchat/protocol'
-import { hostBridge } from './bridge'
+import { hostBridge } from '../bridge'
 
 type Listener = () => void
 
@@ -9,7 +9,7 @@ export interface ChatState {
 
 const initialState: ChatState = { isOpen: false }
 
-class ChatStore {
+export class ChatStore {
   private state: ChatState = initialState
   private readonly listeners = new Set<Listener>()
 
