@@ -4,3 +4,9 @@ dist/
 *.local
 .env
 .DS_Store
+
+
+# Claude
+CLAUDE.md
+docs
+.claude

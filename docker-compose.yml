@@ -7,6 +7,9 @@ services:
   bankchat:
     build:
       context: .
+      args:
+        # Переопределить allowlist origin'ов для виджета (через запятую).
+        # VITE_ALLOWED_PARENTS: "https://bank.com,https://dbo.bank.com"
     image: bankchat:local
     ports:
       - "8080:8080"
