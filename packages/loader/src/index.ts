@@ -1,4 +1,5 @@
-// BankChatClient implementation will be added in Stage 2.
-export const ChatSDK = {
-  version: '0.0.1',
-}
+import { BankChatClient } from './client'
+
+window.ChatSDK = window.ChatSDK ?? new BankChatClient()
+
+export const ChatSDK = window.ChatSDK
