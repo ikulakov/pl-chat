@@ -29,6 +29,11 @@ RUN pnpm install --frozen-lockfile
 
 # Исходники + сборка prod-пакетов (только packages/*, tools/ не собирается).
 COPY . .
+
+# Allowlist родительских origin'ов для виджета (запятые как разделитель).
+ARG VITE_ALLOWED_PARENTS
+ENV VITE_ALLOWED_PARENTS=$VITE_ALLOWED_PARENTS
+
 RUN pnpm build
 
 # ── Stage 2: runtime (nginx, отдача статики) ─────────────────────────────────
