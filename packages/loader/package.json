@@ -16,6 +16,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
   },
@@ -23,7 +24,9 @@
     "@bankchat/protocol": "workspace:*"
   },
   "devDependencies": {
+    "jsdom": "^26.0.0",
     "tsup": "^8.4.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^3.0.0"
   }
 }
