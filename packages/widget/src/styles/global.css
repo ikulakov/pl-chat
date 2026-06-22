@@ -1,0 +1,14 @@
+@import '@fontsource-variable/onest';
+@import './variables.css';
+
+/* Prevent scroll from leaking out of the iframe to the host page */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+*,
+*::before,
+*::after {
+  font-family: var(--font);
+}

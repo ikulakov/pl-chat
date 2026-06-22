@@ -1,0 +1,43 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.row {
+  display: flex;
+  gap: 4px;
+}
+
+.chip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 16px;
+  background: var(--c-surface-secondary);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 18px;
+  letter-spacing: -0.1px;
+  color: var(--c-text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  text-align: center;
+}
+
+.chip:hover {
+  background: var(--c-surface-secondary-hover);
+}
+
+/* Last standalone chip — rounded bottom corners wider */
+.chipFull {
+  composes: chip;
+  flex: none;
+  width: 100%;
+  border-radius: 8px 8px 16px 16px;
+}
