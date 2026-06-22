@@ -1,0 +1,7 @@
+{
+  "i18n-ally.localesPaths": ["packages/widget/src/i18n/locale"],
+  "i18n-ally.keystyle": "flat",
+  "i18n-ally.enabledParsers": ["json"],
+  "i18n-ally.sourceLanguage": "ru",
+  "i18n-ally.displayLanguage": "ru"
+}

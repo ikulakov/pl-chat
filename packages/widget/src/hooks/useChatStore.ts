@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { chatStore } from '../store'
+import { chatStore } from '../store/chatStore'
 
 export function useChatStore() {
   const isOpen = useSyncExternalStore(

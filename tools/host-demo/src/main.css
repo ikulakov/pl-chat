@@ -19,47 +19,67 @@ button {
 
 #fab {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #a06ec5;
+  bottom: 17px;
+  right: 17px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #bdf70d;
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s ease, background 0.15s ease;
+  color: #1a1a1a;
+  transition: transform 0.15s ease;
   z-index: 9999;
+  overflow: hidden;
+  padding: 0;
 }
 
 #fab:hover {
-  background: #8a5aad;
-  transform: scale(1.08);
+    background: #ade307;
 }
 
-#fab:active {
-  transform: scale(0.95);
+/* Icons */
+.fab-icon {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
-#fab svg {
-  width: 26px;
-  height: 26px;
-  fill: #fff;
+/* Default: show chat icon, hide close */
+.fab-icon-chat {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+.fab-icon-close {
+  opacity: 0;
+  transform: rotate(-45deg) scale(0.7);
 }
 
+/* Open state: show close icon, hide chat */
+#fab[aria-expanded="true"] .fab-icon-chat {
+  opacity: 0;
+  transform: rotate(45deg) scale(0.7);
+}
+#fab[aria-expanded="true"] .fab-icon-close {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+/* Badge */
 #fab-badge {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  background: #e53935;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 200px;
+  background: #ff7f32;
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   display: none;
   align-items: center;

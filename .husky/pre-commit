@@ -19,4 +19,4 @@ if [ -n "$STAGED" ]; then
   done <<< "$STAGED"
 fi
 
-pnpm lint && pnpm typecheck
+turbo lint typecheck test

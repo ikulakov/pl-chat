@@ -3,11 +3,13 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "noEmit": true,
+    "resolveJsonModule": true,
     "erasableSyntaxOnly": true,
     "types": ["vite/client"],
     "paths": {
       "@bankchat/protocol": ["../protocol/src/index.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

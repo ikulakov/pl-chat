@@ -1,0 +1,11 @@
+{
+  "input.placeholder": "Message…",
+  "input.attachFile": "Attach file",
+
+  "chat.search": "Search",
+  "chat.menu": "Menu",
+
+  "status.connecting": "Connecting…",
+  "status.waiting": "Waiting for operator…",
+  "status.ended": "Conversation ended"
+}
