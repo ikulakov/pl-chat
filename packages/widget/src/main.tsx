@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { hostBridge } from './bridge'
 import { chatStore } from './store/chatStore'
-import './styles/variables.css'
+import './styles/global.css'
 
 hostBridge.connect((cmd) => chatStore.handleCommand(cmd))
 

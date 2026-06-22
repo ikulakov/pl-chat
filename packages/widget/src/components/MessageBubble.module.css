@@ -1,0 +1,67 @@
+/* Base bubble layout */
+.bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 8px 16px;
+  max-width: 388px;
+  word-break: break-word;
+}
+
+/* Bot bubble — left side, white */
+.bot {
+  align-self: flex-start;
+  background: var(--c-surface-primary);
+  border: 1px solid var(--c-border);
+  color: var(--c-text-primary);
+}
+
+/* User bubble — right side, dark */
+.user {
+  align-self: flex-end;
+  background: var(--c-surface-contrast);
+  color: var(--c-text-invert);
+}
+
+/* Border radius variants for bot (tail bottom-left = 4px) */
+.bot.single   { border-radius: 16px 16px 8px 4px; }
+.bot.first    { border-radius: 16px 16px 8px 8px; }
+.bot.middle   { border-radius: 8px  8px  8px 8px; }
+.bot.last     { border-radius: 8px  8px  16px 4px; }
+
+/* Border radius for user (tail bottom-right = 4px) */
+.user.single  { border-radius: 16px 16px 4px 16px; }
+.user.first   { border-radius: 16px 16px 8px 16px; }
+.user.middle  { border-radius: 8px  8px  8px 8px; }
+.user.last    { border-radius: 8px  8px  4px 16px; }
+
+.text {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 18px;
+  letter-spacing: -0.1px;
+  white-space: pre-wrap;
+  width: 100%;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.time {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: normal;
+  color: var(--c-text-disabled);
+  text-align: right;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.user .time {
+  color: var(--c-text-invert-dim);
+}

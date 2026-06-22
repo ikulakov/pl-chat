@@ -1,0 +1,59 @@
+.header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-h);
+  padding: 0 16px 0 20px;
+  background: var(--c-surface-primary);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: -0.1px;
+  color: var(--c-text-primary);
+  white-space: nowrap;
+}
+
+.status {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 14px;
+  letter-spacing: 0.1px;
+  color: var(--c-text-tertiary);
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--c-surface-tertiary);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--c-text-primary);
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.iconBtn:hover {
+  background: var(--c-surface-secondary);
+}

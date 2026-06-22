@@ -14,9 +14,14 @@
     </div>
     <pre id="log">Log:</pre>
 
-    <button id="fab" aria-label="Открыть чат поддержки">
-      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <button id="fab" aria-label="Открыть чат поддержки" aria-expanded="false">
+      <!-- Chat icon — default (closed) state -->
+      <svg class="fab-icon fab-icon-chat" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
         <path d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 12H6l-2 2V4h16v10z"/>
+      </svg>
+      <!-- Close (X) icon — open state -->
+      <svg class="fab-icon fab-icon-close" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span id="fab-badge"></span>
     </button>

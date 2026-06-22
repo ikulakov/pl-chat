@@ -1,0 +1,32 @@
+:root {
+  /* Text */
+  --c-text-primary: #222;
+  --c-text-tertiary: #717171;
+  --c-text-disabled: #ababab;
+  --c-text-placeholder: #909090;
+  --c-text-invert: #fff;
+  --c-text-invert-dim: rgba(255, 255, 255, 0.6);
+
+  /* Surfaces */
+  --c-surface-primary: #fff;
+  --c-surface-secondary: #f3f4f6;
+  --c-surface-secondary-hover: #e8e9eb;
+  --c-surface-tertiary: #f9f9fa;
+  --c-surface-contrast: #222;
+  --c-surface-purple: #35165c;
+
+  /* Borders */
+  --c-border: #f3f4f6;
+  --c-scrollbar: #e2e4e6;
+
+  /* Accent */
+  --c-orange: #ff7f32;
+  --c-lime: #ade307;
+  --c-purple-light: #ba93fd;
+
+  /* Typography */
+  --font: 'Onest Variable', system-ui, sans-serif;
+
+  /* Sizes */
+  --header-h: 64px;
+}

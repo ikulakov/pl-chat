@@ -65,7 +65,7 @@ export class IframeView {
       return
     }
     Object.assign(this.iframe.style, {
-      inset: 'auto 24px 24px auto',
+      inset: 'auto 17px 80px auto',
       width: '444px',
       height: '656px',
       opacity: '1',
