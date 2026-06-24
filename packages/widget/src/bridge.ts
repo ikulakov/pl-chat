@@ -9,7 +9,12 @@ import {
 
 type CommandHandler = (cmd: HostCommand) => void
 
-class HostBridge {
+export interface HostBridge {
+  connect(handler: CommandHandler): void
+  send(event: ChatEvent): void
+}
+
+export class IframeBridge implements HostBridge {
   private readonly allowedParents: string[] = (
     import.meta.env.VITE_ALLOWED_PARENTS ?? 'http://localhost:5173'
   )
@@ -77,5 +82,3 @@ class HostBridge {
     this.handler?.(e.data.msg)
   }
 }
-
-export const hostBridge = new HostBridge()

@@ -47,25 +47,24 @@
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--c-border) transparent;
-}
 
-.input::placeholder {
-  color: var(--c-text-placeholder);
-}
+  &::placeholder {
+    color: var(--c-text-placeholder);
+  }
 
-.input::-webkit-scrollbar {
-  width: 4px;
-}
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
 
-.input::-webkit-scrollbar-track {
-  background: transparent;
-}
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-.input::-webkit-scrollbar-thumb {
-  background: var(--c-border);
-  border-radius: 2px;
+  &::-webkit-scrollbar-thumb {
+    background: var(--c-border);
+    border-radius: 2px;
+  }
 }
-
 
 .rightBtns {
   display: flex;

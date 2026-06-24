@@ -3,5 +3,13 @@
   "i18n-ally.keystyle": "flat",
   "i18n-ally.enabledParsers": ["json"],
   "i18n-ally.sourceLanguage": "ru",
-  "i18n-ally.displayLanguage": "ru"
+  "i18n-ally.displayLanguage": "ru",
+  // Цвет текста для переведённых ключей
+  "i18n-ally.theme.annotation": "#CE9178",
+  // Цвет рамки для переведённых ключей
+  "i18n-ally.theme.annotationBorder": "transparent",
+  // Цвет текста для НЕпереведённых ключей
+  "i18n-ally.theme.annotationMissing": "#d37070",
+  // Цвет рамки для НЕпереведённых ключей
+  "i18n-ally.theme.annotationMissingBorder": "#d37070"
 }

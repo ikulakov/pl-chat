@@ -14,6 +14,20 @@
   background: var(--c-surface-primary);
   border: 1px solid var(--c-border);
   color: var(--c-text-primary);
+
+  /* tail bottom-left = 4px */
+  &.single {
+    border-radius: 16px 16px 8px 4px;
+  }
+  &.first {
+    border-radius: 16px 16px 8px 8px;
+  }
+  &.middle {
+    border-radius: 8px 8px 8px 8px;
+  }
+  &.last {
+    border-radius: 8px 8px 16px 4px;
+  }
 }
 
 /* User bubble — right side, dark */
@@ -21,19 +35,21 @@
   align-self: flex-end;
   background: var(--c-surface-contrast);
   color: var(--c-text-invert);
+
+  /* tail bottom-right = 4px */
+  &.single {
+    border-radius: 16px 16px 4px 16px;
+  }
+  &.first {
+    border-radius: 16px 16px 8px 16px;
+  }
+  &.middle {
+    border-radius: 8px 8px 8px 8px;
+  }
+  &.last {
+    border-radius: 8px 8px 4px 16px;
+  }
 }
-
-/* Border radius variants for bot (tail bottom-left = 4px) */
-.bot.single   { border-radius: 16px 16px 8px 4px; }
-.bot.first    { border-radius: 16px 16px 8px 8px; }
-.bot.middle   { border-radius: 8px  8px  8px 8px; }
-.bot.last     { border-radius: 8px  8px  16px 4px; }
-
-/* Border radius for user (tail bottom-right = 4px) */
-.user.single  { border-radius: 16px 16px 4px 16px; }
-.user.first   { border-radius: 16px 16px 8px 16px; }
-.user.middle  { border-radius: 8px  8px  8px 8px; }
-.user.last    { border-radius: 8px  8px  4px 16px; }
 
 .text {
   font-size: 14px;
@@ -64,4 +80,17 @@
 
 .user .time {
   color: var(--c-text-invert-dim);
+}
+
+.statusSending {
+  font-size: 18px;
+  line-height: 12px;
+  color: var(--c-text-invert-dim);
+  opacity: 0.5;
+}
+
+.statusFailed {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-danger, #e53935);
 }

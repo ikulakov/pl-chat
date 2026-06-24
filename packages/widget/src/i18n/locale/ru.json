@@ -1,11 +1,22 @@
 {
   "input.placeholder": "Сообщение…",
   "input.attachFile": "Прикрепить файл",
+  "input.stickers": "Смайлы и стикеры",
+  "input.send": "Отправить",
 
   "chat.search": "Поиск",
   "chat.menu": "Меню",
 
-  "status.connecting": "Подключение…",
-  "status.waiting": "Ожидание оператора…",
+  "header.name": "Помощник ОТП",
+  "header.subtitle": "Виртуальный ассистент онлайн",
+
+  "status.loading": "Загрузка",
+  "status.connecting": "Подключаем...",
+  "status.connecting.subtitle": "Соединяем с контакт-центром",
+  "status.waiting": "Ожидаем оператора",
+  "status.waiting.subtitle": "Как только освободится — сразу напишет",
+  "status.error": "Не удалось загрузить данные",
+  "status.error.subtitle": "Пожалуйста, проверьте подключение к интернету и попробуйте снова",
+  "status.error.retry": "Попробовать еще раз",
   "status.ended": "Диалог завершён"
 }
