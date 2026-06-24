@@ -9,9 +9,18 @@ export function setUnauthorizedHandler(handler: () => void): void {
   onUnauthorized = handler
 }
 
+function makeTraceparent(): string {
+  const hex = (n: number) =>
+    [...crypto.getRandomValues(new Uint8Array(n))]
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+  return `00-${hex(16)}-${hex(8)}-01`
+}
+
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    traceparent: makeTraceparent(),
     ...(options?.headers as Record<string, string>),
   }
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
