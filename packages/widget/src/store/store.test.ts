@@ -62,7 +62,6 @@ describe('panel slice — idempotency', () => {
   let store: ReturnType<typeof createChatStore>
 
   beforeEach(() => {
-    vi.clearAllMocks()
     vi.mocked(matrixApi.registerGuest).mockResolvedValue(GUEST)
     vi.mocked(matrixApi.initialSync).mockResolvedValue(syncWaiting)
     vi.mocked(matrixApi.longPollSync).mockImplementation(suspendLoop)
@@ -135,7 +134,6 @@ describe('connection slice — guestConnect status transitions', () => {
   let store: ReturnType<typeof createChatStore>
 
   beforeEach(() => {
-    vi.clearAllMocks()
     vi.mocked(matrixApi.longPollSync).mockImplementation(suspendLoop)
     store = createChatStore(makeBridge())
   })
@@ -198,7 +196,6 @@ describe('messages slice — optimistic send', () => {
   const session = { userId: GUEST.user_id, roomId: ROOM_ID, syncCursor: 'b1' }
 
   beforeEach(() => {
-    vi.clearAllMocks()
     vi.mocked(matrixApi.longPollSync).mockImplementation(suspendLoop)
     store = createChatStore(makeBridge())
     store.setState({ session })
@@ -309,7 +306,6 @@ describe('mergeMessages — deduplication invariants', () => {
 
 describe('initChatStore — connection chain', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     vi.mocked(matrixApi.registerGuest).mockResolvedValue(GUEST)
     vi.mocked(matrixApi.initialSync).mockResolvedValue(syncWaiting)
     vi.mocked(matrixApi.longPollSync).mockImplementation(suspendLoop)

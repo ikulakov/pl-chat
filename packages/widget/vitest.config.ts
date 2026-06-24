@@ -9,6 +9,7 @@ export default mergeConfig(
       environment: 'jsdom',
       globals: true,
       setupFiles: ['./test.setup.ts'],
+      clearMocks: true,
       typecheck: {
         tsconfig: './tsconfig.test.json',
       },
