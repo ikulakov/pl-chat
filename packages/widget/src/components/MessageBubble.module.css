@@ -1,4 +1,3 @@
-/* Base bubble layout */
 .bubble {
   display: flex;
   flex-direction: column;
@@ -8,8 +7,8 @@
   word-break: break-word;
 }
 
-/* Bot bubble — left side, white */
-.bot {
+/* Operator bubble — left side, white */
+.operator {
   align-self: flex-start;
   background: var(--c-surface-primary);
   border: 1px solid var(--c-border);
