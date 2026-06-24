@@ -1,66 +1,52 @@
-import { useScrollClass } from '../hooks/useScrollClass'
-import { cn } from '../shared/cn'
-import styles from './ChatPanel.module.css'
+import { t } from '../i18n'
+import { Spinner } from '../shared/ui/Spinner'
+import { useChatStore } from '../store'
+import chatStyles from './ChatPanel.module.css'
 import { Header } from './Header'
-import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
-import { QuickReplies } from './QuickReplies'
-
-const QUICK_REPLY_ROWS = [
-  ['Баланс и лимиты', 'Заявка на карту'],
-  ['Комиссия', 'Снятие валюты'],
-  ['Инвестиции', 'Условия по вкладам'],
-]
+import { MessageList } from './MessageList'
+import { StatusScreen } from './StatusScreen'
+import statusStyles from './StatusScreen.module.css'
 
 export function ChatPanel() {
-  const handleScroll = useScrollClass(styles.scrolling!)
+  const status = useChatStore((s) => s.status)
+  const retry = useChatStore((s) => s.retry)
 
   return (
-    <div className={styles.panel}>
+    <div className={chatStyles.panel}>
       <Header
-        name="Помощник ОТП"
-        subtitle="Виртуальный ассистент онлайн"
+        name={t('header.name')}
+        subtitle={t('header.subtitle')}
       />
 
-      <div className={styles.messagesWrap}>
-        <div
-          className={styles.messages}
-          onScroll={handleScroll}
-        >
-          <div className={styles.dateSep}>
-            <span className={styles.dateSepLabel}>15 июня</span>
-          </div>
+      {(status === 'connecting' || status === 'waiting') && (
+        <StatusScreen>
+          <Spinner />
+        </StatusScreen>
+      )}
 
-          <div className={styles.group}>
-            <MessageBubble
-              type="bot"
-              position="single"
-              time="11:40"
+      {status === 'error' && (
+        <StatusScreen
+          title={t('status.error')}
+          subtitle={t('status.error.subtitle')}
+          illustration="/error-illustration.png"
+          action={
+            <button
+              className={statusStyles.retryBtn}
+              onClick={retry}
             >
-              {
-                'Здравствуйте!\nЯ виртуальный помощник ОТП. Помогу с типовыми\nвопросами - выберите тему или напишите свой вопрос'
-              }
-            </MessageBubble>
-            <QuickReplies
-              rows={QUICK_REPLY_ROWS}
-              lastRow="Связаться с оператором"
-            />
-          </div>
+              {t('status.error.retry')}
+            </button>
+          }
+        />
+      )}
 
-          {/* Сообщение пользователя */}
-          <div className={cn(styles.group, styles.groupUser)}>
-            <MessageBubble
-              type="user"
-              position="single"
-              time="11:40"
-              status="read"
-            >
-              Условия по вкладам
-            </MessageBubble>
-          </div>
-        </div>
-      </div>
-      <MessageInput />
+      {(status === 'active' || status === 'idle') && (
+        <>
+          <MessageList />
+          <MessageInput />
+        </>
+      )}
     </div>
   )
 }

@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { AttachIcon, SendIcon, StickerIcon } from './icons'
+import { useRef, useState } from 'react'
+import { t } from '../i18n'
+import { useChatStore } from '../store'
+import { AttachIcon, SendIcon } from './icons'
 import styles from './MessageInput.module.css'
 
 interface Props {
@@ -20,8 +22,11 @@ function resize(el: HTMLTextAreaElement) {
   }
 }
 
-export function MessageInput({ placeholder = 'Сообщение…' }: Props) {
+export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
   const [hasText, setHasText] = useState(false)
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sendText = useChatStore((s) => s.sendText)
 
   function handleInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const el = e.currentTarget
@@ -29,33 +34,56 @@ export function MessageInput({ placeholder = 'Сообщение…' }: Props) {
     setHasText(el.value.trim().length > 0)
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      submit()
+    }
+  }
+
+  function submit() {
+    const el = textareaRef.current
+    if (!el) return
+    const text = el.value.trim()
+    if (!text) return
+
+    el.value = ''
+    resize(el)
+    setHasText(false)
+
+    void sendText(text)
+  }
+
   return (
     <div className={styles.wrap}>
       <div className={styles.field}>
         <button
           className={styles.attachBtn}
-          aria-label="Прикрепить файл"
+          aria-label={t('input.attachFile')}
         >
           <AttachIcon />
         </button>
         <textarea
+          ref={textareaRef}
           className={styles.input}
           placeholder={placeholder}
           aria-label={placeholder}
           rows={1}
           onChange={handleInput}
+          onKeyDown={handleKeyDown}
         />
         <div className={styles.rightBtns}>
-          <button
+          {/* <button
             className={styles.iconBtn}
-            aria-label="Смайлы и стикеры"
+            aria-label={t('input.stickers')}
           >
             <StickerIcon />
-          </button>
+          </button> */}
           {hasText && (
             <button
               className={styles.sendBtn}
-              aria-label="Отправить"
+              aria-label={t('input.send')}
+              onClick={submit}
             >
               <SendIcon />
             </button>

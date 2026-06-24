@@ -1,0 +1,67 @@
+.wrap {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.list {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 8px 0 4px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s;
+
+  &.scrolling {
+    scrollbar-color: var(--c-scrollbar) transparent;
+  }
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 2px;
+    transition: background 0.2s;
+  }
+
+  &.scrolling::-webkit-scrollbar-thumb {
+    background: var(--c-scrollbar);
+  }
+}
+
+.dateSep {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 16px;
+}
+
+.dateSepLabel {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 14px;
+  color: var(--c-text-tertiary);
+  background: var(--c-surface-tertiary);
+  padding: 4px 12px;
+  border-radius: 16px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 8px;
+  margin-bottom: 8px;
+}
+
+.groupUser {
+  align-items: flex-end;
+}

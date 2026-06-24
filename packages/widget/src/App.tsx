@@ -1,14 +1,12 @@
 import { Activity } from 'react'
 import { ChatPanel } from './components/ChatPanel'
-import { useChatStore } from './hooks/useChatStore'
-
-const isStandalone = import.meta.env.DEV && window.parent === window
+import { useChatStore } from './store'
 
 export function App() {
-  const { isOpen } = useChatStore()
+  const isOpen = useChatStore((s) => s.isOpen)
 
   return (
-    <Activity mode={isOpen || isStandalone ? 'visible' : 'hidden'}>
+    <Activity mode={isOpen ? 'visible' : 'hidden'}>
       <ChatPanel />
     </Activity>
   )
