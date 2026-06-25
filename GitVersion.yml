@@ -9,3 +9,15 @@ legacy-semver-padding: 4
 build-metadata-padding: 4
 commits-since-version-source-padding: 4
 commit-message-incrementing: Enabled
+branches:
+  release:
+    regex: ^release$
+    mode: ContinuousDelivery
+    tag: ''
+    increment: None
+    prevent-increment-of-merged-branch-version: true
+    track-merge-target: false
+    tracks-release-branches: false
+    is-release-branch: true
+
+    
