@@ -1,0 +1,11 @@
+mode: Mainline
+increment: Inherit
+tag-prefix: '\[vV\]'
+major-version-bump-message: 'from\s?(breaking|major)'
+minor-version-bump-message: 'from\s?(feature|minor)'
+patch-version-bump-message: 'from:\s?(fix|bugfix|hotfix|patch)'
+no-bump-message: 'from\s?(none|skip|doc|tests)'
+legacy-semver-padding: 4
+build-metadata-padding: 4
+commits-since-version-source-padding: 4
+commit-message-incrementing: Enabled
