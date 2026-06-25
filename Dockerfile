@@ -14,6 +14,10 @@
 FROM nexus.isb/plchat-nonprod-docker-hosted/node:24-alpine-obru AS build
 WORKDIR /app
 
+ENV COREPACK_NPM_REGISTRY="https://nexus.isb/repository/npmjs-npm-proxy/"
+ENV NODE_EXTRA_CA_CERTS="/etc/ssl/certs/ca-certificates.crt"
+ENV npm_config_registry="https://nexus.isb/repository/npmjs-npm-proxy/"
+
 # Версия из package.json#packageManager — воспроизводимая сборка.
 RUN corepack enable && corepack prepare pnpm@10.34.3 --activate
 
@@ -24,9 +28,6 @@ COPY packages/loader/package.json    packages/loader/
 COPY packages/widget/package.json    packages/widget/
 COPY tools/host-demo/package.json    tools/host-demo/
 COPY tools/matrix-mock/package.json  tools/matrix-mock/
-
-ENV NODE_EXTRA_CA_CERTS="/etc/ssl/certs/ca-certificates.crt"
-ENV npm_config_registry="https://nexus.isb/repository/npmjs-npm-proxy/"
 
 RUN pnpm install --frozen-lockfile
 
