@@ -2,13 +2,13 @@ import { useEffect, useRef } from 'react'
 import { useScrollClass } from '../hooks/useScrollClass'
 import { cn } from '../shared/cn'
 import { formatTime } from '../shared/formatTime'
-import { useChatStore } from '../store'
+import { useChatStore } from '../hooks/useChatStore'
 import { MessageBubble } from './MessageBubble'
 import styles from './MessageList.module.css'
 
 export function MessageList() {
   const messages = useChatStore((s) => s.messages)
-  const userId = useChatStore((s) => s.session?.userId)
+  const userId = useChatStore((s) => s.userId)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const handleScroll = useScrollClass(styles.scrolling!)

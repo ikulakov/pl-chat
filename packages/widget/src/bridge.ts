@@ -10,7 +10,7 @@ import {
 type CommandHandler = (cmd: HostCommand) => void
 
 export interface HostBridge {
-  connect(handler: CommandHandler): void
+  setCommandHandler(handler: CommandHandler): void
   send(event: ChatEvent): void
 }
 
@@ -28,7 +28,7 @@ export class IframeBridge implements HostBridge {
     this.sendReady()
   }
 
-  connect(handler: CommandHandler): void {
+  setCommandHandler(handler: CommandHandler): void {
     this.handler = handler
   }
 

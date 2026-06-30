@@ -167,7 +167,7 @@ function operatorRespond(text) {
       // m.room.member leave — наш findOperator перестаёт видеть оператора.
       push("m.room.member", OP, { membership: "leave", displayname: "Оля" }, OP);
       push("kc.operator.left", OP, { operator_id: "olya42", reason: "completed" });
-      push("kc.operator.current", OP, { status: "LEFT", operator_id: null }, "");
+      push("kc.operator.current", OP, { status: "left", operator_id: null }, "");
     });
     return;
   }

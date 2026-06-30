@@ -1,6 +1,7 @@
+import { useChatActions } from '../hooks/useChatActions'
+import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
 import { Spinner } from '../shared/ui/Spinner'
-import { useChatStore } from '../store'
 import chatStyles from './ChatPanel.module.css'
 import { Header } from './Header'
 import { MessageInput } from './MessageInput'
@@ -10,7 +11,7 @@ import statusStyles from './StatusScreen.module.css'
 
 export function ChatPanel() {
   const status = useChatStore((s) => s.status)
-  const retry = useChatStore((s) => s.retry)
+  const { retry } = useChatActions()
 
   return (
     <div className={chatStyles.panel}>

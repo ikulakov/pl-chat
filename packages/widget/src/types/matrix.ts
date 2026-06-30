@@ -1,4 +1,4 @@
-import type { MatrixEventType } from '../shared/matrixConst'
+import type { MatrixEventType } from '../matrix/consts'
 
 interface BaseClientEvent {
   event_id: string
@@ -9,12 +9,23 @@ interface BaseClientEvent {
 
 export interface RoomMessageEvent extends BaseClientEvent {
   type: typeof MatrixEventType.RoomMessage
-  content: { msgtype: string; body: string; url?: string | undefined }
+  content: {
+    msgtype: string
+    body: string
+    url?: string
+  }
 }
 
 export interface OperatorCurrentEvent extends BaseClientEvent {
   type: typeof MatrixEventType.OperatorCurrent
-  content: { status?: string | undefined }
+  state_key: ''
+  content: {
+    status: 'active' | 'left'
+    operator_id?: string
+    displayname?: string
+    avatar_url?: string
+    since_ts?: number
+  }
 }
 
 export interface GenericClientEvent extends BaseClientEvent {

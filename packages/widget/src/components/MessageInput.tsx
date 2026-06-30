@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
+import { useChatActions } from '../hooks/useChatActions'
 import { t } from '../i18n'
-import { useChatStore } from '../store'
 import { AttachIcon, SendIcon } from './icons'
 import styles from './MessageInput.module.css'
 
@@ -26,7 +26,7 @@ export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
   const [hasText, setHasText] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const sendText = useChatStore((s) => s.sendText)
+  const { sendMessage } = useChatActions()
 
   function handleInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const el = e.currentTarget
@@ -51,7 +51,7 @@ export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
     resize(el)
     setHasText(false)
 
-    void sendText(text)
+    void sendMessage(text)
   }
 
   return (

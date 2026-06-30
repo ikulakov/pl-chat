@@ -73,7 +73,8 @@
   line-height: normal;
   color: var(--c-text-disabled);
   text-align: right;
-  width: 28px;
+  min-width: 28px;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
