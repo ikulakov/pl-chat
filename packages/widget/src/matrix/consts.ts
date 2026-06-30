@@ -8,6 +8,6 @@ export const MsgType = {
 } as const
 
 export const OperatorStatus = {
-  Active: 'ACTIVE',
-  Left: 'LEFT',
+  Active: 'active',
+  Left: 'left',
 } as const

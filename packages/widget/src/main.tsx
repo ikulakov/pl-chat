@@ -2,14 +2,15 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { IframeBridge } from './bridge'
-import { initChatStore } from './store'
+import { initChatController } from './chatController'
 import './styles/global.css'
 
-const store = initChatStore(new IframeBridge())
+const bridge = new IframeBridge()
+const controller = initChatController(bridge)
 
 // Standalone dev mode
 if (import.meta.env.DEV && window.parent === window) {
-  store.getState().handleCommand({ type: 'OPEN' })
+  controller.handleHostCommand({ type: 'OPEN' })
 }
 
 const root = document.getElementById('root')

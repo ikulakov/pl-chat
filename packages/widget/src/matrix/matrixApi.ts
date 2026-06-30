@@ -1,5 +1,5 @@
-import { MsgType } from '../shared/matrixConst'
 import type { RegisterResponse, SyncResponse } from '../types/requests'
+import { MsgType } from './consts'
 import { request } from './httpClient'
 
 export const matrixApi = {
@@ -35,3 +35,5 @@ export const matrixApi = {
     )
   },
 }
+
+export type MatrixApi = typeof matrixApi

@@ -1,3 +1,5 @@
+const BASE_URL: string = import.meta.env.VITE_HOMESERVER_URL ?? ''
+
 let accessToken: string | null = null
 let onUnauthorized: (() => void) | null = null
 
@@ -25,7 +27,7 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   }
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
 
-  const response = await fetch(`/_matrix/client/v3${path}`, { ...options, headers })
+  const response = await fetch(`${BASE_URL}/_matrix/client/v3${path}`, { ...options, headers })
 
   if (response.status === 401) {
     onUnauthorized?.()

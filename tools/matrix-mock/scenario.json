@@ -30,7 +30,7 @@
       "type": "kc.operator.current",
       "state_key": "",
       "sender": "@operatorkc:bank.ru",
-      "content": { "status": "ACTIVE", "operator_id": "olya42", "displayname": "Оля", "role": "human" }
+      "content": { "status": "active", "operator_id": "olya42", "displayname": "Оля" }
     },
     {
       "type": "m.room.message",
