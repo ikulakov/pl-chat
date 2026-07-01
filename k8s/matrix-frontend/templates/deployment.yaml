@@ -11,15 +11,6 @@ spec:
     metadata:
       labels:
         app: {{ .Values.deploy.name }}
-      # Аннотации для kubernetes_sd_configs из k8s/observability/prometheus.yaml —
-      # Prometheus сам найдёт pod, переключится на /actuator/prometheus.
-      # Management endpoints висят на 9091 (см. management.server.port в
-      # application.yml) — отдельный Tomcat-connector + thread pool, изолирует
-      # health/metrics от боевого трафика 8080.
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/actuator/prometheus"
-        prometheus.io/port: "9091"
     spec:
       imagePullSecrets:
       - name: nexus
@@ -35,23 +26,6 @@ spec:
               containerPort: 8080
             - name: management
               containerPort: 9091
-          envFrom:
-            - configMapRef:
-                name: {{ .Values.deploy.name }}-config
-          volumeMounts:
-            - name: jwt-keys
-              mountPath: /app/keys
-              readOnly: true
-            # Логи (ECS JSON через RollingFileAppender) пишутся в /app/logs.
-            # hostPath шарит каталог с fluent-bit DaemonSet'ом — он читает
-            # тот же файл прямо с хоста через свой /var/log/matrixkc mount.
-            - name: applogs
-              mountPath: /app/logs
-            # Media-файлы (см. matrixkc.media.fs.root): пробрасываем hostPath
-            # в /app/media. Между рестартами пода файлы переживают —
-            # `mxc://` ссылки в timeline остаются валидными.
-            - name: media
-              mountPath: /app/media
           # Probes рассчитаны на ~30-40 сек холодного старта (Liquibase + Spring context).
           # Стучатся в 9091 (management) — изолированы от 8080, не страдают
           # от выгоревшего пула основного connector'а.
@@ -76,15 +50,3 @@ spec:
             limits:
               cpu: "1000m"
               memory: "1Gi"
-      volumes:
-        - name: jwt-keys
-          secret:
-            secretName: {{ .Values.deploy.name }}-jwt-keys
-        - name: applogs
-          hostPath:
-            path: /var/log/matrixkc
-            type: DirectoryOrCreate
-        - name: media
-          hostPath:
-            path: /var/lib/matrixkc/media
-            type: DirectoryOrCreate
