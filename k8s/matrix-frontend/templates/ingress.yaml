@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: privatecloud-pki
+  name: {{ .Values.deploy.name }}
+  labels:
+    name: {{ .Values.deploy.name }}
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: {{ .Values.deploy.namecluster }}
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: {{ .Values.deploy.name }}
+            port:
+              number: 443
+  tls:
+  - hosts:
+    - {{ .Values.deploy.namecluster }}
+    secretName: {{ .Values.deploy.namecluster }}
