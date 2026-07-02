@@ -1,11 +1,22 @@
 {
   "input.placeholder": "Message…",
   "input.attachFile": "Attach file",
+  "input.stickers": "Stickers and emoji",
+  "input.send": "Send",
 
   "chat.search": "Search",
   "chat.menu": "Menu",
 
-  "status.connecting": "Connecting…",
-  "status.waiting": "Waiting for operator…",
+  "header.name": "OTP Assistant",
+  "header.subtitle": "Virtual assistant online",
+
+  "status.loading": "Loading",
+  "status.connecting": "Connecting...",
+  "status.connecting.subtitle": "Connecting to the contact center",
+  "status.waiting": "Waiting for operator",
+  "status.waiting.subtitle": "We'll connect you as soon as one is available",
+  "status.error": "Failed to load",
+  "status.error.subtitle": "Please check your internet connection and try again",
+  "status.error.retry": "Try again",
   "status.ended": "Conversation ended"
 }

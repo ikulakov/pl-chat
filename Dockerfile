@@ -31,6 +31,8 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Allowlist родительских origin'ов для виджета (запятые как разделитель).
+# ОБЯЗАТЕЛЬНЫЙ аргумент — виджет упадёт при старте если не задан.
+# Пример: --build-arg VITE_ALLOWED_PARENTS="https://bank.ru,https://dbo.bank.ru"
 ARG VITE_ALLOWED_PARENTS
 ENV VITE_ALLOWED_PARENTS=$VITE_ALLOWED_PARENTS
 

@@ -1,4 +1,5 @@
 import prettier from 'eslint-config-prettier'
+import i18next from 'eslint-plugin-i18next'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import globals from 'globals'
@@ -44,6 +45,27 @@ export default tseslint.config(
   {
     files: ['packages/widget/src/**/*.tsx'],
     ...reactRefresh.configs.vite,
+  },
+  {
+    files: ['packages/widget/src/**/*.tsx'],
+    plugins: { i18next },
+    rules: {
+      'i18next/no-literal-string': [
+        'error',
+        {
+          framework: 'react',
+          mode: 'jsx-only',
+          'jsx-attributes': {
+            // whitelist: только атрибуты с пользовательским текстом
+            include: ['aria-label', 'aria-placeholder', 'placeholder', 'title', 'subtitle', 'alt'],
+          },
+          words: {
+            // строки без латиницы и кириллицы: эмодзи, пунктуация, одиночные символы
+            exclude: ['^[^a-zA-Z\\u0400-\\u04ff]+$'],
+          },
+        },
+      ],
+    },
   },
 
   prettier,

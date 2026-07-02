@@ -28,10 +28,10 @@
   white-space: nowrap;
   transition: background 0.15s;
   text-align: center;
-}
 
-.chip:hover {
-  background: var(--c-surface-secondary-hover);
+  &:hover {
+    background: var(--c-surface-secondary-hover);
+  }
 }
 
 /* Last standalone chip — rounded bottom corners wider */
