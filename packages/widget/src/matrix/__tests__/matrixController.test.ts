@@ -8,7 +8,7 @@ import {
   syncResponse,
 } from '../../shared/testUtils/matrixFixtures'
 import type { MatrixApi } from '../matrixApi'
-import { MatrixController } from '../matrixController'
+import { CONNECTION_FAILED_ERROR, MatrixController } from '../matrixController'
 import { MatrixSessionManager } from '../session/sessionManager'
 import { MatrixError } from '../transport/matrixError'
 
@@ -49,7 +49,10 @@ describe('MatrixController (orchestrator)', () => {
 
     await controller.connect()
 
-    expect(applied.at(-1)).toEqual({ type: 'connection.failed', error: 'Не удалось подключиться' })
+    expect(applied.at(-1)).toEqual({
+      type: 'connection.failed',
+      error: CONNECTION_FAILED_ERROR,
+    })
   })
 
   it('does not connect when already connected', async () => {
@@ -120,6 +123,7 @@ describe('MatrixController (orchestrator)', () => {
 
     expect(api.registerGuest).toHaveBeenCalledTimes(2)
     expect(applied.some((action) => action.type === 'connection.failed')).toBe(false)
+    expect(applied.some((action) => action.type === 'session.recovering')).toBe(true)
   })
 
   it('stops and clears tokens when sync reports a deactivated user', async () => {
@@ -138,7 +142,7 @@ describe('MatrixController (orchestrator)', () => {
     await vi.waitFor(() =>
       expect(applied).toContainEqual({
         type: 'connection.failed',
-        error: 'Не удалось подключиться',
+        error: CONNECTION_FAILED_ERROR,
       }),
     )
 
@@ -162,7 +166,10 @@ describe('MatrixController (orchestrator)', () => {
 
     await controller.connect()
 
-    expect(applied.at(-1)).toEqual({ type: 'connection.failed', error: 'Не удалось подключиться' })
+    expect(applied.at(-1)).toEqual({
+      type: 'connection.failed',
+      error: CONNECTION_FAILED_ERROR,
+    })
     // Deactivation must not be silently worked around by registering a fresh guest —
     // that would defeat the server-side block.
     expect(api.registerGuest).not.toHaveBeenCalled()
@@ -274,6 +281,7 @@ describe('MatrixController (orchestrator)', () => {
     await vi.waitFor(() =>
       expect(applied.filter((action) => action.type === 'session.started')).toHaveLength(1),
     )
+    expect(applied).toContainEqual({ type: 'session.recovering' })
     controller.disconnect()
   })
 
@@ -285,7 +293,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
     })
-    const { controller } = harness(
+    const { controller, applied } = harness(
       { phase: 'connected', identity: { userId: '@u:bank', roomId: '!r:bank' } },
       api,
     )
@@ -301,12 +309,13 @@ describe('MatrixController (orchestrator)', () => {
     await controller.sendMessage('hi')
 
     expect(api.registerGuest).toHaveBeenCalledOnce()
+    expect(applied.filter((action) => action.type === 'session.recovering')).toHaveLength(1)
     recoverySync.resolve(syncResponse('s1'))
     await vi.waitFor(() => expect(api.initialSync).toHaveBeenCalledOnce())
     controller.disconnect()
   })
 
-  it('sendMessage treats user deactivation as a terminal session failure', async () => {
+  it('sendMessage clears tokens and reports connection failure on user deactivation', async () => {
     const api = makeMatrixApi({
       sendMessage: vi
         .fn<MatrixApi['sendMessage']>()
@@ -323,7 +332,7 @@ describe('MatrixController (orchestrator)', () => {
     expect(applied).toContainEqual({ type: 'message.failed', localId: expect.any(String) })
     expect(applied).toContainEqual({
       type: 'connection.failed',
-      error: 'Не удалось подключиться',
+      error: CONNECTION_FAILED_ERROR,
     })
     expect(api.registerGuest).not.toHaveBeenCalled()
     expect(tokens.getAccessToken()).toBeNull()

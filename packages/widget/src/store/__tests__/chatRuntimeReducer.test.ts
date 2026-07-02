@@ -105,6 +105,24 @@ describe('chatRuntimeReducer', () => {
     expect(failed.room.messages).toHaveLength(0)
   })
 
+  it('session.recovering keeps the current runtime data while recovery is in flight', () => {
+    const connected = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'session.started',
+      identity: IDENTITY,
+      cursor: 's1',
+      joinedRoom: joinedRoom(),
+    })
+    const withError = { ...connected, error: 'expired' }
+
+    const recovering = chatRuntimeReducer(withError, { type: 'session.recovering' })
+
+    expect(recovering.phase).toBe('recovering')
+    expect(recovering.error).toBeNull()
+    expect(recovering.identity).toEqual(IDENTITY)
+    expect(recovering.cursor).toBe('s1')
+    expect(recovering.room).toBe(connected.room)
+  })
+
   it('routes optimistic add / sent through the room reducer', () => {
     const withOptimistic = chatRuntimeReducer(
       { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },

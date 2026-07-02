@@ -2,6 +2,10 @@ import { MatrixEventType, OperatorStatus } from '../matrix/consts'
 import type { ClientEvent, OperatorCurrentEvent, RoomMessageEvent } from '../types/matrix'
 import type { ChatMessage, OperatorState } from './model'
 
+function isRoomMessage(event: ClientEvent): event is RoomMessageEvent {
+  return event.type === MatrixEventType.RoomMessage
+}
+
 export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
   const result = [...existing]
 
@@ -54,15 +58,13 @@ export function reduceOperator(current: OperatorState, events: ClientEvent[]): O
 }
 
 export function timelineToMessages(events: ClientEvent[] = []): ChatMessage[] {
-  return events
-    .filter((e): e is RoomMessageEvent => e.type === MatrixEventType.RoomMessage)
-    .map((e) => ({
-      localId: e.event_id,
-      eventId: e.event_id,
-      sender: e.sender,
-      body: e.content.body,
-      ts: e.origin_server_ts,
-      pending: false,
-      failed: false,
-    }))
+  return events.filter(isRoomMessage).map((e) => ({
+    localId: e.event_id,
+    eventId: e.event_id,
+    sender: e.sender,
+    body: e.content.body,
+    ts: e.origin_server_ts,
+    pending: false,
+    failed: false,
+  }))
 }

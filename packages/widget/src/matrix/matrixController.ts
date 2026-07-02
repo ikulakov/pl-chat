@@ -47,6 +47,7 @@ export class MatrixController implements MatrixService {
 
     await this.runConnectFlow(
       lifecycleId,
+      'connecting',
       () => this.sessionManager.establishSession(),
       (err) => {
         console.error('[PLChat] connect failed:', err)
@@ -90,10 +91,11 @@ export class MatrixController implements MatrixService {
 
   private async runConnectFlow(
     lifecycleId: number,
+    phase: 'connecting' | 'recovering',
     establish: () => Promise<GuestSession>,
     onFailure: (err: unknown) => void,
   ): Promise<void> {
-    this.dispatch({ type: 'connection.connecting' })
+    this.dispatch({ type: phase === 'recovering' ? 'session.recovering' : 'connection.connecting' })
 
     try {
       const session = await establish()
@@ -138,7 +140,7 @@ export class MatrixController implements MatrixService {
   private handleAuthError(err: unknown, context: string): boolean {
     if (isUserDeactivatedError(err)) {
       console.error(`[PLChat] ${context} user deactivated:`, err)
-      this.failTerminalSession()
+      this.failSession()
       return true
     }
 
@@ -161,6 +163,7 @@ export class MatrixController implements MatrixService {
 
     const recovery = this.runConnectFlow(
       lifecycleId,
+      'recovering',
       () => this.sessionManager.resetGuestSession(),
       (err) => console.error('[PLChat] session recovery failed:', err),
     )
@@ -172,7 +175,7 @@ export class MatrixController implements MatrixService {
     })
   }
 
-  private failTerminalSession(): void {
+  private failSession(): void {
     this.nextLifecycle()
     this.syncLoop.stop()
     this.sessionManager.clearSession()
