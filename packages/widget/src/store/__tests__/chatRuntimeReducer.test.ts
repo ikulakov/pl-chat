@@ -1,45 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { MatrixEventType, MsgType, OperatorStatus } from '../matrix/consts'
-import type { JoinedRoom } from '../types/matrix'
-import { chatRuntimeReducer } from './chatRuntimeReducer'
-import type { Identity } from './model'
-import { INITIAL_RUNTIME_STATE } from './store'
+import {
+  emptyJoinedRoom,
+  operatorCurrentEvent,
+  roomMessageEvent,
+} from '../../shared/testUtils/matrixFixtures'
+import type { JoinedRoom } from '../../types/matrix'
+import { chatRuntimeReducer } from '../chatRuntimeReducer'
+import type { Identity } from '../model'
+import { INITIAL_RUNTIME_STATE } from '../store'
 
 const IDENTITY: Identity = { userId: '@user:bank', roomId: '!room:bank' }
-const OPERATOR_ID = '@operator:bank'
 
 function joinedRoom(): JoinedRoom {
-  return {
-    state: {
-      events: [
-        {
-          type: MatrixEventType.OperatorCurrent,
-          state_key: '',
-          event_id: '$op',
-          sender: OPERATOR_ID,
-          origin_server_ts: 1,
-          content: {
-            status: OperatorStatus.Active,
-            operator_id: OPERATOR_ID,
-            displayname: 'Support',
-          },
-        },
-      ],
-    },
-    timeline: {
-      limited: true,
-      prev_batch: 'p1',
-      events: [
-        {
-          type: MatrixEventType.RoomMessage,
-          event_id: '$m1',
-          sender: OPERATOR_ID,
-          origin_server_ts: 2,
-          content: { msgtype: MsgType.Text, body: 'hello' },
-        },
-      ],
-    },
-  }
+  return emptyJoinedRoom({
+    state: { events: [operatorCurrentEvent()] },
+    timeline: { limited: true, prev_batch: 'p1', events: [roomMessageEvent()] },
+  })
 }
 
 describe('chatRuntimeReducer', () => {
@@ -56,6 +32,46 @@ describe('chatRuntimeReducer', () => {
     expect(next.cursor).toBe('s1')
     expect(next.room.messages).toHaveLength(1)
     expect(next.room.operator.isActive).toBe(true)
+  })
+
+  it('resets room state when a new session starts in a different room', () => {
+    const connected = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'session.started',
+      identity: IDENTITY,
+      cursor: 's1',
+      joinedRoom: joinedRoom(),
+    })
+    const withDraft = chatRuntimeReducer(connected, {
+      type: 'message.optimisticAdded',
+      message: {
+        localId: 'l1',
+        eventId: 'optimistic:l1',
+        sender: IDENTITY.userId,
+        body: 'old draft',
+        ts: 2,
+        pending: true,
+        failed: false,
+      },
+    })
+
+    const next = chatRuntimeReducer(withDraft, {
+      type: 'session.started',
+      identity: { userId: '@new:bank', roomId: '!new:bank' },
+      cursor: 's2',
+      joinedRoom: emptyJoinedRoom({
+        timeline: {
+          events: [
+            roomMessageEvent({
+              event_id: '$new',
+              content: { body: 'new session message' },
+              origin_server_ts: 3,
+            }),
+          ],
+        },
+      }),
+    })
+
+    expect(next.room.messages.map((message) => message.body)).toEqual(['new session message'])
   })
 
   it('sync.received WITHOUT a roomAction keeps the same room reference', () => {

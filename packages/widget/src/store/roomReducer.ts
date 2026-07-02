@@ -1,6 +1,5 @@
-import { timelineToMessages } from '../matrix/transforms'
 import type { JoinedRoom } from '../types/matrix'
-import { mergeMessages, mergeTimelineEvents, reduceOperator } from './helpers'
+import { mergeMessages, mergeTimelineEvents, reduceOperator, timelineToMessages } from './helpers'
 import type { RoomState, RuntimeAction } from './model'
 
 function applySync(room: RoomState, joinedRoom: JoinedRoom): RoomState {
@@ -33,7 +32,7 @@ export function roomReducer(room: RoomState, action: RuntimeAction): RoomState {
       return {
         ...room,
         messages: room.messages.map((m) =>
-          m.localId === action.localId ? { ...m, pending: false, failed: true } : m,
+          m.localId === action.localId && m.pending ? { ...m, pending: false, failed: true } : m,
         ),
       }
     default:

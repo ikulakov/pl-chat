@@ -18,5 +18,8 @@
   "status.error": "Failed to load",
   "status.error.subtitle": "Please check your internet connection and try again",
   "status.error.retry": "Try again",
-  "status.ended": "Conversation ended"
+  "status.ended": "Conversation ended",
+  "status.crash": "Something went wrong",
+  "status.crash.subtitle": "Please try again, or close and reopen the chat",
+  "status.crash.retry": "Try again"
 }
