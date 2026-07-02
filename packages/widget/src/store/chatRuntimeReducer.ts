@@ -10,6 +10,9 @@ export function chatRuntimeReducer(
     case 'connection.connecting':
       return { ...state, phase: 'connecting', error: null }
 
+    case 'session.recovering':
+      return { ...state, phase: 'recovering', error: null }
+
     case 'connection.failed':
       return { ...INITIAL_RUNTIME_STATE, phase: 'error', error: action.error }
 

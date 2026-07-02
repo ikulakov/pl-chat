@@ -4,6 +4,7 @@ export type RuntimeAction =
   | { type: 'connection.connecting' }
   | { type: 'session.started'; identity: Identity; cursor: string; joinedRoom: JoinedRoom }
   | { type: 'connection.failed'; error: string }
+  | { type: 'session.recovering' }
   | { type: 'sync.received'; cursor: string; joinedRoom?: JoinedRoom }
   | { type: 'message.optimisticAdded'; message: ChatMessage }
   | { type: 'message.sent'; localId: string; eventId: string }
@@ -44,7 +45,7 @@ export interface ChatMessage {
   failed: boolean
 }
 
-export type Phase = 'idle' | 'connecting' | 'connected' | 'error'
+export type Phase = 'idle' | 'connecting' | 'recovering' | 'connected' | 'error'
 
 export interface ChatUIState {
   isOpen: boolean

@@ -6,6 +6,7 @@ function deriveStatus(phase: Phase, room: RoomState): ConnectionStatus {
     case 'idle':
       return 'idle'
     case 'connecting':
+    case 'recovering':
       return 'connecting'
     case 'error':
       return 'error'
