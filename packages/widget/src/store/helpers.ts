@@ -1,31 +1,32 @@
 import { MatrixEventType, OperatorStatus } from '../matrix/consts'
-import type { ClientEvent, OperatorCurrentEvent } from '../types/matrix'
+import type { ClientEvent, OperatorCurrentEvent, RoomMessageEvent } from '../types/matrix'
 import type { ChatMessage, OperatorState } from './model'
 
 export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
   const result = [...existing]
 
-  for (const msg of incoming) {
-    if (result.some((m) => m.eventId === msg.eventId)) continue
+  for (const incomingMsg of incoming) {
+    if (result.some((m) => m.eventId === incomingMsg.eventId)) continue
 
     // race: если sync вернул событие раньше, чем пришёл ответ на PUT /send
     // находим оптимистичный черновик и обновляем его реальным event_id
     const pendingIdx = result.findIndex(
-      (m) => m.pending && !m.failed && m.sender === msg.sender && m.body === msg.body,
+      (m) =>
+        m.pending && !m.failed && m.sender === incomingMsg.sender && m.body === incomingMsg.body,
     )
     if (pendingIdx !== -1) {
       result[pendingIdx] = {
         ...result[pendingIdx]!,
-        eventId: msg.eventId,
-        ts: msg.ts,
+        eventId: incomingMsg.eventId,
+        ts: incomingMsg.ts,
         pending: false,
       }
     } else {
-      result.push(msg)
+      result.push(incomingMsg)
     }
   }
 
-  return result.toSorted((a, b) => a.ts - b.ts)
+  return result
 }
 
 export function mergeTimelineEvents(
@@ -50,4 +51,18 @@ export function reduceOperator(current: OperatorState, events: ClientEvent[]): O
     id: isActive ? (operatorEvent.content.operator_id ?? operatorEvent.sender) : null,
     displayName: isActive ? (operatorEvent.content.displayname ?? null) : null,
   }
+}
+
+export function timelineToMessages(events: ClientEvent[] = []): ChatMessage[] {
+  return events
+    .filter((e): e is RoomMessageEvent => e.type === MatrixEventType.RoomMessage)
+    .map((e) => ({
+      localId: e.event_id,
+      eventId: e.event_id,
+      sender: e.sender,
+      body: e.content.body,
+      ts: e.origin_server_ts,
+      pending: false,
+      failed: false,
+    }))
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { mergeMessages } from './helpers'
-import type { ChatMessage } from './model'
+import { mergeMessages } from '../helpers'
+import type { ChatMessage } from '../model'
 
 const base: ChatMessage = {
   localId: '$a',
@@ -38,6 +38,18 @@ describe('mergeMessages — deduplication invariants', () => {
     expect(result[0]!.pending).toBe(false)
   })
 
+  it('sync-race: duplicate pending messages with the same body resolve only one draft', () => {
+    const first = { ...base, localId: 'local-1', eventId: 'optimistic:1', pending: true }
+    const second = { ...base, localId: 'local-2', eventId: 'optimistic:2', pending: true, ts: 101 }
+    const fromSync = { ...base, eventId: '$real', ts: 150 }
+
+    const result = mergeMessages([first, second], [fromSync])
+
+    expect(result).toHaveLength(2)
+    expect(result.filter((message) => message.eventId === '$real')).toHaveLength(1)
+    expect(result.filter((message) => message.pending)).toHaveLength(1)
+  })
+
   it('sync-race: failed message not resolved (only pending=true matches)', () => {
     const failed = { ...base, eventId: 'optimistic:uuid', pending: false, failed: true }
     const fromSync = { ...base, eventId: '$real', ts: 150 }
@@ -45,15 +57,5 @@ describe('mergeMessages — deduplication invariants', () => {
     const result = mergeMessages([failed], [fromSync])
 
     expect(result).toHaveLength(2)
-  })
-
-  it('result is sorted by ts ascending', () => {
-    const old = { ...base, eventId: '$old', ts: 50 }
-    const newer = { ...base, localId: '$new', eventId: '$new', ts: 200 }
-
-    const result = mergeMessages([newer], [old])
-
-    expect(result[0]!.eventId).toBe('$old')
-    expect(result[1]!.eventId).toBe('$new')
   })
 })

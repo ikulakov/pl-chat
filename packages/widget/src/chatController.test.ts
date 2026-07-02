@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HostBridge } from './bridge'
 import { ChatController } from './chatController'
-import type { ChatBackend } from './matrix/matrixController'
+import type { MatrixService } from './matrix/matrixController'
 import { chatStore } from './store/store'
 
 function makeBridge(): HostBridge {
   return { setCommandHandler: vi.fn(), send: vi.fn() }
 }
 
-function makeMatrix(): ChatBackend {
+function makeMatrix(): MatrixService {
   return {
     connect: vi.fn().mockResolvedValue(undefined),
     disconnect: vi.fn(),

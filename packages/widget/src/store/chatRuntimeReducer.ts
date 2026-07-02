@@ -6,36 +6,36 @@ export function chatRuntimeReducer(
   state: ChatRuntimeState,
   action: RuntimeAction,
 ): ChatRuntimeState {
-  const room = roomReducer(state.room, action)
-
   switch (action.type) {
     case 'connection.connecting':
-      return {
-        ...state,
-        phase: 'connecting',
-        error: null,
-        room,
-      }
+      return { ...state, phase: 'connecting', error: null }
 
-    case 'session.started':
+    case 'connection.failed':
+      return { ...INITIAL_RUNTIME_STATE, phase: 'error', error: action.error }
+
+    case 'session.started': {
+      const baseRoom =
+        state.identity?.roomId === action.identity.roomId ? state.room : INITIAL_RUNTIME_STATE.room
+
       return {
         ...state,
         phase: 'connected',
         error: null,
         identity: action.identity,
         cursor: action.cursor,
-        room,
+        room: roomReducer(baseRoom, action),
       }
-
-    case 'connection.failed':
-      return { ...INITIAL_RUNTIME_STATE, phase: 'error', error: action.error }
+    }
 
     case 'sync.received':
-      return { ...state, cursor: action.cursor, room }
+      return { ...state, cursor: action.cursor, room: roomReducer(state.room, action) }
 
     case 'message.optimisticAdded':
     case 'message.sent':
     case 'message.failed':
-      return { ...state, room }
+      return { ...state, room: roomReducer(state.room, action) }
+
+    default:
+      return state
   }
 }

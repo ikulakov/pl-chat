@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { IframeBridge } from './bridge'
 import { initChatController } from './chatController'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import './styles/global.css'
 
 const bridge = new IframeBridge()
@@ -18,6 +19,8 @@ if (!root) throw new Error('#root not found')
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 )

@@ -20,7 +20,7 @@ export function ChatPanel() {
         subtitle={t('header.subtitle')}
       />
 
-      {(status === 'connecting' || status === 'waiting') && (
+      {(status === 'idle' || status === 'connecting') && (
         <StatusScreen>
           <Spinner />
         </StatusScreen>
@@ -30,7 +30,7 @@ export function ChatPanel() {
         <StatusScreen
           title={t('status.error')}
           subtitle={t('status.error.subtitle')}
-          illustration="/error-illustration.png"
+          illustration={`${import.meta.env.BASE_URL}/error-illustration.png`}
           action={
             <button
               className={statusStyles.retryBtn}
@@ -42,7 +42,7 @@ export function ChatPanel() {
         />
       )}
 
-      {(status === 'active' || status === 'idle') && (
+      {(status === 'waiting' || status === 'active') && (
         <>
           <MessageList />
           <MessageInput />

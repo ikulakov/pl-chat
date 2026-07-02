@@ -4,7 +4,7 @@ export type RuntimeAction =
   | { type: 'connection.connecting' }
   | { type: 'session.started'; identity: Identity; cursor: string; joinedRoom: JoinedRoom }
   | { type: 'connection.failed'; error: string }
-  | { type: 'sync.received'; cursor: string; joinedRoom?: JoinedRoom | undefined }
+  | { type: 'sync.received'; cursor: string; joinedRoom?: JoinedRoom }
   | { type: 'message.optimisticAdded'; message: ChatMessage }
   | { type: 'message.sent'; localId: string; eventId: string }
   | { type: 'message.failed'; localId: string }
@@ -28,6 +28,7 @@ export interface OperatorState {
   id: string | null
   displayName: string | null
 }
+
 export interface Identity {
   userId: string
   roomId: string
