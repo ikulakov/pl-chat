@@ -26,6 +26,8 @@ spec:
               containerPort: 8080
             - name: management
               containerPort: 9091
+          env:
+            {{- toYaml .Values.env | nindent 10 }}
           # Probes рассчитаны на ~30-40 сек холодного старта (Liquibase + Spring context).
           # Стучатся в 9091 (management) — изолированы от 8080, не страдают
           # от выгоревшего пула основного connector'а.
