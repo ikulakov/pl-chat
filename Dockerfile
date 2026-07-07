@@ -11,7 +11,7 @@
 #   DNS_RESOLVER    — DNS для резолва апстрима (default: 127.0.0.11 — Docker DNS)
 
 # ── Stage 1: сборка ──────────────────────────────────────────────────────────
-FROM nexus.isb/plchat-nonprod-docker-hosted/node:24-alpine-obru AS build
+FROM nexus.isb/library/node:24-alpine-obru AS build
 WORKDIR /app
 
 ENV COREPACK_NPM_REGISTRY="https://nexus.isb/repository/npmjs-npm-proxy/"
@@ -41,7 +41,7 @@ ENV VITE_ALLOWED_PARENTS=$VITE_ALLOWED_PARENTS
 RUN pnpm build
 
 # ── Stage 2: runtime (nginx, отдача статики) ─────────────────────────────────
-FROM nexus.isb/plchat-nonprod-docker-hosted/nginx:1.27-alpine-obru AS runtime
+FROM nexus.isb/library/nginx:1.27-alpine-obru AS runtime
 
 # Шаблон конфига: nginx прогоняет envsubst по /etc/nginx/templates/*.
 # NGINX_ENVSUBST_FILTER ограничивает подстановку только NGINX_*-переменными,
