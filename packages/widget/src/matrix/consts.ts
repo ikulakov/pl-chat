@@ -1,3 +1,5 @@
+export const MATRIX_API_PREFIX = '/_matrix/client/v3'
+
 export const MatrixEventType = {
   RoomMessage: 'm.room.message',
   OperatorCurrent: 'kc.operator.current',

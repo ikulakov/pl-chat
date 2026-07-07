@@ -1,24 +1,25 @@
 import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
-import { matrixApi } from './matrix/matrixApi'
-import { MatrixController, type MatrixSession } from './matrix/matrixController'
+import { createMatrixService } from './matrix/createMatrixService'
+import type { MatrixService } from './matrix/matrixController'
 import { chatStore } from './store/store'
 
 export class ChatController {
   private readonly bridge: HostBridge
-  private readonly matrix: MatrixSession
+  private readonly matrix: MatrixService
 
-  constructor(bridge: HostBridge, matrix?: MatrixSession) {
+  constructor(bridge: HostBridge, matrix?: MatrixService) {
     this.bridge = bridge
     this.bridge.setCommandHandler(this.handleHostCommand)
 
-    this.matrix =
-      matrix ??
-      new MatrixController({
-        api: matrixApi,
+    if (matrix) {
+      this.matrix = matrix
+    } else {
+      this.matrix = createMatrixService({
         dispatch: (action) => chatStore.getState().dispatch(action),
         getState: chatStore.getState,
       })
+    }
   }
 
   handleHostCommand = (cmd: HostCommand): void => {
@@ -44,7 +45,7 @@ export class ChatController {
     void this.matrix.connect()
   }
 
-  destroy(): void {
+  destroy = (): void => {
     this.matrix.disconnect()
   }
 
