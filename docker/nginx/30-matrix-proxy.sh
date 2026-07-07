@@ -32,5 +32,3 @@ location /_matrix/ {
 EOF
 
 echo "[matrix-proxy] прокси /_matrix → ${MATRIX_BACKEND} включён"
-
-exit 0
