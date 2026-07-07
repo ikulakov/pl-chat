@@ -11,7 +11,7 @@ mkdir -p /etc/nginx/snippets
 if [ -z "${MATRIX_BACKEND:-}" ]; then
     rm -f "$SNIPPET"
     echo "[matrix-proxy] MATRIX_BACKEND не задан — отдаём только статику"
-    exit 0
+    return 0
 fi
 
 # Переменная в proxy_pass + resolver → имя апстрима резолвится в рантайме,
