@@ -33,4 +33,7 @@ EOF
 
 echo "[matrix-proxy] прокси /_matrix → ${MATRIX_BACKEND} включён"
 
+echo "sleep.."
+sleep 3600
+
 exit 0
