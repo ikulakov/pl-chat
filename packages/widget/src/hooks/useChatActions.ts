@@ -2,5 +2,11 @@ import { getChatController } from '../chatController'
 
 export function useChatActions() {
   const controller = getChatController()
-  return { sendMessage: controller.sendMessage, retry: controller.retry }
+
+  return {
+    sendMessage: controller.sendMessage,
+    retry: controller.retry,
+    open: controller.open,
+    close: controller.close,
+  }
 }

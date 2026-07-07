@@ -9,42 +9,28 @@
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding: 8px 0 4px;
-  scrollbar-gutter: stable;
+  padding-left: 8px;
+  padding-right: max(0px, calc(8px - var(--scrollbar-w, 0px)));
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 0.2s;
 
-  &.scrolling {
+  &:hover {
     scrollbar-color: var(--c-scrollbar) transparent;
   }
-
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 2px;
-    transition: background 0.2s;
-  }
-
-  &.scrolling::-webkit-scrollbar-thumb {
-    background: var(--c-scrollbar);
-  }
 }
 
-.dateSep {
+.dateSeparator {
+  position: sticky;
+  top: 12px;
+  z-index: 1;
   display: flex;
   justify-content: center;
-  margin: 8px 0 16px;
+  margin: 12px 0;
+  pointer-events: none;
 }
 
-.dateSepLabel {
+.dateSeparatorLabel {
   font-size: 14px;
   font-weight: 400;
   line-height: 14px;
@@ -52,16 +38,24 @@
   background: var(--c-surface-tertiary);
   padding: 4px 12px;
   border-radius: 16px;
+  overflow-wrap: anywhere;
 }
 
-.group {
+.dayGroup {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 0 8px;
-  margin-bottom: 8px;
+
+  & :last-child {
+    margin-bottom: 0;
+  }
 }
 
-.groupUser {
-  align-items: flex-end;
+.bottomSentinel {
+  height: 1px;
+}
+
+.scrollButton {
+  position: absolute;
+  right: 16px;
+  bottom: 8px;
 }

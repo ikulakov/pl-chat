@@ -38,22 +38,3 @@
   align-items: center;
   gap: 8px;
 }
-
-.iconBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: var(--c-surface-tertiary);
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  color: var(--c-text-primary);
-  padding: 0;
-  transition: background 0.15s;
-
-  &:hover {
-    background: var(--c-surface-secondary);
-  }
-}

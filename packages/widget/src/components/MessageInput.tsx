@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useChatActions } from '../hooks/useChatActions'
 import { t } from '../i18n'
+import { IconButton } from '../shared/ui/IconButton'
 import { AttachIcon, SendIcon } from './icons'
 import styles from './MessageInput.module.css'
 
@@ -9,7 +10,7 @@ interface Props {
 }
 
 const LINE_HEIGHT = 20
-const MAX_LINES = 7
+const MAX_LINES = 10
 const MAX_TEXTAREA_HEIGHT = LINE_HEIGHT * MAX_LINES
 
 function resize(el: HTMLTextAreaElement) {
@@ -57,36 +58,41 @@ export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
   return (
     <div className={styles.wrap}>
       <div className={styles.field}>
-        <button
-          className={styles.attachBtn}
-          aria-label={t('input.attachFile')}
-        >
-          <AttachIcon />
-        </button>
-        <textarea
-          ref={textareaRef}
-          className={styles.input}
-          placeholder={placeholder}
-          aria-label={placeholder}
-          rows={1}
-          onChange={handleInput}
-          onKeyDown={handleKeyDown}
-        />
-        <div className={styles.rightBtns}>
-          {/* <button
-            className={styles.iconBtn}
-            aria-label={t('input.stickers')}
+        <div className={styles.main}>
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label={t('input.attachFile')}
           >
-            <StickerIcon />
-          </button> */}
+            <AttachIcon />
+          </IconButton>
+          <textarea
+            ref={textareaRef}
+            className={styles.input}
+            placeholder={placeholder}
+            aria-label={placeholder}
+            rows={1}
+            onChange={handleInput}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
+        <div className={styles.rightBtns}>
+          {/* <div className={styles.slot}>
+            <IconButton variant="ghost" size="sm" aria-label={t('input.stickers')}>
+              <StickerIcon />
+            </IconButton>
+          </div> */}
           {hasText && (
-            <button
-              className={styles.sendBtn}
-              aria-label={t('input.send')}
-              onClick={submit}
-            >
-              <SendIcon />
-            </button>
+            <div className={styles.slot}>
+              <IconButton
+                variant="accent"
+                className={styles.sendBtn}
+                aria-label={t('input.send')}
+                onClick={submit}
+              >
+                <SendIcon />
+              </IconButton>
+            </div>
           )}
         </div>
       </div>

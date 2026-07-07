@@ -1,22 +1,25 @@
 .spinner {
-  &.sm {
-    display: inline-block;
-    width: 18px;
-    height: 18px;
-    border-width: 2px;
+  display: inline-block;
+  border-style: solid;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+
+  &.inline {
+    width: 10px;
+    height: 10px;
+    border-width: 1.2px;
     border-color: currentColor;
     border-top-color: transparent;
     vertical-align: middle;
   }
 
-  &.md {
+  &.block {
     display: block;
     width: 36px;
     height: 36px;
-    border: 3px solid var(--c-surface-secondary);
+    border-width: 3px;
+    border-color: var(--c-surface-secondary);
     border-top-color: var(--c-surface-purple);
-    border-radius: 50%;
-    animation: spin 0.75s linear infinite;
   }
 }
 

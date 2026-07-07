@@ -1,15 +1,13 @@
 {
-  "input.placeholder": "Message…",
+  "input.placeholder": "Message",
   "input.attachFile": "Attach file",
   "input.stickers": "Stickers and emoji",
   "input.send": "Send",
-
   "chat.search": "Search",
   "chat.menu": "Menu",
-
+  "chat.close": "Close chat",
   "header.name": "OTP Assistant",
   "header.subtitle": "Virtual assistant online",
-
   "status.loading": "Loading",
   "status.connecting": "Connecting...",
   "status.connecting.subtitle": "Connecting to the contact center",
@@ -21,5 +19,10 @@
   "status.ended": "Conversation ended",
   "status.crash": "Something went wrong",
   "status.crash.subtitle": "Please try again, or close and reopen the chat",
-  "status.crash.retry": "Try again"
+  "status.crash.retry": "Try again",
+  "date.today": "Today",
+  "date.yesterday": "Yesterday",
+  "dev.operatorMessagePlaceholder": "Operator message (dev)",
+  "dev.operatorMessageSend": "Send",
+  "chat.scroll-down": "Go to bottom"
 }

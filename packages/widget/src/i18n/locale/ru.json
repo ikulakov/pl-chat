@@ -1,15 +1,13 @@
 {
-  "input.placeholder": "Сообщение…",
+  "input.placeholder": "Сообщение",
   "input.attachFile": "Прикрепить файл",
   "input.stickers": "Смайлы и стикеры",
   "input.send": "Отправить",
-
   "chat.search": "Поиск",
   "chat.menu": "Меню",
-
+  "chat.close": "Закрыть чат",
   "header.name": "Помощник ОТП",
   "header.subtitle": "Виртуальный ассистент онлайн",
-
   "status.loading": "Загрузка",
   "status.connecting": "Подключаем...",
   "status.connecting.subtitle": "Соединяем с контакт-центром",
@@ -21,5 +19,10 @@
   "status.ended": "Диалог завершён",
   "status.crash": "Что-то пошло не так",
   "status.crash.subtitle": "Попробуйте ещё раз или закройте и снова откройте чат",
-  "status.crash.retry": "Попробовать снова"
+  "status.crash.retry": "Попробовать снова",
+  "date.today": "Сегодня",
+  "date.yesterday": "Вчера",
+  "dev.operatorMessagePlaceholder": "Сообщение от оператора (dev)",
+  "dev.operatorMessageSend": "Отправить",
+  "chat.scroll-down": "Скролл вниз"
 }
