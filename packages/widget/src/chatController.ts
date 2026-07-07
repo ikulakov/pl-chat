@@ -49,7 +49,7 @@ export class ChatController {
     this.matrix.disconnect()
   }
 
-  private open(): void {
+  open = (): void => {
     if (chatStore.getState().isOpen) return
 
     chatStore.getState().openPanel()
@@ -57,7 +57,7 @@ export class ChatController {
     void this.matrix.connect()
   }
 
-  private close(): void {
+  close = (): void => {
     if (!chatStore.getState().isOpen) return
 
     chatStore.getState().closePanel()

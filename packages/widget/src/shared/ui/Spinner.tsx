@@ -2,10 +2,10 @@ import { t } from '../../i18n'
 import styles from './Spinner.module.css'
 
 interface Props {
-  size?: 'sm' | 'md'
+  size?: 'inline' | 'block'
 }
 
-export function Spinner({ size = 'md' }: Props) {
+export function Spinner({ size = 'block' }: Props) {
   return (
     <span
       className={`${styles.spinner} ${styles[size]}`}

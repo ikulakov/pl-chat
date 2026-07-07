@@ -5,7 +5,7 @@ import { Spinner } from '../shared/ui/Spinner'
 import chatStyles from './ChatPanel.module.css'
 import { Header } from './Header'
 import { MessageInput } from './MessageInput'
-import { MessageList } from './MessageList'
+import { MessageList } from './MessageList/MessageList'
 import { StatusScreen } from './StatusScreen'
 import statusStyles from './StatusScreen.module.css'
 
