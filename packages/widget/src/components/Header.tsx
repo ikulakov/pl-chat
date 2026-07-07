@@ -1,3 +1,8 @@
+import { useChatActions } from '../hooks/useChatActions'
+import { useChatStore } from '../hooks/useChatStore'
+import { t } from '../i18n'
+import { IconButton } from '../shared/ui/IconButton'
+import { CloseIcon } from './icons'
 import styles from './Header.module.css'
 
 interface Props {
@@ -6,6 +11,9 @@ interface Props {
 }
 
 export function Header({ name, subtitle }: Props) {
+  const viewport = useChatStore((s) => s.viewport)
+  const { close } = useChatActions()
+
   return (
     <header className={styles.header}>
       <div className={styles.info}>
@@ -13,12 +21,22 @@ export function Header({ name, subtitle }: Props) {
         <span className={styles.status}>{subtitle}</span>
       </div>
       <div className={styles.actions}>
-        {/* <button className={styles.iconBtn} aria-label={t('chat.menu')}>
+        {/* <IconButton variant="surface" size="md" aria-label={t('chat.menu')}>
           <SearchIcon />
-        </button>
-        <button className={styles.iconBtn} aria-label={t('chat.menu')}>
+        </IconButton>
+        <IconButton variant="surface" size="md" aria-label={t('chat.menu')}>
           <MoreIcon />
-        </button> */}
+        </IconButton> */}
+        {viewport === 'fullscreen' && (
+          <IconButton
+            variant="surface"
+            size="md"
+            aria-label={t('chat.close')}
+            onClick={close}
+          >
+            <CloseIcon />
+          </IconButton>
+        )}
       </div>
     </header>
   )

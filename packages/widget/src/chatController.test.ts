@@ -80,6 +80,50 @@ describe('ChatController — panel commands', () => {
     controller.handleHostCommand({ type: 'TOGGLE' })
     expect(chatStore.getState().isOpen).toBe(false)
   })
+
+  // close() публичный: в fullscreen-режиме iframe перекрывает FAB хоста, и виджет
+  // должен уметь закрыть себя сам (кнопка в Header), не только по команде CLOSE/TOGGLE.
+  it('close() can be called directly by the widget itself, not just via a host command', () => {
+    const bridge = makeBridge()
+    const controller = new ChatController(bridge, makeMatrix())
+    controller.handleHostCommand({ type: 'OPEN' })
+    vi.mocked(bridge.send).mockClear()
+
+    controller.close()
+
+    expect(chatStore.getState().isOpen).toBe(false)
+    expect(bridge.send).toHaveBeenCalledWith({ type: 'CLOSED' })
+  })
+})
+
+// ---- viewport mode (mobile fullscreen support) ----
+
+describe('ChatController — viewport mode', () => {
+  it('INIT with viewport payload stores it', () => {
+    const controller = new ChatController(makeBridge(), makeMatrix())
+
+    controller.handleHostCommand({ type: 'INIT', payload: { viewport: 'fullscreen' } })
+
+    expect(chatStore.getState().viewport).toBe('fullscreen')
+  })
+
+  it('INIT without viewport payload keeps the current value', () => {
+    const controller = new ChatController(makeBridge(), makeMatrix())
+    chatStore.getState().setViewport('fullscreen')
+
+    controller.handleHostCommand({ type: 'INIT', payload: {} })
+
+    expect(chatStore.getState().viewport).toBe('fullscreen')
+  })
+
+  it('SET_VIEWPORT updates the mode after INIT (resize/orientation change)', () => {
+    const controller = new ChatController(makeBridge(), makeMatrix())
+    controller.handleHostCommand({ type: 'INIT', payload: { viewport: 'docked' } })
+
+    controller.handleHostCommand({ type: 'SET_VIEWPORT', payload: { mode: 'fullscreen' } })
+
+    expect(chatStore.getState().viewport).toBe('fullscreen')
+  })
 })
 
 // ---- bridge wiring + delegation ----

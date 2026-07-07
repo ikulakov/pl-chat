@@ -7,10 +7,13 @@ function isRoomMessage(event: ClientEvent): event is RoomMessageEvent {
 }
 
 export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
-  const result = [...existing]
+  let result = existing
 
   for (const incomingMsg of incoming) {
     if (result.some((m) => m.eventId === incomingMsg.eventId)) continue
+
+    // копия на первое реальное изменение
+    if (result === existing) result = [...existing]
 
     // race: если sync вернул событие раньше, чем пришёл ответ на PUT /send
     // находим оптимистичный черновик и обновляем его реальным event_id
@@ -38,7 +41,9 @@ export function mergeTimelineEvents(
   incoming: ClientEvent[],
 ): ClientEvent[] {
   const ids = new Set(existing.map((event) => event.event_id))
-  return [...existing, ...incoming.filter((event) => !ids.has(event.event_id))]
+  const newEvents = incoming.filter((event) => !ids.has(event.event_id))
+
+  return newEvents.length === 0 ? existing : [...existing, ...newEvents]
 }
 
 export function reduceOperator(current: OperatorState, events: ClientEvent[]): OperatorState {

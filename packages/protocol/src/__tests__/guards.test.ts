@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { isEnvelope, makeEnvelope } from '../envelope'
 import { MAX_MESSAGE_BYTES, withinSizeLimit } from '../policy'
+import { HOST_COMMAND_TYPES, isHostCommand } from '../protocol'
 
 describe('isEnvelope', () => {
   it('accepts a valid envelope', () => {
@@ -29,6 +30,18 @@ describe('isEnvelope', () => {
   it('rejects primitive', () => {
     expect(isEnvelope('string')).toBe(false)
     expect(isEnvelope(42)).toBe(false)
+  })
+})
+
+describe('isHostCommand', () => {
+  it('accepts every declared command type (catches union/array drift)', () => {
+    for (const type of HOST_COMMAND_TYPES) {
+      expect(isHostCommand({ type })).toBe(true)
+    }
+  })
+
+  it('rejects an unknown type', () => {
+    expect(isHostCommand({ type: 'NOT_A_REAL_COMMAND' })).toBe(false)
   })
 })
 

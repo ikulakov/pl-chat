@@ -22,7 +22,7 @@ export class ChatController {
     }
   }
 
-  handleHostCommand = (cmd: HostCommand): void => {
+  private handleHostCommand = (cmd: HostCommand): void => {
     switch (cmd.type) {
       case 'OPEN':
         this.open()
@@ -35,6 +35,12 @@ export class ChatController {
         else this.open()
         break
       case 'INIT':
+        if (cmd.payload.viewport) {
+          chatStore.getState().setViewport(cmd.payload.viewport)
+        }
+        break
+      case 'SET_VIEWPORT':
+        chatStore.getState().setViewport(cmd.payload.mode)
         break
     }
   }
@@ -49,7 +55,7 @@ export class ChatController {
     this.matrix.disconnect()
   }
 
-  private open(): void {
+  open = (): void => {
     if (chatStore.getState().isOpen) return
 
     chatStore.getState().openPanel()
@@ -57,7 +63,7 @@ export class ChatController {
     void this.matrix.connect()
   }
 
-  private close(): void {
+  close = (): void => {
     if (!chatStore.getState().isOpen) return
 
     chatStore.getState().closePanel()

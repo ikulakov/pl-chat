@@ -22,5 +22,6 @@ export function selectChatUIState(state: ChatStoreState): ChatUIState {
     userId: state.identity?.userId ?? null,
     error: state.error,
     messages: state.room.messages,
+    viewport: state.viewport,
   }
 }

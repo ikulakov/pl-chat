@@ -3,9 +3,10 @@ import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
 import { Spinner } from '../shared/ui/Spinner'
 import chatStyles from './ChatPanel.module.css'
+import { DevOperatorTools } from './DevOperatorTools'
 import { Header } from './Header'
 import { MessageInput } from './MessageInput'
-import { MessageList } from './MessageList'
+import { MessageList } from './MessageList/MessageList'
 import { StatusScreen } from './StatusScreen'
 import statusStyles from './StatusScreen.module.css'
 
@@ -15,6 +16,8 @@ export function ChatPanel() {
 
   return (
     <div className={chatStyles.panel}>
+      {import.meta.env.DEV && <DevOperatorTools />}
+
       <Header
         name={t('header.name')}
         subtitle={t('header.subtitle')}

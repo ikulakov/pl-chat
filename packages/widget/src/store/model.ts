@@ -1,3 +1,4 @@
+import type { ViewportMode } from '@bankchat/protocol'
 import type { ClientEvent, JoinedRoom } from '../types/matrix'
 
 export type RuntimeAction =
@@ -53,6 +54,7 @@ export interface ChatUIState {
   userId: string | null
   error: string | null
   messages: ChatMessage[]
+  viewport: ViewportMode
 }
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'waiting' | 'active' | 'error'

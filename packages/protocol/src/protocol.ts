@@ -2,9 +2,15 @@
  * Контракт сообщений host ↔ iframe.
  */
 
-// Стартовый конфиг, который хост передаёт виджету командой INIT.
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface InitConfig {}
+// Режим раскладки панели:
+// 'docked' — плавающее окно поверх страницы (desktop),
+// 'fullscreen' — во весь экран (mobile)
+export type ViewportMode = 'docked' | 'fullscreen'
+
+// Стартовый конфиг, который loader передаёт виджету командой INIT.
+export interface InitConfig {
+  viewport?: ViewportMode
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Команды: хост → iframe
@@ -14,6 +20,7 @@ export type HostCommand =
   | { type: 'OPEN' }
   | { type: 'CLOSE' }
   | { type: 'TOGGLE' }
+  | { type: 'SET_VIEWPORT'; payload: { mode: ViewportMode } }
 
 export type HostCommandType = HostCommand['type']
 
@@ -33,6 +40,7 @@ export const HOST_COMMAND_TYPES = [
   'OPEN',
   'CLOSE',
   'TOGGLE',
+  'SET_VIEWPORT',
 ] as const satisfies readonly HostCommandType[]
 
 export const CHAT_EVENT_TYPES = [

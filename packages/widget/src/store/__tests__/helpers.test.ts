@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { mergeMessages } from '../helpers'
+import { roomMessageEvent } from '../../shared/testUtils/matrixFixtures'
+import { mergeMessages, mergeTimelineEvents } from '../helpers'
 import type { ChatMessage } from '../model'
 
 const base: ChatMessage = {
@@ -56,6 +57,34 @@ describe('mergeMessages — deduplication invariants', () => {
 
     const result = mergeMessages([failed], [fromSync])
 
+    expect(result).toHaveLength(2)
+  })
+
+  it('returns the same array reference when nothing actually changes (empty or fully-duplicate incoming)', () => {
+    // критично для React: если ссылка на messages меняется на каждый пустой тик sync-петли,
+    // любой useEffect/подписка с зависимостью [messages] будет срабатывать без реальных изменений
+    const existing = [base]
+
+    expect(mergeMessages(existing, [])).toBe(existing)
+    expect(mergeMessages(existing, [base])).toBe(existing)
+  })
+})
+
+describe('mergeTimelineEvents — reference stability', () => {
+  it('returns the same array reference when there are no new events', () => {
+    const existing = [roomMessageEvent()]
+
+    expect(mergeTimelineEvents(existing, [])).toBe(existing)
+    expect(mergeTimelineEvents(existing, [roomMessageEvent()])).toBe(existing)
+  })
+
+  it('returns a new array when a genuinely new event arrives', () => {
+    const existing = [roomMessageEvent({ event_id: '$m1' })]
+    const incoming = [roomMessageEvent({ event_id: '$m2' })]
+
+    const result = mergeTimelineEvents(existing, incoming)
+
+    expect(result).not.toBe(existing)
     expect(result).toHaveLength(2)
   })
 })
