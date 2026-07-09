@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.deploy.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.deploy.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.deploy.name }}
+    spec:
+      imagePullSecrets:
+      - name: nexus
+      containers:
+        - name: {{ .Values.deploy.name }}
+          image: {{ .Values.deploy.image }}
+          # Образ собирается через `minikube image build` — оседает прямо в
+          # docker'е minikube'а, без push в registry. Never блокирует попытки
+          # docker pull.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            {{- toYaml .Values.env | nindent 10 }}
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "768Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"

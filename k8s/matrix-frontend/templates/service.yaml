@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.deploy.name }}
+  labels:
+    app: {{ .Values.deploy.name }}
+  template:
+spec:
+  selector:
+    app: {{ .Values.deploy.name }}
+  template:
+  ports:
+    - name: http
+      port: 443
+      targetPort: 8080
