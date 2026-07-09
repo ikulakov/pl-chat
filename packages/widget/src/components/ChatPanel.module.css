@@ -1,76 +1,8 @@
 .panel {
-  position: fixed;
-  inset: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--c-surface-primary);
   overflow: hidden;
-}
-
-.messagesWrap {
-  flex: 1;
-  position: relative;
-  min-height: 0;
-}
-
-.messages {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  padding: 8px 0 4px;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition: scrollbar-color 0.2s;
-}
-
-.messages.scrolling {
-  scrollbar-color: var(--c-scrollbar) transparent;
-}
-
-.messages::-webkit-scrollbar {
-  width: 4px;
-}
-
-.messages::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.messages::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 2px;
-  transition: background 0.2s;
-}
-
-.messages.scrolling::-webkit-scrollbar-thumb {
-  background: var(--c-scrollbar);
-}
-
-.dateSep {
-  display: flex;
-  justify-content: center;
-  margin: 8px 0 16px;
-}
-
-.dateSepLabel {
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 14px;
-  color: var(--c-text-tertiary);
-  background: var(--c-surface-tertiary);
-  padding: 4px 12px;
-  border-radius: 16px;
-}
-
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 0 8px;
-  margin-bottom: 8px;
-}
-
-.groupUser {
-  align-items: flex-end;
 }

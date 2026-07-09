@@ -4,7 +4,13 @@
 /* Prevent scroll from leaking out of the iframe to the host page */
 html,
 body {
+  height: 100%;
+  margin: 0;
   overscroll-behavior: none;
+}
+
+#root {
+  height: 100%;
 }
 
 *,

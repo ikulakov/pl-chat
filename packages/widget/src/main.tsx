@@ -1,17 +1,26 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { hostBridge } from './bridge'
-import { chatStore } from './store/chatStore'
+import { IframeBridge } from './bridge'
+import { initChatController } from './chatController'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import './styles/global.css'
 
-hostBridge.connect((cmd) => chatStore.handleCommand(cmd))
+const bridge = new IframeBridge()
+const controller = initChatController(bridge)
+
+// Standalone dev mode
+if (import.meta.env.DEV && window.parent === window) {
+  controller.handleHostCommand({ type: 'OPEN' })
+}
 
 const root = document.getElementById('root')
 if (!root) throw new Error('#root not found')
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 )
