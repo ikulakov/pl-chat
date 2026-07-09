@@ -7,6 +7,7 @@ export interface OutgoingText {
 
 export function createOptimisticTextMessage(sender: string, text: string): OutgoingText {
   const localId = crypto.randomUUID()
+  const txnId = crypto.randomUUID()
   return {
     message: {
       localId,
@@ -16,7 +17,8 @@ export function createOptimisticTextMessage(sender: string, text: string): Outgo
       ts: Date.now(),
       pending: true,
       failed: false,
+      txnId,
     },
-    txnId: crypto.randomUUID(),
+    txnId,
   }
 }

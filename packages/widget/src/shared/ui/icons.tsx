@@ -208,6 +208,49 @@ export function ChecksIcon(props: IconProps) {
   )
 }
 
+export function RetryIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path
+        d="M20 12a8 8 0 10-2.34 5.66"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M20 8v4h-4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Icon>
+  )
+}
+
+export function CopyIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect
+        x="8"
+        y="8"
+        width="12"
+        height="12"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Icon>
+  )
+}
+
 export function FailedIcon(props: IconProps) {
   return (
     <Icon

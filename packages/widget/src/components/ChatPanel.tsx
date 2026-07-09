@@ -12,7 +12,7 @@ import statusStyles from './StatusScreen.module.css'
 
 export function ChatPanel() {
   const status = useChatStore((s) => s.status)
-  const { retry } = useChatActions()
+  const { reconnect } = useChatActions()
 
   return (
     <div className={chatStyles.panel}>
@@ -33,11 +33,11 @@ export function ChatPanel() {
         <StatusScreen
           title={t('status.error')}
           subtitle={t('status.error.subtitle')}
-          illustration={`${import.meta.env.BASE_URL}/error-illustration.png`}
+          illustration={'/error-illustration.png'}
           action={
             <button
               className={statusStyles.retryBtn}
-              onClick={retry}
+              onClick={reconnect}
             >
               {t('status.error.retry')}
             </button>

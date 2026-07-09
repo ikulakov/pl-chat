@@ -24,5 +24,9 @@
   "date.yesterday": "Вчера",
   "dev.operatorMessagePlaceholder": "Сообщение от оператора (dev)",
   "dev.operatorMessageSend": "Отправить",
-  "chat.scroll-down": "Скролл вниз"
+  "chat.scroll-down": "Скролл вниз",
+  "chat.action.menu": "Меню",
+  "chat.action.copy": "Копировать",
+  "chat.action.copied": "Скопировано",
+  "chat.action.retry": "Повторить отправку"
 }

@@ -1,28 +1,24 @@
 .bubble {
-  padding: 12px 16px;
-  max-width: 388px;
+  padding: 11px 16px;
+  max-width: 380px;
+  min-width: 0;
   word-break: break-word;
 
   &.single {
     border-radius: 16px;
-    margin-bottom: 12px;
   }
   &.first {
     border-radius: 16px 16px 8px 8px;
-    margin-bottom: 4px;
   }
   &.middle {
     border-radius: 8px;
-    margin-bottom: 4px;
   }
   &.last {
     border-radius: 8px 8px 16px 16px;
-    margin-bottom: 12px;
   }
 }
 
 .operator {
-  align-self: flex-start;
   background: var(--c-surface-primary);
   color: var(--c-text-primary);
   border: 1px solid var(--c-border);
@@ -34,7 +30,6 @@
 }
 
 .user {
-  align-self: flex-end;
   background: var(--c-surface-contrast);
   color: var(--c-text-invert);
 

@@ -16,9 +16,13 @@ export class FakeIntersectionObserver implements IntersectionObserver {
 
   root = null
   rootMargin = ''
+  scrollMargin = ''
   thresholds: ReadonlyArray<number> = []
 
-  constructor(private readonly callback: IntersectionObserverCallback) {
+  private readonly callback: IntersectionObserverCallback
+
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback
     FakeIntersectionObserver.instances.push(this)
   }
 

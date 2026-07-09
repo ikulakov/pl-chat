@@ -47,7 +47,9 @@ export class ChatController {
 
   sendMessage = (text: string): Promise<void> => this.matrix.sendMessage(text)
 
-  retry = (): void => {
+  resendMessage = (localId: string): Promise<void> => this.matrix.resendMessage(localId)
+
+  reconnect = (): void => {
     void this.matrix.connect()
   }
 

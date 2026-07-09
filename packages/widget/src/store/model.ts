@@ -10,6 +10,7 @@ export type RuntimeAction =
   | { type: 'message.optimisticAdded'; message: ChatMessage }
   | { type: 'message.sent'; localId: string; eventId: string }
   | { type: 'message.failed'; localId: string }
+  | { type: 'message.retrying'; localId: string }
 
 export interface ChatRuntimeState {
   phase: Phase
@@ -37,8 +38,12 @@ export interface Identity {
 }
 
 export interface ChatMessage {
+  // React key, якорь для optimistic-обновлений
   localId: string
+  // id события в комнате от сервера; до ответа — placeholder `optimistic:{localId}`
   eventId: string
+  // idempotency-ключ запроса PUT /send
+  txnId?: string
   sender: string
   body: string
   ts: number
@@ -47,6 +52,8 @@ export interface ChatMessage {
 }
 
 export type Phase = 'idle' | 'connecting' | 'recovering' | 'connected' | 'error'
+
+export type MessageStatus = 'sending' | 'sent' | 'read' | 'failed'
 
 export interface ChatUIState {
   isOpen: boolean

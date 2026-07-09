@@ -4,7 +4,8 @@ import { t } from '../i18n'
 import { chatStore } from '../store/store'
 import styles from './DevOperatorTools.module.css'
 
-const DEV_OPERATOR_ID = '@operator:bank'
+// Фолбэк, пока в комнате ещё нет ни одного операторского сообщения
+const DEV_OPERATOR_FALLBACK_ID = '@operator:bank'
 
 export function DevOperatorTools() {
   const [text, setText] = useState('')
@@ -14,12 +15,18 @@ export function DevOperatorTools() {
     const body = text.trim()
     if (!body) return
 
+    const lastOperatorMessage = chatStore
+      .getState()
+      .room.messages.findLast((m) => m.sender !== userId)
+
+    const operatorId = lastOperatorMessage?.sender ?? DEV_OPERATOR_FALLBACK_ID
+
     chatStore.getState().dispatch({
       type: 'message.optimisticAdded',
       message: {
         localId: crypto.randomUUID(),
         eventId: crypto.randomUUID(),
-        sender: userId === DEV_OPERATOR_ID ? '@dev-guest:bank' : DEV_OPERATOR_ID,
+        sender: userId === operatorId ? '@dev-guest:bank' : operatorId,
         body,
         ts: Date.now(),
         pending: false,

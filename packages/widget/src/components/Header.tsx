@@ -2,7 +2,7 @@ import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
 import { IconButton } from '../shared/ui/IconButton'
-import { CloseIcon } from './icons'
+import { CloseIcon } from '../shared/ui/icons'
 import styles from './Header.module.css'
 
 interface Props {

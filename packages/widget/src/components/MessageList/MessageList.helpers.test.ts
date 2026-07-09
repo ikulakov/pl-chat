@@ -1,17 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { chatMessage } from '../../shared/testUtils/matrixFixtures'
 import type { ChatMessage } from '../../store/model'
-import { getPosition } from './MessageList.helpers'
+import { deriveMessageStatus, getPosition } from './MessageList.helpers'
 
 function message(sender: string): ChatMessage {
-  return {
-    localId: sender,
-    eventId: sender,
-    sender,
-    body: 'x',
-    ts: 0,
-    pending: false,
-    failed: false,
-  }
+  return chatMessage({ localId: sender, eventId: sender, sender, body: 'x' })
 }
 
 describe('getPosition', () => {
@@ -36,5 +29,22 @@ describe('getPosition', () => {
 
   it('returns "last" when only the previous message shares the sender', () => {
     expect(getPosition(me, me, op)).toBe('last')
+  })
+})
+
+describe('deriveMessageStatus', () => {
+  const base = message('@me:bank')
+
+  it('returns "failed" for a failed message, regardless of pending', () => {
+    expect(deriveMessageStatus({ ...base, failed: true, pending: true })).toBe('failed')
+    expect(deriveMessageStatus({ ...base, failed: true, pending: false })).toBe('failed')
+  })
+
+  it('returns "sending" for a pending, non-failed message', () => {
+    expect(deriveMessageStatus({ ...base, pending: true, failed: false })).toBe('sending')
+  })
+
+  it('returns "sent" when neither pending nor failed', () => {
+    expect(deriveMessageStatus({ ...base, pending: false, failed: false })).toBe('sent')
   })
 })

@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { chatMessage } from '../shared/testUtils/matrixFixtures'
 import type { ChatMessage } from '../store/model'
 import { FakeIntersectionObserver } from '../../test.setup'
 import { useChatScroll } from './useChatScroll'
@@ -11,7 +12,7 @@ let seq = 0
 function message(sender: string): ChatMessage {
   seq += 1
   const id = `m${seq}`
-  return { localId: id, eventId: id, sender, body: 'x', ts: seq, pending: false, failed: false }
+  return chatMessage({ localId: id, eventId: id, sender, body: 'x', ts: seq })
 }
 
 // Последний созданный IntersectionObserver — через него эмулируем пересечение сентинела.

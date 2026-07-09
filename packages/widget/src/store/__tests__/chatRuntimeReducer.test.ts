@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  chatMessage,
   emptyJoinedRoom,
+  OPERATOR_ID,
   operatorCurrentEvent,
   roomMessageEvent,
 } from '../../shared/testUtils/matrixFixtures'
 import type { JoinedRoom } from '../../types/matrix'
 import { chatRuntimeReducer } from '../chatRuntimeReducer'
-import type { Identity } from '../model'
+import type { ChatMessage, Identity } from '../model'
 import { INITIAL_RUNTIME_STATE } from '../store'
 
 const IDENTITY: Identity = { userId: '@user:bank', roomId: '!room:bank' }
@@ -18,8 +20,20 @@ function joinedRoom(): JoinedRoom {
   })
 }
 
+function ownMessage(overrides: Partial<ChatMessage>): ChatMessage {
+  return chatMessage({
+    localId: 'l1',
+    eventId: 'optimistic:l1',
+    sender: IDENTITY.userId,
+    body: 'hi',
+    ts: 1,
+    pending: true,
+    ...overrides,
+  })
+}
+
 describe('chatRuntimeReducer', () => {
-  it('starts a session and applies the initial room action', () => {
+  it('starts a session and applies the initial room snapshot (messages + operator)', () => {
     const next = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
       type: 'session.started',
       identity: IDENTITY,
@@ -31,7 +45,7 @@ describe('chatRuntimeReducer', () => {
     expect(next.identity).toEqual(IDENTITY)
     expect(next.cursor).toBe('s1')
     expect(next.room.messages).toHaveLength(1)
-    expect(next.room.operator.isActive).toBe(true)
+    expect(next.room.operator).toEqual({ isActive: true, id: OPERATOR_ID, displayName: 'Support' })
   })
 
   it('resets room state when a new session starts in a different room', () => {
@@ -43,15 +57,7 @@ describe('chatRuntimeReducer', () => {
     })
     const withDraft = chatRuntimeReducer(connected, {
       type: 'message.optimisticAdded',
-      message: {
-        localId: 'l1',
-        eventId: 'optimistic:l1',
-        sender: IDENTITY.userId,
-        body: 'old draft',
-        ts: 2,
-        pending: true,
-        failed: false,
-      },
+      message: ownMessage({ body: 'old draft', ts: 2 }),
     })
 
     const next = chatRuntimeReducer(withDraft, {
@@ -123,21 +129,10 @@ describe('chatRuntimeReducer', () => {
     expect(recovering.room).toBe(connected.room)
   })
 
-  it('routes optimistic add / sent through the room reducer', () => {
+  it('routes optimistic add / sent through the room slice', () => {
     const withOptimistic = chatRuntimeReducer(
       { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
-      {
-        type: 'message.optimisticAdded',
-        message: {
-          localId: 'l1',
-          eventId: 'optimistic:l1',
-          sender: IDENTITY.userId,
-          body: 'hi',
-          ts: 1,
-          pending: true,
-          failed: false,
-        },
-      },
+      { type: 'message.optimisticAdded', message: ownMessage({}) },
     )
     expect(withOptimistic.room.messages[0]!.pending).toBe(true)
 
@@ -149,5 +144,72 @@ describe('chatRuntimeReducer', () => {
 
     expect(sent.room.messages[0]!.eventId).toBe('$real')
     expect(sent.room.messages[0]!.pending).toBe(false)
+  })
+
+  it('marks a still-pending optimistic message as failed', () => {
+    const withOptimistic = chatRuntimeReducer(
+      { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
+      { type: 'message.optimisticAdded', message: ownMessage({}) },
+    )
+
+    const failed = chatRuntimeReducer(withOptimistic, { type: 'message.failed', localId: 'l1' })
+
+    expect(failed.room.messages[0]!.pending).toBe(false)
+    expect(failed.room.messages[0]!.failed).toBe(true)
+  })
+
+  it('does not mark a message failed after sync already resolved it', () => {
+    const withOptimistic = chatRuntimeReducer(
+      { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
+      { type: 'message.optimisticAdded', message: ownMessage({}) },
+    )
+    const resolvedBySync = chatRuntimeReducer(withOptimistic, {
+      type: 'sync.received',
+      cursor: 's1',
+      joinedRoom: emptyJoinedRoom({
+        // тело совпадает с оптимистичным ('hi') — иначе mergeMessages не свяжет черновик с реальным событием
+        timeline: {
+          events: [
+            roomMessageEvent({
+              event_id: '$real',
+              sender: IDENTITY.userId,
+              content: { body: 'hi' },
+            }),
+          ],
+        },
+      }),
+    })
+
+    const failedLate = chatRuntimeReducer(resolvedBySync, { type: 'message.failed', localId: 'l1' })
+
+    expect(failedLate.room.messages).toHaveLength(1)
+    expect(failedLate.room.messages[0]!.eventId).toBe('$real')
+    expect(failedLate.room.messages[0]!.failed).toBe(false)
+  })
+
+  it('retries a failed message in place — pending again, failed cleared, index unchanged', () => {
+    const withFirst = chatRuntimeReducer(
+      { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
+      {
+        type: 'message.optimisticAdded',
+        message: ownMessage({ localId: 'l1', body: 'first', pending: false, failed: true }),
+      },
+    )
+    const withSecond = chatRuntimeReducer(withFirst, {
+      type: 'message.optimisticAdded',
+      message: ownMessage({
+        localId: 'l2',
+        eventId: 'optimistic:l2',
+        body: 'second',
+        ts: 2,
+        pending: false,
+      }),
+    })
+
+    const retried = chatRuntimeReducer(withSecond, { type: 'message.retrying', localId: 'l1' })
+
+    expect(retried.room.messages).toHaveLength(2)
+    expect(retried.room.messages[0]).toMatchObject({ localId: 'l1', pending: true, failed: false })
+    expect(retried.room.messages[1]).toMatchObject({ localId: 'l2', pending: false, failed: false })
   })
 })

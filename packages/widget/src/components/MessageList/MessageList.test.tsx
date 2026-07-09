@@ -1,20 +1,22 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { chatMessage } from '../../shared/testUtils/matrixFixtures'
 import type { ChatMessage } from '../../store/model'
 import { INITIAL_ROOM_STATE, chatStore } from '../../store/store'
 import { MessageList } from './MessageList'
 
+// resendMessage дёргает ChatController → MatrixService, которые в этом тесте не поднимаются
+vi.mock('../../hooks/useChatActions', () => ({
+  useChatActions: () => ({ resendMessage: vi.fn() }),
+}))
+
 function message(overrides: Partial<ChatMessage>): ChatMessage {
-  return {
+  return chatMessage({
     localId: overrides.eventId ?? 'local',
     eventId: 'event',
-    sender: '@operator:bank',
-    body: 'hello',
     ts: Date.now(),
-    pending: false,
-    failed: false,
     ...overrides,
-  }
+  })
 }
 
 describe('MessageList', () => {

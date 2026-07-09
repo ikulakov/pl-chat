@@ -1,9 +1,32 @@
 import { MatrixEventType, OperatorStatus } from '../matrix/consts'
-import type { ClientEvent, OperatorCurrentEvent, RoomMessageEvent } from '../types/matrix'
-import type { ChatMessage, OperatorState } from './model'
+import type {
+  ClientEvent,
+  JoinedRoom,
+  OperatorCurrentEvent,
+  RoomMessageEvent,
+} from '../types/matrix'
+import type { ChatMessage, ChatRuntimeState, OperatorState, RoomState } from './model'
 
 function isRoomMessage(event: ClientEvent): event is RoomMessageEvent {
   return event.type === MatrixEventType.RoomMessage
+}
+
+export function updateMessages(
+  state: ChatRuntimeState,
+  updater: (messages: ChatMessage[]) => ChatMessage[],
+): ChatRuntimeState {
+  return { ...state, room: { ...state.room, messages: updater(state.room.messages) } }
+}
+
+export function applySync(room: RoomState, joinedRoom: JoinedRoom): RoomState {
+  const timelineEvents = joinedRoom.timeline.events
+  const stateEvents = joinedRoom.state.events
+  return {
+    ...room,
+    timeline: mergeTimelineEvents(room.timeline, timelineEvents),
+    messages: mergeMessages(room.messages, timelineToMessages(timelineEvents)),
+    operator: reduceOperator(room.operator, [...stateEvents, ...timelineEvents]),
+  }
 }
 
 export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {

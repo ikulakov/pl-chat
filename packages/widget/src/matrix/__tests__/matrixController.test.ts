@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ChatRuntimeState, RuntimeAction } from '../../store/model'
+import type {
+  ChatMessage,
+  ChatRuntimeState,
+  Identity,
+  RoomState,
+  RuntimeAction,
+} from '../../store/model'
 import { INITIAL_RUNTIME_STATE } from '../../store/store'
 import {
+  chatMessage,
   createFakeTokenStore,
   deferred,
   makeMatrixApi,
@@ -13,6 +20,8 @@ import { MatrixSessionManager } from '../session/sessionManager'
 import { MatrixError } from '../transport/matrixError'
 
 vi.mock('../../shared/sleep', () => ({ sleep: () => Promise.resolve() }))
+
+const IDENTITY: Identity = { userId: '@u:bank', roomId: '!r:bank' }
 
 // Контролируемый снимок стора + спай на apply — проверяем, какие доменные
 // действия контроллер диспетчит (стор реальный не подключаем).
@@ -26,6 +35,27 @@ function harness(initial: Partial<ChatRuntimeState> = {}, api: MatrixApi = makeM
   const sessionManager = new MatrixSessionManager(api, tokens)
   const controller = new MatrixController({ dispatch, getState: () => state, api, sessionManager })
   return { controller, dispatch, applied, tokens }
+}
+
+// Общая форма "неудачно отправленного" сообщения для resendMessage-тестов ниже
+function failedMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+  return chatMessage({
+    localId: 'local-1',
+    eventId: 'optimistic:local-1',
+    sender: IDENTITY.userId,
+    body: 'hi',
+    ts: 1,
+    failed: true,
+    ...overrides,
+  })
+}
+
+function roomWithMessage(message: ChatMessage): RoomState {
+  return {
+    timeline: [],
+    messages: [message],
+    operator: { isActive: false, id: null, displayName: null },
+  }
 }
 
 describe('MatrixController (orchestrator)', () => {
@@ -73,8 +103,8 @@ describe('MatrixController (orchestrator)', () => {
     expect(api.registerGuest).not.toHaveBeenCalled()
   })
 
-  it('retry (connect from error phase) re-establishes the session', async () => {
-    // Это ровно тот guard, на который опирается кнопка retry в UI: connect()
+  it('reconnect (connect from error phase) re-establishes the session', async () => {
+    // Это ровно тот guard, на который опирается кнопка reconnect в UI: connect()
     // должен пропускать вызов из phase 'error', а не только из 'idle'.
     const { controller, applied } = harness({ phase: 'error', error: 'Не удалось подключиться' })
 
@@ -231,7 +261,7 @@ describe('MatrixController (orchestrator)', () => {
   it('sendMessage dispatches optimisticAdded then sent', async () => {
     const { controller, applied } = harness({
       phase: 'connected',
-      identity: { userId: '@u:bank', roomId: '!r:bank' },
+      identity: IDENTITY,
     })
 
     await controller.sendMessage('hi')
@@ -255,7 +285,7 @@ describe('MatrixController (orchestrator)', () => {
   it('sendMessage does nothing when phase is not connected, even with a stale identity', async () => {
     const { controller, dispatch } = harness({
       phase: 'connecting',
-      identity: { userId: '@u:bank', roomId: '!r:bank' },
+      identity: IDENTITY,
     })
 
     await controller.sendMessage('hi')
@@ -269,10 +299,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
     })
-    const { controller, applied } = harness(
-      { phase: 'connected', identity: { userId: '@u:bank', roomId: '!r:bank' } },
-      api,
-    )
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
 
     await controller.sendMessage('hi')
 
@@ -293,10 +320,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
     })
-    const { controller, applied } = harness(
-      { phase: 'connected', identity: { userId: '@u:bank', roomId: '!r:bank' } },
-      api,
-    )
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
     const handleSyncError = (
       controller as unknown as {
         handleSyncError: (err: unknown, meta: { backoff: number }) => void
@@ -321,10 +345,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError('M_USER_DEACTIVATED', 'disabled')),
     })
-    const { controller, applied, tokens } = harness(
-      { phase: 'connected', identity: { userId: '@u:bank', roomId: '!r:bank' } },
-      api,
-    )
+    const { controller, applied, tokens } = harness({ phase: 'connected', identity: IDENTITY }, api)
     tokens.setSession({ accessToken: 'token', refreshToken: 'refresh', userId: '@u:bank' })
 
     await controller.sendMessage('hi')
@@ -344,10 +365,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi({
       sendMessage: vi.fn<MatrixApi['sendMessage']>().mockReturnValue(send.promise),
     })
-    const { controller, applied } = harness(
-      { phase: 'connected', identity: { userId: '@u:bank', roomId: '!r:bank' } },
-      api,
-    )
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
 
     const promise = controller.sendMessage('hi')
     await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledOnce())
@@ -360,15 +378,92 @@ describe('MatrixController (orchestrator)', () => {
     expect(applied.some((action) => action.type === 'message.sent')).toBe(false)
   })
 
+  it('resendMessage dispatches retrying then sent under the same localId', async () => {
+    const { controller, applied } = harness({
+      phase: 'connected',
+      identity: IDENTITY,
+      room: roomWithMessage(failedMessage({ txnId: 'txn-original' })),
+    })
+
+    await controller.resendMessage('local-1')
+
+    expect(applied[0]).toEqual({ type: 'message.retrying', localId: 'local-1' })
+    expect(applied[1]).toEqual({ type: 'message.sent', localId: 'local-1', eventId: '$real' })
+  })
+
+  it('resendMessage reuses the original txnId so the server can dedup the retry', async () => {
+    const api = makeMatrixApi()
+    const { controller } = harness(
+      {
+        phase: 'connected',
+        identity: IDENTITY,
+        room: roomWithMessage(failedMessage({ txnId: 'txn-original' })),
+      },
+      api,
+    )
+
+    await controller.resendMessage('local-1')
+
+    const [, txnId] = vi.mocked(api.sendMessage).mock.calls[0]!
+    expect(txnId).toBe('txn-original')
+  })
+
+  it('resendMessage does nothing when the failed message has no txnId', async () => {
+    const { controller, dispatch } = harness({
+      phase: 'connected',
+      identity: IDENTITY,
+      room: roomWithMessage(failedMessage()),
+    })
+
+    await controller.resendMessage('local-1')
+
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('resendMessage dispatches message.failed on a repeat send failure', async () => {
+    const api = makeMatrixApi({
+      sendMessage: vi.fn<MatrixApi['sendMessage']>().mockRejectedValue(new Error('network down')),
+    })
+    const { controller, applied } = harness(
+      {
+        phase: 'connected',
+        identity: IDENTITY,
+        room: roomWithMessage(failedMessage({ txnId: 'txn-original' })),
+      },
+      api,
+    )
+
+    await controller.resendMessage('local-1')
+
+    expect(applied).toContainEqual({ type: 'message.failed', localId: 'local-1' })
+  })
+
+  it('resendMessage does nothing when the message is not failed', async () => {
+    const { controller, dispatch } = harness({
+      phase: 'connected',
+      identity: IDENTITY,
+      room: roomWithMessage(
+        chatMessage({
+          localId: 'local-1',
+          eventId: 'optimistic:local-1',
+          sender: IDENTITY.userId,
+          body: 'hi',
+          ts: 1,
+        }),
+      ),
+    })
+
+    await controller.resendMessage('local-1')
+
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
   it('does not start auth recovery from a stale send error', async () => {
     const send = deferred<Awaited<ReturnType<MatrixApi['sendMessage']>>>()
     const api = makeMatrixApi({
       sendMessage: vi.fn<MatrixApi['sendMessage']>().mockReturnValue(send.promise),
     })
-    const { controller, applied } = harness(
-      { phase: 'connected', identity: { userId: '@u:bank', roomId: '!r:bank' } },
-      api,
-    )
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
 
     const promise = controller.sendMessage('hi')
     await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledOnce())

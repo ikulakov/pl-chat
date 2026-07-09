@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { roomMessageEvent } from '../../shared/testUtils/matrixFixtures'
+import { chatMessage, roomMessageEvent } from '../../shared/testUtils/matrixFixtures'
 import { mergeMessages, mergeTimelineEvents } from '../helpers'
-import type { ChatMessage } from '../model'
 
-const base: ChatMessage = {
+const base = chatMessage({
   localId: '$a',
   eventId: '$a',
   sender: '@op:bank.ru',
   body: 'hi',
   ts: 100,
-  pending: false,
-  failed: false,
-}
+})
 
 describe('mergeMessages — deduplication invariants', () => {
   it('appends message with unknown eventId', () => {
@@ -49,6 +46,19 @@ describe('mergeMessages — deduplication invariants', () => {
     expect(result).toHaveLength(2)
     expect(result.filter((message) => message.eventId === '$real')).toHaveLength(1)
     expect(result.filter((message) => message.pending)).toHaveLength(1)
+  })
+
+  it('sync-race: при одинаковом теле реальный event достаётся ПЕРВОМУ черновику (known txnId-less gap)', () => {
+    // матч идёт по sender+body, не по unsigned.transaction_id → если сервер создал событие
+    // для второго черновика, а sync принёс его раньше ответа PUT первого, resolved окажется
+    // первый. Пиним поведение: будущий матч по txnId должен изменить его осознанно.
+    const first = { ...base, localId: 'local-1', eventId: 'optimistic:1', pending: true, ts: 100 }
+    const second = { ...base, localId: 'local-2', eventId: 'optimistic:2', pending: true, ts: 101 }
+    const fromSync = { ...base, eventId: '$real', ts: 150 }
+
+    const result = mergeMessages([first, second], [fromSync])
+
+    expect(result.find((message) => message.eventId === '$real')?.localId).toBe('local-1')
   })
 
   it('sync-race: failed message not resolved (only pending=true matches)', () => {
