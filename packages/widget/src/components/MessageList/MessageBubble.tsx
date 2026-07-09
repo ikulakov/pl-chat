@@ -1,11 +1,11 @@
 import { cn } from '../../shared/cn'
 import { Spinner } from '../../shared/ui/Spinner'
-import { ChecksIcon, FailedIcon } from '../icons'
+import { ChecksIcon, FailedIcon } from '../../shared/ui/icons'
+import type { MessageStatus } from '../../store/model'
 import styles from './MessageBubble.module.css'
 
 type BubbleType = 'operator' | 'user'
 export type BubblePosition = 'single' | 'first' | 'middle' | 'last'
-type MessageStatus = 'sending' | 'sent' | 'read' | 'failed'
 
 interface Props {
   type: BubbleType
@@ -17,7 +17,10 @@ interface Props {
 
 export function MessageBubble({ type, position = 'single', time, status, children }: Props) {
   return (
-    <div className={cn(styles.bubble, styles[type], styles[position])}>
+    <div
+      className={cn(styles.bubble, styles[type], styles[position])}
+      data-role="message-bubble"
+    >
       <p className={styles.text}>
         {children}
         <span className={styles.meta}>

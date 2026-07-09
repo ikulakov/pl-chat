@@ -22,7 +22,7 @@ export class ChatController {
     }
   }
 
-  handleHostCommand = (cmd: HostCommand): void => {
+  private handleHostCommand = (cmd: HostCommand): void => {
     switch (cmd.type) {
       case 'OPEN':
         this.open()
@@ -35,13 +35,21 @@ export class ChatController {
         else this.open()
         break
       case 'INIT':
+        if (cmd.payload.viewport) {
+          chatStore.getState().setViewport(cmd.payload.viewport)
+        }
+        break
+      case 'SET_VIEWPORT':
+        chatStore.getState().setViewport(cmd.payload.mode)
         break
     }
   }
 
   sendMessage = (text: string): Promise<void> => this.matrix.sendMessage(text)
 
-  retry = (): void => {
+  resendMessage = (localId: string): Promise<void> => this.matrix.resendMessage(localId)
+
+  reconnect = (): void => {
     void this.matrix.connect()
   }
 

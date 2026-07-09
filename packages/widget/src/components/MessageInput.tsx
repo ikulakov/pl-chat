@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useChatActions } from '../hooks/useChatActions'
 import { t } from '../i18n'
 import { IconButton } from '../shared/ui/IconButton'
-import { AttachIcon, SendIcon } from './icons'
+import { AttachIcon, SendIcon } from '../shared/ui/icons'
 import styles from './MessageInput.module.css'
 
 interface Props {

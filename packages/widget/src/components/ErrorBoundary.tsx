@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <StatusScreen
             title={t('status.crash')}
             subtitle={t('status.crash.subtitle')}
-            illustration={`${import.meta.env.BASE_URL}/error-illustration.png`}
+            illustration={`/error-illustration.png`}
             action={
               <button
                 className={statusStyles.retryBtn}

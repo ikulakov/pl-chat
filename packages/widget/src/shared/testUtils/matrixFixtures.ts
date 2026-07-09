@@ -2,11 +2,25 @@ import { vi } from 'vitest'
 import { MatrixEventType, MsgType, OperatorStatus } from '../../matrix/consts'
 import type { MatrixApi } from '../../matrix/matrixApi'
 import type { SessionInit } from '../../matrix/session/types'
+import type { ChatMessage } from '../../store/model'
 import type { JoinedRoom, OperatorCurrentEvent, RoomMessageEvent } from '../../types/matrix'
 import type { SyncResponse } from '../../types/requests'
 
 export const ROOM_ID = '!room:bank'
 export const OPERATOR_ID = '@operator:bank'
+
+export function chatMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+  return {
+    localId: 'm1',
+    eventId: 'm1',
+    sender: OPERATOR_ID,
+    body: 'hello',
+    ts: 0,
+    pending: false,
+    failed: false,
+    ...overrides,
+  }
+}
 
 export function emptyJoinedRoom(overrides: Partial<JoinedRoom> = {}): JoinedRoom {
   return {

@@ -1,13 +1,13 @@
 import { useMemo, useRef } from 'react'
+import { useChatActions } from '../../hooks/useChatActions'
 import { useChatScroll } from '../../hooks/useChatScroll'
 import { useChatStore } from '../../hooks/useChatStore'
 import { t } from '../../i18n'
-import { formatTime } from '../../shared/formatTime'
 import { IconButton } from '../../shared/ui/IconButton'
-import { ChevronDownIcon } from '../icons'
-import { MessageBubble } from './MessageBubble'
+import { ChevronDownIcon } from '../../shared/ui/icons'
 import { getPosition, groupMessagesByDate } from './MessageList.helpers'
 import styles from './MessageList.module.css'
+import { MessageRow } from './MessageRow'
 
 export function MessageList() {
   const userId = useChatStore((s) => s.userId)
@@ -16,6 +16,8 @@ export function MessageList() {
 
   const messagesListRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  const { resendMessage } = useChatActions()
 
   const { showScrollButton, scrollToBottom } = useChatScroll({
     messages,
@@ -41,18 +43,17 @@ export function MessageList() {
             >
               <span className={styles.dateSeparatorLabel}>{label}</span>
             </div>
+
             {messages.map((message, index, arr) => {
               const position = getPosition(arr[index - 1], message, arr[index + 1])
               return (
-                <MessageBubble
+                <MessageRow
                   key={message.localId}
-                  type={message.sender === userId ? 'user' : 'operator'}
+                  userId={userId}
+                  message={message}
                   position={position}
-                  time={formatTime(message.ts)}
-                  status={message.pending ? 'sending' : message.failed ? 'failed' : 'sent'}
-                >
-                  {message.body}
-                </MessageBubble>
+                  onRetry={resendMessage}
+                />
               )
             })}
           </div>

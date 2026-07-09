@@ -1,5 +1,5 @@
 import { formatDateLabel, startOfDay } from '../../shared/formatDate'
-import type { ChatMessage } from '../../store/model'
+import type { ChatMessage, MessageStatus } from '../../store/model'
 import type { BubblePosition } from './MessageBubble'
 
 interface DayGroup {
@@ -38,4 +38,10 @@ export function getPosition(
   if (!isPrevSame && isNextSame) return 'first'
   if (isPrevSame && isNextSame) return 'middle'
   return 'last'
+}
+
+export function deriveMessageStatus(message: ChatMessage): MessageStatus {
+  if (message.failed) return 'failed'
+  if (message.pending) return 'sending'
+  return 'sent'
 }

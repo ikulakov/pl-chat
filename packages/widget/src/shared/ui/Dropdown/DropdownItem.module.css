@@ -1,0 +1,23 @@
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--c-text-primary);
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--c-surface-tertiary);
+  }
+}
+
+.item svg {
+  flex-shrink: 0;
+}

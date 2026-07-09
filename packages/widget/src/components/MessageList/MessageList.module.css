@@ -45,13 +45,48 @@
   display: flex;
   flex-direction: column;
 
-  & :last-child {
+  &:has(~ .dayGroup) > .messageRow:last-child {
     margin-bottom: 0;
   }
 }
 
 .bottomSentinel {
   height: 1px;
+}
+
+.messageRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin-bottom: 4px;
+
+  & [data-role='message-actions-trigger'] {
+    transition: opacity 0.15s;
+    order: 2;
+    flex-shrink: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &.own {
+    justify-content: flex-end;
+
+    & [data-role='message-actions-trigger'] {
+      order: 0;
+    }
+  }
+
+  &.groupEnd {
+    margin-bottom: 12px;
+  }
+
+  &:hover [data-role='message-actions-trigger'],
+  &:focus-within [data-role='message-actions-trigger'],
+  &:has([data-role='message-actions-trigger'][aria-expanded='true'])
+    [data-role='message-actions-trigger'] {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .scrollButton {

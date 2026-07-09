@@ -5,7 +5,8 @@ export function useChatActions() {
 
   return {
     sendMessage: controller.sendMessage,
-    retry: controller.retry,
+    resendMessage: controller.resendMessage,
+    reconnect: controller.reconnect,
     open: controller.open,
     close: controller.close,
   }

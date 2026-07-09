@@ -24,5 +24,9 @@
   "date.yesterday": "Yesterday",
   "dev.operatorMessagePlaceholder": "Operator message (dev)",
   "dev.operatorMessageSend": "Send",
-  "chat.scroll-down": "Go to bottom"
+  "chat.scroll-down": "Go to bottom",
+  "chat.action.menu": "Menu",
+  "chat.action.copy": "Copy",
+  "chat.action.copied": "Copied",
+  "chat.action.retry": "Retry"
 }

@@ -1,16 +1,42 @@
 import { MatrixEventType, OperatorStatus } from '../matrix/consts'
-import type { ClientEvent, OperatorCurrentEvent, RoomMessageEvent } from '../types/matrix'
-import type { ChatMessage, OperatorState } from './model'
+import type {
+  ClientEvent,
+  JoinedRoom,
+  OperatorCurrentEvent,
+  RoomMessageEvent,
+} from '../types/matrix'
+import type { ChatMessage, ChatRuntimeState, OperatorState, RoomState } from './model'
 
 function isRoomMessage(event: ClientEvent): event is RoomMessageEvent {
   return event.type === MatrixEventType.RoomMessage
 }
 
+export function updateMessages(
+  state: ChatRuntimeState,
+  updater: (messages: ChatMessage[]) => ChatMessage[],
+): ChatRuntimeState {
+  return { ...state, room: { ...state.room, messages: updater(state.room.messages) } }
+}
+
+export function applySync(room: RoomState, joinedRoom: JoinedRoom): RoomState {
+  const timelineEvents = joinedRoom.timeline.events
+  const stateEvents = joinedRoom.state.events
+  return {
+    ...room,
+    timeline: mergeTimelineEvents(room.timeline, timelineEvents),
+    messages: mergeMessages(room.messages, timelineToMessages(timelineEvents)),
+    operator: reduceOperator(room.operator, [...stateEvents, ...timelineEvents]),
+  }
+}
+
 export function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
-  const result = [...existing]
+  let result = existing
 
   for (const incomingMsg of incoming) {
     if (result.some((m) => m.eventId === incomingMsg.eventId)) continue
+
+    // копия на первое реальное изменение
+    if (result === existing) result = [...existing]
 
     // race: если sync вернул событие раньше, чем пришёл ответ на PUT /send
     // находим оптимистичный черновик и обновляем его реальным event_id
@@ -38,7 +64,9 @@ export function mergeTimelineEvents(
   incoming: ClientEvent[],
 ): ClientEvent[] {
   const ids = new Set(existing.map((event) => event.event_id))
-  return [...existing, ...incoming.filter((event) => !ids.has(event.event_id))]
+  const newEvents = incoming.filter((event) => !ids.has(event.event_id))
+
+  return newEvents.length === 0 ? existing : [...existing, ...newEvents]
 }
 
 export function reduceOperator(current: OperatorState, events: ClientEvent[]): OperatorState {
