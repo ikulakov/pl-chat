@@ -3,7 +3,7 @@
 # Без MATRIX_BACKEND образ остаётся чистым статик-сервером (snippet не пишется,
 # wildcard-include в конфиге остаётся пустым). Запускается nginx-образом из
 # /docker-entrypoint.d/ до старта nginx.
-set -x
+set -eu
 
 SNIPPET=/etc/nginx/snippets/matrix-proxy-enabled.conf
 mkdir -p /etc/nginx/snippets
