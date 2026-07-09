@@ -11,8 +11,12 @@
 #   DNS_RESOLVER    — DNS для резолва апстрима (default: 127.0.0.11 — Docker DNS)
 
 # ── Stage 1: сборка ──────────────────────────────────────────────────────────
-FROM node:24-alpine AS build
+FROM nexus.isb/library/node:24-alpine-obru AS build
 WORKDIR /app
+
+ENV COREPACK_NPM_REGISTRY="https://nexus.isb/repository/npmjs-npm-proxy/"
+ENV NODE_EXTRA_CA_CERTS="/etc/ssl/certs/ca-certificates.crt"
+ENV npm_config_registry="https://nexus.isb/repository/npmjs-npm-proxy/"
 
 # Версия из package.json#packageManager — воспроизводимая сборка.
 RUN corepack enable && corepack prepare pnpm@10.34.3 --activate
@@ -39,7 +43,7 @@ ENV VITE_ALLOWED_PARENTS=$VITE_ALLOWED_PARENTS
 RUN pnpm build
 
 # ── Stage 2: runtime (nginx, отдача статики) ─────────────────────────────────
-FROM nginx:1.27-alpine AS runtime
+FROM nexus.isb/library/nginx:1.27-alpine-obru AS runtime
 
 # Шаблон конфига: nginx прогоняет envsubst по /etc/nginx/templates/*.
 # NGINX_ENVSUBST_FILTER ограничивает подстановку только NGINX_*-переменными,
