@@ -1,26 +1,25 @@
 import { useMemo, useRef } from 'react'
-import { useChatActions } from '../../hooks/useChatActions'
+import { isSystem } from '../../domain/timeline'
 import { useChatScroll } from '../../hooks/useChatScroll'
 import { useChatStore } from '../../hooks/useChatStore'
 import { t } from '../../i18n'
 import { IconButton } from '../../shared/ui/IconButton'
 import { ChevronDownIcon } from '../../shared/ui/icons'
-import { getPosition, groupMessagesByDate } from './MessageList.helpers'
+import { getPosition, groupTimelineByDate } from './MessageList.helpers'
 import styles from './MessageList.module.css'
 import { MessageRow } from './MessageRow'
+import { SystemMessage } from './SystemMessage'
 
 export function MessageList() {
   const userId = useChatStore((s) => s.userId)
-  const messages = useChatStore((s) => s.messages)
-  const messagesGroupedByDate = useMemo(() => groupMessagesByDate(messages), [messages])
+  const timeline = useChatStore((s) => s.timeline)
+  const timelineGroupedByDate = useMemo(() => groupTimelineByDate(timeline), [timeline])
 
   const messagesListRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const { resendMessage } = useChatActions()
-
   const { showScrollButton, scrollToBottom } = useChatScroll({
-    messages,
+    timeline,
     userId,
     containerRef: messagesListRef,
     bottomRef,
@@ -32,7 +31,7 @@ export function MessageList() {
         ref={messagesListRef}
         className={styles.list}
       >
-        {messagesGroupedByDate.map(({ key, label, messages }) => (
+        {timelineGroupedByDate.map(({ key, label, items }) => (
           <div
             key={key}
             className={styles.dayGroup}
@@ -44,15 +43,17 @@ export function MessageList() {
               <span className={styles.dateSeparatorLabel}>{label}</span>
             </div>
 
-            {messages.map((message, index, arr) => {
-              const position = getPosition(arr[index - 1], message, arr[index + 1])
+            {items.map((item, index, arr) => {
+              if (isSystem(item)) {
+                return <SystemMessage key={item.localId}>{item.content.body}</SystemMessage>
+              }
+              const position = getPosition(arr[index - 1], item, arr[index + 1])
               return (
                 <MessageRow
-                  key={message.localId}
+                  key={item.localId}
                   userId={userId}
-                  message={message}
+                  message={item}
                   position={position}
-                  onRetry={resendMessage}
                 />
               )
             })}

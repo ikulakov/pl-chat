@@ -11,7 +11,7 @@ export default mergeConfig(
       setupFiles: ['./test.setup.ts'],
       clearMocks: true,
       typecheck: {
-        tsconfig: './tsconfig.test.json',
+        tsconfig: './tsconfig.json',
       },
     },
     resolve: {

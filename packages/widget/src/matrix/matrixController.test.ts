@@ -1,25 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
-import type {
-  ChatMessage,
-  ChatRuntimeState,
-  Identity,
-  RoomState,
-  RuntimeAction,
-} from '../../store/model'
-import { INITIAL_RUNTIME_STATE } from '../../store/store'
+import type { ChatRuntimeState, Identity, RoomState, RuntimeAction } from '../store/state'
+import type { TextTimelineItem } from '../domain/timeline'
+import { INITIAL_RUNTIME_STATE } from '../store/store'
 import {
-  chatMessage,
   createFakeTokenStore,
   deferred,
   makeMatrixApi,
   syncResponse,
-} from '../../shared/testUtils/matrixFixtures'
-import type { MatrixApi } from '../matrixApi'
-import { CONNECTION_FAILED_ERROR, MatrixController } from '../matrixController'
-import { MatrixSessionManager } from '../session/sessionManager'
-import { MatrixError } from '../transport/matrixError'
+  textItem,
+} from '../shared/testUtils/matrixFixtures'
+import type { MatrixApi } from './matrixApi'
+import { CONNECTION_FAILED_ERROR, MatrixController } from './matrixController'
+import { MatrixSessionManager } from './session/sessionManager'
+import { MatrixError } from './transport/matrixError'
 
-vi.mock('../../shared/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock('../shared/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 const IDENTITY: Identity = { userId: '@u:bank', roomId: '!r:bank' }
 
@@ -38,22 +33,23 @@ function harness(initial: Partial<ChatRuntimeState> = {}, api: MatrixApi = makeM
 }
 
 // Общая форма "неудачно отправленного" сообщения для resendMessage-тестов ниже
-function failedMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
-  return chatMessage({
+function failedMessage(
+  overrides: Partial<Omit<TextTimelineItem, 'kind' | 'content'>> & { body?: string } = {},
+): TextTimelineItem {
+  return textItem({
     localId: 'local-1',
     eventId: 'optimistic:local-1',
     sender: IDENTITY.userId,
     body: 'hi',
     ts: 1,
-    failed: true,
+    sendStatus: 'failed',
     ...overrides,
   })
 }
 
-function roomWithMessage(message: ChatMessage): RoomState {
+function roomWithMessage(message: TextTimelineItem): RoomState {
   return {
-    timeline: [],
-    messages: [message],
+    timeline: [message],
     operator: { isActive: false, id: null, displayName: null },
   }
 }
@@ -443,7 +439,7 @@ describe('MatrixController (orchestrator)', () => {
       phase: 'connected',
       identity: IDENTITY,
       room: roomWithMessage(
-        chatMessage({
+        textItem({
           localId: 'local-1',
           eventId: 'optimistic:local-1',
           sender: IDENTITY.userId,

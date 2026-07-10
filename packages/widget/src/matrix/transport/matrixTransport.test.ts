@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createFakeTokenStore } from '../../shared/testUtils/matrixFixtures'
 import { LocalStorageSessionStore } from '../session/localStorageSessionStore'
-import { MatrixTransport } from '../transport/matrixTransport'
+import { MatrixTransport } from './matrixTransport'
 
 const BASE_URL = 'https://matrix.bank'
 

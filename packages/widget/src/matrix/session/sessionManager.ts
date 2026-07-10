@@ -1,6 +1,6 @@
 import { sleep } from '../../shared/sleep'
-import type { JoinedRoom } from '../../types/matrix'
-import type { SyncResponse } from '../../types/requests'
+import type { JoinedRoom } from '../types'
+import type { SyncResponse } from '../dto'
 import type { MatrixApi } from '../matrixApi'
 import { isMatrixAuthError, MatrixErrCode, MatrixError } from '../transport/matrixError'
 import type { MatrixSessionStore } from './types'
