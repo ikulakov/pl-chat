@@ -19,7 +19,7 @@
     height: 36px;
     border-width: 3px;
     border-color: var(--c-surface-secondary);
-    border-top-color: var(--c-surface-purple);
+    border-top-color: var(--c-surface-contrast);
   }
 }
 

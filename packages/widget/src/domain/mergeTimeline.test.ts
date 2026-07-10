@@ -77,6 +77,25 @@ describe('mergeTimeline — deduplication invariants', () => {
     expect(result.find((message) => message.eventId === '$real')?.localId).toBe('local-1')
   })
 
+  it('PUT-first: серверный ts из sync вытесняет клиентский у уже отправленного сообщения', () => {
+    // PUT /send зарезолвил черновик раньше sync: реальный eventId, но клиентский ts.
+    const sent = { ...base, eventId: '$real', ts: 999, sendStatus: 'sent' as const }
+    const fromSync = { ...base, eventId: '$real', ts: 150 }
+
+    const result = mergeTimeline([sent], [fromSync])
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.ts).toBe(150)
+    expect(result[0]).toMatchObject({ sendStatus: 'sent', eventId: '$real' })
+  })
+
+  it('PUT-first: повторный sync с тем же ts не меняет ссылку на массив', () => {
+    // серверный ts уже подтянут — идемпотентный тик не должен триггерить ре-рендер
+    const reconciled = [{ ...base, eventId: '$real', ts: 150, sendStatus: 'sent' as const }]
+
+    expect(mergeTimeline(reconciled, [{ ...base, eventId: '$real', ts: 150 }])).toBe(reconciled)
+  })
+
   it('sync-race: failed message not resolved (only sending matches)', () => {
     const failed = { ...base, eventId: 'optimistic:uuid', sendStatus: 'failed' as const }
     const fromSync = { ...base, eventId: '$real', ts: 150 }

@@ -11,14 +11,19 @@ const findPendingDraft = (items: TimelineItem[], incoming: MessageTimelineItem):
       item.content.body === incoming.content.body,
   )
 
-const isDuplicate = (items: TimelineItem[], item: TimelineItem): boolean =>
-  items.some((existing) => existing.eventId === item.eventId)
-
 export function mergeTimeline(existing: TimelineItem[], incoming: TimelineItem[]): TimelineItem[] {
   let result = existing
 
   for (const incomingItem of incoming) {
-    if (isDuplicate(result, incomingItem)) continue
+    const dupIdx = result.findIndex((existing) => existing.eventId === incomingItem.eventId)
+    if (dupIdx !== -1) {
+      const existingItem = result[dupIdx]!
+      if (existingItem.ts === incomingItem.ts) continue
+
+      if (result === existing) result = [...existing]
+      result[dupIdx] = { ...existingItem, ts: incomingItem.ts }
+      continue
+    }
 
     // копия на первое реальное изменение
     if (result === existing) result = [...existing]
