@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createMatrixApi } from '../matrixApi'
-import type { MatrixTransport } from '../transport/matrixTransport'
+import { createMatrixApi } from './matrixApi'
+import type { MatrixTransport } from './transport/matrixTransport'
 
 // matrixController мокает весь MatrixApi, поэтому реальную сборку URL/тела не проверяет
 // нигде больше — этот слой тестируется только здесь.

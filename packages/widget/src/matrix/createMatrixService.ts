@@ -1,4 +1,4 @@
-import type { ChatRuntimeState, RuntimeAction } from '../store/model'
+import type { ChatRuntimeState, RuntimeAction } from '../store/state'
 import { createMatrixApi } from './matrixApi'
 import { MatrixController, type MatrixService } from './matrixController'
 import { LocalStorageSessionStore } from './session/localStorageSessionStore'

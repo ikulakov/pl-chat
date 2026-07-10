@@ -1,11 +1,18 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MessageActions } from './MessageActions'
 import { t } from '../../i18n'
+import { MessageActions } from './MessageActions'
+
+const resendMessage = vi.fn()
+
+vi.mock('../../hooks/useChatActions', () => ({
+  useChatActions: () => ({ resendMessage }),
+}))
 
 describe('MessageActions', () => {
   beforeEach(() => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
+    resendMessage.mockClear()
   })
 
   afterEach(() => {
@@ -15,9 +22,9 @@ describe('MessageActions', () => {
   it('opens the dropdown on trigger click and closes it on outside click', async () => {
     render(
       <MessageActions
+        localId="m1"
         text="hello"
         canRetry={false}
-        onRetry={vi.fn()}
       />,
     )
 
@@ -33,9 +40,9 @@ describe('MessageActions', () => {
   it('copies the message body to the clipboard when "Копировать" is clicked', async () => {
     render(
       <MessageActions
+        localId="m1"
         text="hello world"
         canRetry={false}
-        onRetry={vi.fn()}
       />,
     )
 
@@ -48,9 +55,9 @@ describe('MessageActions', () => {
   it('a real tap on "Копировать" (pointerdown → click) is not swallowed by the outside-close handler', async () => {
     render(
       <MessageActions
+        localId="m1"
         text="hello world"
         canRetry={false}
-        onRetry={vi.fn()}
       />,
     )
 
@@ -66,28 +73,27 @@ describe('MessageActions', () => {
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('hello world'))
   })
 
-  it('shows "Повторить" only when canRetry is true, and invokes onRetry', () => {
-    const onRetry = vi.fn()
+  it('shows "Повторить" only when canRetry is true, and invokes resendMessage with the message localId', () => {
     render(
       <MessageActions
+        localId="m1"
         text="hello"
         canRetry={true}
-        onRetry={onRetry}
       />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Меню' }))
     fireEvent.click(screen.getByText(t('chat.action.retry')))
 
-    expect(onRetry).toHaveBeenCalledOnce()
+    expect(resendMessage).toHaveBeenCalledExactlyOnceWith('m1')
   })
 
   it('does not render "Повторить отправку" when canRetry is false', () => {
     render(
       <MessageActions
+        localId="m1"
         text="hello"
         canRetry={false}
-        onRetry={vi.fn()}
       />,
     )
 

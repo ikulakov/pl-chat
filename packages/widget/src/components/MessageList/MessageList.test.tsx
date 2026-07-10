@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { chatMessage } from '../../shared/testUtils/matrixFixtures'
-import type { ChatMessage } from '../../store/model'
+import { systemItem, textItem } from '../../shared/testUtils/matrixFixtures'
+import type { TextTimelineItem } from '../../domain/timeline'
 import { INITIAL_ROOM_STATE, chatStore } from '../../store/store'
 import { MessageList } from './MessageList'
 
@@ -10,8 +10,10 @@ vi.mock('../../hooks/useChatActions', () => ({
   useChatActions: () => ({ resendMessage: vi.fn() }),
 }))
 
-function message(overrides: Partial<ChatMessage>): ChatMessage {
-  return chatMessage({
+function message(
+  overrides: Partial<Omit<TextTimelineItem, 'kind' | 'content'>> & { body?: string },
+): TextTimelineItem {
+  return textItem({
     localId: overrides.eventId ?? 'local',
     eventId: 'event',
     ts: Date.now(),
@@ -40,7 +42,7 @@ describe('MessageList', () => {
     chatStore.setState({
       room: {
         ...INITIAL_ROOM_STATE,
-        messages: [
+        timeline: [
           message({ localId: 'm1', eventId: 'm1', ts: day1, body: 'a' }),
           message({ localId: 'm2', eventId: 'm2', ts: day1 + 1000, body: 'b' }),
           message({ localId: 'm3', eventId: 'm3', ts: day2, body: 'c' }),
@@ -63,7 +65,7 @@ describe('MessageList', () => {
     chatStore.setState({
       room: {
         ...INITIAL_ROOM_STATE,
-        messages: [
+        timeline: [
           message({ localId: 'm1', eventId: 'm1', ts: day1, body: 'a' }),
           message({ localId: 'm2', eventId: 'm2', ts: day1 + 1000, body: 'b' }),
           message({ localId: 'm3', eventId: 'm3', ts: day2, body: 'c' }),
@@ -80,5 +82,25 @@ describe('MessageList', () => {
     expect(separators[0]?.parentElement?.textContent).not.toContain('c')
     expect(separators[1]?.parentElement?.textContent).toContain('c')
     expect(separators[1]?.parentElement?.textContent).not.toContain('a')
+  })
+
+  it('renders a system message as a plain badge, without message actions or bubble status', () => {
+    const day1 = new Date('2026-07-01T10:00:00').getTime()
+
+    chatStore.setState({
+      room: {
+        ...INITIAL_ROOM_STATE,
+        timeline: [
+          systemItem({ localId: 'sys1', eventId: 'sys1', ts: day1, body: 'Оператор завершил чат' }),
+        ],
+      },
+    })
+
+    const { container } = render(<MessageList />)
+
+    expect(screen.getByText('Оператор завершил чат')).toBeInTheDocument()
+    expect(container.querySelector('[data-role="system-message"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-role="message-actions-trigger"]')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-role="message-bubble"]')).not.toBeInTheDocument()
   })
 })

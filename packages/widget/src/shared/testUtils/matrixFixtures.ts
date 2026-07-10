@@ -1,24 +1,57 @@
 import { vi } from 'vitest'
+import type { SystemTimelineItem, TextTimelineItem } from '../../domain/timeline'
 import { MatrixEventType, MsgType, OperatorStatus } from '../../matrix/consts'
+import type { SyncResponse } from '../../matrix/dto'
 import type { MatrixApi } from '../../matrix/matrixApi'
 import type { SessionInit } from '../../matrix/session/types'
-import type { ChatMessage } from '../../store/model'
-import type { JoinedRoom, OperatorCurrentEvent, RoomMessageEvent } from '../../types/matrix'
-import type { SyncResponse } from '../../types/requests'
+import type {
+  JoinedRoom,
+  OperatorCurrentEvent,
+  OperatorJoinedEvent,
+  OperatorLeftEvent,
+  RoomMessageEvent,
+} from '../../matrix/types'
 
 export const ROOM_ID = '!room:bank'
 export const OPERATOR_ID = '@operator:bank'
 
-export function chatMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+export function textItem(
+  overrides: Partial<Omit<TextTimelineItem, 'kind' | 'content'>> & { body?: string } = {},
+): TextTimelineItem {
+  const { body, ...rest } = overrides
   return {
+    kind: 'text',
     localId: 'm1',
     eventId: 'm1',
     sender: OPERATOR_ID,
-    body: 'hello',
     ts: 0,
-    pending: false,
-    failed: false,
-    ...overrides,
+    sendStatus: 'sent',
+    ...rest,
+    content: { body: body ?? 'hello' },
+  }
+}
+
+export function systemItem(
+  overrides: { localId?: string; eventId?: string; ts?: number; body?: string } = {},
+): SystemTimelineItem {
+  return {
+    kind: 'system',
+    localId: overrides.localId ?? 'sys1',
+    eventId: overrides.eventId ?? 'sys1',
+    ts: overrides.ts ?? 0,
+    content: { body: overrides.body ?? 'system' },
+  }
+}
+
+export function noticeItem(
+  overrides: { localId?: string; eventId?: string; ts?: number; body?: string } = {},
+): SystemTimelineItem {
+  return {
+    kind: 'notice',
+    localId: overrides.localId ?? 'notice1',
+    eventId: overrides.eventId ?? 'notice1',
+    ts: overrides.ts ?? 0,
+    content: { body: overrides.body ?? 'notice' },
   }
 }
 
@@ -59,8 +92,43 @@ export function roomMessageEvent(
     event_id: '$m1',
     sender: OPERATOR_ID,
     origin_server_ts: 2,
-    content: { msgtype: MsgType.Text, body: 'hello', ...content },
+    // content — дискриминированный union; фикстура собирает конкретный вариант вручную,
+    // спред Partial<union> размывает msgtype до объединения литералов
+    content: { msgtype: MsgType.Text, body: 'hello', ...content } as RoomMessageEvent['content'],
     ...rest,
+  }
+}
+
+export function operatorJoinedEvent(
+  overrides: Partial<OperatorJoinedEvent['content']> = {},
+): OperatorJoinedEvent {
+  return {
+    type: MatrixEventType.OperatorJoined,
+    event_id: '$op-joined',
+    sender: OPERATOR_ID,
+    origin_server_ts: 1,
+    content: {
+      operator_id: OPERATOR_ID,
+      displayname: 'Ольга',
+      role: 'human',
+      ...overrides,
+    },
+  }
+}
+
+export function operatorLeftEvent(
+  overrides: Partial<OperatorLeftEvent['content']> = {},
+): OperatorLeftEvent {
+  return {
+    type: MatrixEventType.OperatorLeft,
+    event_id: '$op-left',
+    sender: OPERATOR_ID,
+    origin_server_ts: 1,
+    content: {
+      operator_id: OPERATOR_ID,
+      reason: 'completed',
+      ...overrides,
+    },
   }
 }
 

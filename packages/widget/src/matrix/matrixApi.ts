@@ -1,4 +1,4 @@
-import type { RegisterResponse, SyncResponse } from '../types/requests'
+import type { RegisterResponse, SyncResponse } from './dto'
 import { MATRIX_API_PREFIX, MsgType } from './consts'
 import type { MatrixTransport } from './transport/matrixTransport'
 

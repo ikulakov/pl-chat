@@ -1,7 +1,7 @@
+import type { SendStatus } from '../../domain/timeline'
 import { cn } from '../../shared/cn'
 import { Spinner } from '../../shared/ui/Spinner'
 import { ChecksIcon, FailedIcon } from '../../shared/ui/icons'
-import type { MessageStatus } from '../../store/model'
 import styles from './MessageBubble.module.css'
 
 type BubbleType = 'operator' | 'user'
@@ -11,7 +11,7 @@ interface Props {
   type: BubbleType
   position?: BubblePosition
   time: string
-  status?: MessageStatus
+  status?: SendStatus
   children: React.ReactNode
 }
 

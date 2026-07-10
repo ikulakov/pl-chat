@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
-  chatMessage,
   emptyJoinedRoom,
   OPERATOR_ID,
   operatorCurrentEvent,
   roomMessageEvent,
-} from '../../shared/testUtils/matrixFixtures'
-import type { JoinedRoom } from '../../types/matrix'
-import { chatRuntimeReducer } from '../chatRuntimeReducer'
-import type { ChatMessage, Identity } from '../model'
-import { INITIAL_RUNTIME_STATE } from '../store'
+  textItem,
+} from '../shared/testUtils/matrixFixtures'
+import type { TextTimelineItem } from '../domain/timeline'
+import type { JoinedRoom } from '../matrix/types'
+import { chatRuntimeReducer } from './reducer'
+import type { Identity } from './state'
+import { INITIAL_RUNTIME_STATE } from './store'
 
 const IDENTITY: Identity = { userId: '@user:bank', roomId: '!room:bank' }
 
@@ -20,14 +21,16 @@ function joinedRoom(): JoinedRoom {
   })
 }
 
-function ownMessage(overrides: Partial<ChatMessage>): ChatMessage {
-  return chatMessage({
+function ownMessage(
+  overrides: Partial<Omit<TextTimelineItem, 'kind' | 'content'>> & { body?: string } = {},
+): TextTimelineItem {
+  return textItem({
     localId: 'l1',
     eventId: 'optimistic:l1',
     sender: IDENTITY.userId,
     body: 'hi',
     ts: 1,
-    pending: true,
+    sendStatus: 'sending',
     ...overrides,
   })
 }
@@ -44,7 +47,7 @@ describe('chatRuntimeReducer', () => {
     expect(next.phase).toBe('connected')
     expect(next.identity).toEqual(IDENTITY)
     expect(next.cursor).toBe('s1')
-    expect(next.room.messages).toHaveLength(1)
+    expect(next.room.timeline).toHaveLength(1)
     expect(next.room.operator).toEqual({ isActive: true, id: OPERATOR_ID, displayName: 'Support' })
   })
 
@@ -77,7 +80,9 @@ describe('chatRuntimeReducer', () => {
       }),
     })
 
-    expect(next.room.messages.map((message) => message.body)).toEqual(['new session message'])
+    expect(next.room.timeline.map((message) => message.content.body)).toEqual([
+      'new session message',
+    ])
   })
 
   it('sync.received WITHOUT a roomAction keeps the same room reference', () => {
@@ -108,7 +113,7 @@ describe('chatRuntimeReducer', () => {
     expect(failed.error).toBe('network')
     expect(failed.identity).toBeNull()
     expect(failed.cursor).toBeNull()
-    expect(failed.room.messages).toHaveLength(0)
+    expect(failed.room.timeline).toHaveLength(0)
   })
 
   it('session.recovering keeps the current runtime data while recovery is in flight', () => {
@@ -134,7 +139,7 @@ describe('chatRuntimeReducer', () => {
       { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
       { type: 'message.optimisticAdded', message: ownMessage({}) },
     )
-    expect(withOptimistic.room.messages[0]!.pending).toBe(true)
+    expect(withOptimistic.room.timeline[0]).toMatchObject({ sendStatus: 'sending' })
 
     const sent = chatRuntimeReducer(withOptimistic, {
       type: 'message.sent',
@@ -142,8 +147,8 @@ describe('chatRuntimeReducer', () => {
       eventId: '$real',
     })
 
-    expect(sent.room.messages[0]!.eventId).toBe('$real')
-    expect(sent.room.messages[0]!.pending).toBe(false)
+    expect(sent.room.timeline[0]!.eventId).toBe('$real')
+    expect(sent.room.timeline[0]).toMatchObject({ sendStatus: 'sent' })
   })
 
   it('marks a still-pending optimistic message as failed', () => {
@@ -154,8 +159,7 @@ describe('chatRuntimeReducer', () => {
 
     const failed = chatRuntimeReducer(withOptimistic, { type: 'message.failed', localId: 'l1' })
 
-    expect(failed.room.messages[0]!.pending).toBe(false)
-    expect(failed.room.messages[0]!.failed).toBe(true)
+    expect(failed.room.timeline[0]).toMatchObject({ sendStatus: 'failed' })
   })
 
   it('does not mark a message failed after sync already resolved it', () => {
@@ -167,7 +171,7 @@ describe('chatRuntimeReducer', () => {
       type: 'sync.received',
       cursor: 's1',
       joinedRoom: emptyJoinedRoom({
-        // тело совпадает с оптимистичным ('hi') — иначе mergeMessages не свяжет черновик с реальным событием
+        // тело совпадает с оптимистичным ('hi') — иначе mergeTimeline не свяжет черновик с реальным событием
         timeline: {
           events: [
             roomMessageEvent({
@@ -182,17 +186,17 @@ describe('chatRuntimeReducer', () => {
 
     const failedLate = chatRuntimeReducer(resolvedBySync, { type: 'message.failed', localId: 'l1' })
 
-    expect(failedLate.room.messages).toHaveLength(1)
-    expect(failedLate.room.messages[0]!.eventId).toBe('$real')
-    expect(failedLate.room.messages[0]!.failed).toBe(false)
+    expect(failedLate.room.timeline).toHaveLength(1)
+    expect(failedLate.room.timeline[0]!.eventId).toBe('$real')
+    expect(failedLate.room.timeline[0]).toMatchObject({ sendStatus: 'sent' })
   })
 
-  it('retries a failed message in place — pending again, failed cleared, index unchanged', () => {
+  it('retries a failed message in place — sending again, index unchanged', () => {
     const withFirst = chatRuntimeReducer(
       { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
       {
         type: 'message.optimisticAdded',
-        message: ownMessage({ localId: 'l1', body: 'first', pending: false, failed: true }),
+        message: ownMessage({ localId: 'l1', body: 'first', sendStatus: 'failed' }),
       },
     )
     const withSecond = chatRuntimeReducer(withFirst, {
@@ -202,14 +206,14 @@ describe('chatRuntimeReducer', () => {
         eventId: 'optimistic:l2',
         body: 'second',
         ts: 2,
-        pending: false,
+        sendStatus: 'sent',
       }),
     })
 
     const retried = chatRuntimeReducer(withSecond, { type: 'message.retrying', localId: 'l1' })
 
-    expect(retried.room.messages).toHaveLength(2)
-    expect(retried.room.messages[0]).toMatchObject({ localId: 'l1', pending: true, failed: false })
-    expect(retried.room.messages[1]).toMatchObject({ localId: 'l2', pending: false, failed: false })
+    expect(retried.room.timeline).toHaveLength(2)
+    expect(retried.room.timeline[0]).toMatchObject({ localId: 'l1', sendStatus: 'sending' })
+    expect(retried.room.timeline[1]).toMatchObject({ localId: 'l2', sendStatus: 'sent' })
   })
 })

@@ -5,10 +5,11 @@
     "noEmit": true,
     "resolveJsonModule": true,
     "erasableSyntaxOnly": true,
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "types": ["vite/client"],
     "paths": {
       "@bankchat/protocol": ["../protocol/src/index.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

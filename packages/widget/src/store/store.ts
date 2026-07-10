@@ -1,8 +1,8 @@
 import type { ViewportMode } from '@bankchat/protocol'
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import { chatRuntimeReducer } from './chatRuntimeReducer'
-import type { ChatRuntimeState, RoomState, RuntimeAction } from './model'
+import { chatRuntimeReducer } from './reducer'
+import type { ChatRuntimeState, RoomState, RuntimeAction } from './state'
 
 export interface ChatStoreState extends ChatRuntimeState {
   isOpen: boolean
@@ -15,7 +15,6 @@ export interface ChatStoreState extends ChatRuntimeState {
 
 export const INITIAL_ROOM_STATE: RoomState = {
   timeline: [],
-  messages: [],
   operator: {
     id: null,
     displayName: null,

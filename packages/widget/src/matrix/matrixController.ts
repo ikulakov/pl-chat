@@ -1,6 +1,7 @@
-import type { ChatRuntimeState, RuntimeAction } from '../store/model'
+import { createOptimisticTextMessage } from '../domain/optimistic'
+import { isSystem } from '../domain/timeline'
+import type { ChatRuntimeState, RuntimeAction } from '../store/state'
 import { type MatrixApi } from './matrixApi'
-import { createOptimisticTextMessage } from './messages'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
 import { isMatrixAuthError, isUserDeactivatedError } from './transport/matrixError'
@@ -75,7 +76,13 @@ export class MatrixController implements MatrixService {
     const { message, txnId } = createOptimisticTextMessage(identity.userId, text)
     this.dispatch({ type: 'message.optimisticAdded', message })
 
-    await this.dispatchSend(identity.roomId, message.localId, message.body, txnId, 'sendMessage')
+    await this.dispatchSend(
+      identity.roomId,
+      message.localId,
+      message.content.body,
+      txnId,
+      'sendMessage',
+    )
   }
 
   async resendMessage(localId: string): Promise<void> {
@@ -83,13 +90,21 @@ export class MatrixController implements MatrixService {
 
     if (phase !== 'connected' || !identity) return
 
-    const message = room.messages.find((m) => m.localId === localId)
+    const message = room.timeline.find((m) => m.localId === localId)
 
-    if (!message || !message.failed || !message.txnId) return
+    if (!message || isSystem(message) || message.sendStatus !== 'failed' || !message.txnId) {
+      return
+    }
 
     this.dispatch({ type: 'message.retrying', localId })
 
-    await this.dispatchSend(identity.roomId, localId, message.body, message.txnId, 'resendMessage')
+    await this.dispatchSend(
+      identity.roomId,
+      localId,
+      message.content.body,
+      message.txnId,
+      'resendMessage',
+    )
   }
 
   private async dispatchSend(

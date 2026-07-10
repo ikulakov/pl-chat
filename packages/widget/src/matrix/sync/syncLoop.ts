@@ -1,5 +1,5 @@
 import { sleep } from '../../shared/sleep'
-import type { SyncResponse } from '../../types/requests'
+import type { SyncResponse } from '../dto'
 import type { MatrixApi } from '../matrixApi'
 
 export interface SyncTick {

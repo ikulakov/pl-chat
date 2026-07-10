@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { LocalStorageSessionStore } from '../session/localStorageSessionStore'
+import { LocalStorageSessionStore } from './localStorageSessionStore'
 
 const STORAGE_KEY = 'plchat.session'
 

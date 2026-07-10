@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { chatMessage } from '../../shared/testUtils/matrixFixtures'
-import type { ChatMessage } from '../../store/model'
-import { deriveMessageStatus, getPosition } from './MessageList.helpers'
+import { noticeItem, systemItem, textItem } from '../../shared/testUtils/matrixFixtures'
+import type { TextTimelineItem } from '../../domain/timeline'
+import { getPosition } from './MessageList.helpers'
 
-function message(sender: string): ChatMessage {
-  return chatMessage({ localId: sender, eventId: sender, sender, body: 'x' })
+function message(sender: string): TextTimelineItem {
+  return textItem({ localId: sender, eventId: sender, sender, body: 'x' })
 }
 
 describe('getPosition', () => {
@@ -30,21 +30,14 @@ describe('getPosition', () => {
   it('returns "last" when only the previous message shares the sender', () => {
     expect(getPosition(me, me, op)).toBe('last')
   })
-})
 
-describe('deriveMessageStatus', () => {
-  const base = message('@me:bank')
-
-  it('returns "failed" for a failed message, regardless of pending', () => {
-    expect(deriveMessageStatus({ ...base, failed: true, pending: true })).toBe('failed')
-    expect(deriveMessageStatus({ ...base, failed: true, pending: false })).toBe('failed')
+  it('senderless system-плашка соседом разрывает группировку', () => {
+    // плашка (без sender) не должна считаться «тем же отправителем»
+    expect(getPosition(systemItem(), me, systemItem())).toBe('single')
   })
 
-  it('returns "sending" for a pending, non-failed message', () => {
-    expect(deriveMessageStatus({ ...base, pending: true, failed: false })).toBe('sending')
-  })
-
-  it('returns "sent" when neither pending nor failed', () => {
-    expect(deriveMessageStatus({ ...base, pending: false, failed: false })).toBe('sent')
+  it('m.notice плашка соседом тоже разрывает группировку', () => {
+    // notice — плашка от ACD-моста, не bubble; не должна склеивать пузыри вокруг себя
+    expect(getPosition(noticeItem(), me, noticeItem())).toBe('single')
   })
 })

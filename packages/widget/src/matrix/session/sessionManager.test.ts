@@ -6,7 +6,7 @@ import {
   syncResponse,
 } from '../../shared/testUtils/matrixFixtures'
 import type { MatrixApi } from '../matrixApi'
-import { MatrixSessionManager } from '../session/sessionManager'
+import { MatrixSessionManager } from './sessionManager'
 import { MatrixError } from '../transport/matrixError'
 
 vi.mock('../../shared/sleep', () => ({ sleep: () => Promise.resolve() }))

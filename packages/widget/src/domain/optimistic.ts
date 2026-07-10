@@ -1,7 +1,7 @@
-import type { ChatMessage } from '../store/model'
+import type { TextTimelineItem } from './timeline'
 
 export interface OutgoingText {
-  message: ChatMessage
+  message: TextTimelineItem
   txnId: string
 }
 
@@ -10,14 +10,14 @@ export function createOptimisticTextMessage(sender: string, text: string): Outgo
   const txnId = crypto.randomUUID()
   return {
     message: {
+      kind: 'text',
       localId,
       eventId: `optimistic:${localId}`,
-      sender,
-      body: text,
-      ts: Date.now(),
-      pending: true,
-      failed: false,
       txnId,
+      sender,
+      ts: Date.now(),
+      sendStatus: 'sending',
+      content: { body: text },
     },
     txnId,
   }

@@ -1,5 +1,7 @@
 import type { ViewportMode } from '@bankchat/protocol'
-import type { ClientEvent, JoinedRoom } from '../types/matrix'
+import type { OperatorState } from '../domain/operator'
+import type { TimelineItem } from '../domain/timeline'
+import type { JoinedRoom } from '../matrix/types'
 
 export type RuntimeAction =
   | { type: 'connection.connecting' }
@@ -7,7 +9,7 @@ export type RuntimeAction =
   | { type: 'connection.failed'; error: string }
   | { type: 'session.recovering' }
   | { type: 'sync.received'; cursor: string; joinedRoom?: JoinedRoom }
-  | { type: 'message.optimisticAdded'; message: ChatMessage }
+  | { type: 'message.optimisticAdded'; message: TimelineItem }
   | { type: 'message.sent'; localId: string; eventId: string }
   | { type: 'message.failed'; localId: string }
   | { type: 'message.retrying'; localId: string }
@@ -21,15 +23,8 @@ export interface ChatRuntimeState {
 }
 
 export interface RoomState {
-  timeline: ClientEvent[]
-  messages: ChatMessage[]
+  timeline: TimelineItem[]
   operator: OperatorState
-}
-
-export interface OperatorState {
-  isActive: boolean
-  id: string | null
-  displayName: string | null
 }
 
 export interface Identity {
@@ -37,30 +32,14 @@ export interface Identity {
   roomId: string
 }
 
-export interface ChatMessage {
-  // React key, якорь для optimistic-обновлений
-  localId: string
-  // id события в комнате от сервера; до ответа — placeholder `optimistic:{localId}`
-  eventId: string
-  // idempotency-ключ запроса PUT /send
-  txnId?: string
-  sender: string
-  body: string
-  ts: number
-  pending: boolean
-  failed: boolean
-}
-
 export type Phase = 'idle' | 'connecting' | 'recovering' | 'connected' | 'error'
-
-export type MessageStatus = 'sending' | 'sent' | 'read' | 'failed'
 
 export interface ChatUIState {
   isOpen: boolean
   status: ConnectionStatus
   userId: string | null
   error: string | null
-  messages: ChatMessage[]
+  timeline: TimelineItem[]
   viewport: ViewportMode
 }
 

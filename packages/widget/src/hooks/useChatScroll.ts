@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ChatMessage } from '../store/model'
+import { isSystem, type TimelineItem } from '../domain/timeline'
 import { useIntersectionObserver } from './useIntersectionObserver'
 
 const NEAR_BOTTOM_PX = 80
 
 interface UseChatScrollParams {
-  messages: ChatMessage[]
+  timeline: TimelineItem[]
   userId: string | null
   containerRef: React.RefObject<HTMLElement | null>
   bottomRef: React.RefObject<Element | null>
@@ -18,7 +18,7 @@ interface UseChatScrollParams {
  * - Прилипание к низу при изменении размера контейнера
  * - CSS-переменная --scrollbar-w (ширина скроллбара)
  */
-export function useChatScroll({ containerRef, bottomRef, messages, userId }: UseChatScrollParams): {
+export function useChatScroll({ containerRef, bottomRef, timeline, userId }: UseChatScrollParams): {
   showScrollButton: boolean
   scrollToBottom: () => void
 } {
@@ -31,13 +31,13 @@ export function useChatScroll({ containerRef, bottomRef, messages, userId }: Use
   // Основная логика скролла при новых сообщениях
   useLayoutEffect(() => {
     const list = containerRef.current
-    const lastMessage = messages.at(-1)
+    const lastMessage = timeline.at(-1)
     if (!list || !lastMessage || lastMessage.localId === lastMessageIdRef.current) return
 
     const isFirstRender = lastMessageIdRef.current === null
     lastMessageIdRef.current = lastMessage.localId
 
-    const isOwnMessage = lastMessage.sender === userId
+    const isOwnMessage = !isSystem(lastMessage) && lastMessage.sender === userId
     if (!isOwnMessage && !isNearBottomRef.current) return
 
     const behavior = !isFirstRender && isNearBottomRef.current ? 'smooth' : 'auto'
@@ -45,7 +45,7 @@ export function useChatScroll({ containerRef, bottomRef, messages, userId }: Use
       isAutoScrollingRef.current = true
     }
     list.scrollTo({ top: list.scrollHeight, behavior })
-  }, [messages, userId, containerRef])
+  }, [timeline, userId, containerRef])
 
   // Отслеживание bottom чата
   useIntersectionObserver({
