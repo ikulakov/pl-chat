@@ -5,7 +5,9 @@ import {
   type ChatEvent,
   type ChatEventType,
   type HostCommand,
+  type InitConfig,
   type PayloadOf,
+  type ViewportMode,
 } from '@bankchat/protocol'
 import { chatOrigin, validateConfig, widgetUrl, type LoaderConfig } from './config'
 import { IframeView } from './iframe'
@@ -29,7 +31,10 @@ export class BankChatClient {
     this.origin = chatOrigin(config)
 
     const parentOrigin = window.location.origin
-    this.iframe = new IframeView(widgetUrl(config, parentOrigin))
+    this.iframe = new IframeView({
+      src: widgetUrl(config, parentOrigin),
+      onViewportChange: this.handleViewportChange,
+    })
     this.iframe.mount()
 
     this.on('INIT_ACK', () => {
@@ -50,6 +55,9 @@ export class BankChatClient {
   }
   toggle(): void {
     this.send({ type: 'TOGGLE' })
+  }
+  private handleViewportChange = (mode: ViewportMode): void => {
+    this.send({ type: 'SET_VIEWPORT', payload: { mode } })
   }
 
   on<E extends ChatEventType>(eventType: E, handler: (event: PayloadOf<E>) => void): () => void {
@@ -79,8 +87,10 @@ export class BankChatClient {
     this.port = channel.port1
     this.port.onmessage = this.onPortMessage
 
+    const initPayload: InitConfig = { viewport: this.iframe.getViewportMode() }
+
     this.iframe.contentWindow?.postMessage(
-      makeEnvelope<HostCommand>({ type: 'INIT', payload: this.config! }),
+      makeEnvelope<HostCommand>({ type: 'INIT', payload: initPayload }),
       this.origin,
       [channel.port2],
     )

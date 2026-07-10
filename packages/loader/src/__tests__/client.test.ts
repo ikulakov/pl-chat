@@ -11,6 +11,7 @@ vi.mock('../iframe', () => ({
     mount: vi.fn(),
     open: vi.fn(),
     close: vi.fn(),
+    getViewportMode: vi.fn().mockReturnValue('docked'),
     get contentWindow() {
       return mockContentWindow
     },

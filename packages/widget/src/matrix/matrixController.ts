@@ -7,10 +7,13 @@ import { isMatrixAuthError, isUserDeactivatedError } from './transport/matrixErr
 
 export const CONNECTION_FAILED_ERROR = 'Не удалось подключиться'
 
+type AuthErrorContext = 'sync' | 'sendMessage' | 'resendMessage'
+
 export interface MatrixService {
   connect: () => Promise<void>
   disconnect: () => void
   sendMessage: (text: string) => Promise<void>
+  resendMessage: (localId: string) => Promise<void>
 }
 
 export interface MatrixControllerDeps {
@@ -41,7 +44,7 @@ export class MatrixController implements MatrixService {
 
   async connect(): Promise<void> {
     const { phase } = this.getState()
-    if (phase !== 'idle' && phase !== 'error') return
+    if (!(phase === 'idle' || phase === 'error')) return
 
     const lifecycleId = this.nextLifecycle()
 
@@ -65,7 +68,6 @@ export class MatrixController implements MatrixService {
   }
 
   async sendMessage(text: string): Promise<void> {
-    const lifecycleId = this.lifecycleId
     const { identity, phase } = this.getState()
 
     if (phase !== 'connected' || !identity) return
@@ -73,19 +75,45 @@ export class MatrixController implements MatrixService {
     const { message, txnId } = createOptimisticTextMessage(identity.userId, text)
     this.dispatch({ type: 'message.optimisticAdded', message })
 
+    await this.dispatchSend(identity.roomId, message.localId, message.body, txnId, 'sendMessage')
+  }
+
+  async resendMessage(localId: string): Promise<void> {
+    const { identity, phase, room } = this.getState()
+
+    if (phase !== 'connected' || !identity) return
+
+    const message = room.messages.find((m) => m.localId === localId)
+
+    if (!message || !message.failed || !message.txnId) return
+
+    this.dispatch({ type: 'message.retrying', localId })
+
+    await this.dispatchSend(identity.roomId, localId, message.body, message.txnId, 'resendMessage')
+  }
+
+  private async dispatchSend(
+    roomId: string,
+    localId: string,
+    body: string,
+    txnId: string,
+    context: AuthErrorContext,
+  ): Promise<void> {
+    const lifecycleId = this.lifecycleId
+
     try {
-      const { event_id } = await this.api.sendMessage(identity.roomId, txnId, text)
+      const { event_id } = await this.api.sendMessage(roomId, txnId, body)
       if (!this.isCurrentLifecycle(lifecycleId)) return
 
-      this.dispatch({ type: 'message.sent', localId: message.localId, eventId: event_id })
+      this.dispatch({ type: 'message.sent', localId, eventId: event_id })
     } catch (err) {
       if (!this.isCurrentLifecycle(lifecycleId)) return
 
-      this.dispatch({ type: 'message.failed', localId: message.localId })
+      this.dispatch({ type: 'message.failed', localId })
 
       // sync-петля не обязательно первой заметит мёртвую сессию — отправка может
       // словить ту же auth-ошибку раньше следующего long-poll.
-      this.handleAuthError(err, 'sendMessage')
+      this.handleAuthError(err, context)
     }
   }
 
@@ -137,7 +165,7 @@ export class MatrixController implements MatrixService {
     console.error('[PLChat] sync error, retrying in', meta.backoff, 'ms:', err)
   }
 
-  private handleAuthError(err: unknown, context: string): boolean {
+  private handleAuthError(err: unknown, context: AuthErrorContext): boolean {
     if (isUserDeactivatedError(err)) {
       console.error(`[PLChat] ${context} user deactivated:`, err)
       this.failSession()
@@ -152,7 +180,7 @@ export class MatrixController implements MatrixService {
     return false
   }
 
-  private recoverFromAuthError(err: unknown, context: string): void {
+  private recoverFromAuthError(err: unknown, context: AuthErrorContext): void {
     console.error(`[PLChat] ${context} auth error:`, err)
     this.syncLoop.stop()
     this.startSessionRecovery(this.lifecycleId)

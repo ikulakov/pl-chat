@@ -9,9 +9,9 @@ import './styles/global.css'
 const bridge = new IframeBridge()
 const controller = initChatController(bridge)
 
-// Standalone dev mode
-if (import.meta.env.DEV && window.parent === window) {
-  controller.handleHostCommand({ type: 'OPEN' })
+// Standalone dev mode //import.meta.env.DEV &&
+if (window.parent === window) {
+  controller.open()
 }
 
 const root = document.getElementById('root')

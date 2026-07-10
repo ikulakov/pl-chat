@@ -1,0 +1,10 @@
+.dropdown {
+  position: fixed;
+  z-index: 100;
+  min-width: 160px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--c-surface-primary);
+  border: 1px solid var(--c-border);
+  box-shadow: 0px 16px 56px 0px rgba(0, 0, 0, 0.2);
+}

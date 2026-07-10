@@ -1,7 +1,7 @@
 import { type InitConfig } from '@bankchat/protocol'
 
-/** Публичный конфиг, который хост передаёт в ChatSDK.init(). */
-export interface LoaderConfig extends InitConfig {
+// Публичный конфиг, который хост передаёт в ChatSDK.init()
+export interface LoaderConfig extends Omit<InitConfig, 'viewport'> {
   /** Источник истины для origin и URL виджета, напр. https://chat.bank.com */
   chatUrl: string
 }
