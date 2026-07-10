@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MatrixApi } from '../matrixApi'
-import { MatrixSyncLoop } from '../sync/syncLoop'
+import { MatrixSyncLoop } from './syncLoop'
 
 type LongPoll = MatrixApi['longPollSync']
 

@@ -24,9 +24,15 @@
   "date.yesterday": "Вчера",
   "dev.operatorMessagePlaceholder": "Сообщение от оператора (dev)",
   "dev.operatorMessageSend": "Отправить",
+  "dev.operatorMessageNotice": "Notice",
   "chat.scroll-down": "Скролл вниз",
   "chat.action.menu": "Меню",
   "chat.action.copy": "Копировать",
   "chat.action.copied": "Скопировано",
-  "chat.action.retry": "Повторить отправку"
+  "chat.action.retry": "Повторить отправку",
+  "system.operatorJoinedHuman": "Вам поможет {name}",
+  "system.operatorJoinedBot": "С вами работает чат-бот",
+  "system.operatorLeftCompleted": "Оператор завершил чат",
+  "system.operatorLeftTransferred": "Передача другому оператору",
+  "system.operatorLeftTimeout": "Сессия завершена по тайм-ауту"
 }

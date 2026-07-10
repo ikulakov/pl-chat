@@ -1,4 +1,4 @@
-import type { ChatUIState, ConnectionStatus, Phase, RoomState } from './model'
+import type { ChatUIState, ConnectionStatus, Phase, RoomState } from './state'
 import type { ChatStoreState } from './store'
 
 function deriveStatus(phase: Phase, room: RoomState): ConnectionStatus {
@@ -21,7 +21,7 @@ export function selectChatUIState(state: ChatStoreState): ChatUIState {
     status: deriveStatus(state.phase, state.room),
     userId: state.identity?.userId ?? null,
     error: state.error,
-    messages: state.room.messages,
+    timeline: state.room.timeline,
     viewport: state.viewport,
   }
 }

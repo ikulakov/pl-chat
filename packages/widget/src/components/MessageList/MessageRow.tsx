@@ -1,39 +1,37 @@
 import { memo } from 'react'
+import type { MessageTimelineItem } from '../../domain/timeline'
 import { cn } from '../../shared/cn'
 import { formatTime } from '../../shared/formatTime'
-import type { ChatMessage } from '../../store/model'
 import { MessageActions } from './MessageActions'
 import { MessageBubble, type BubblePosition } from './MessageBubble'
-import { deriveMessageStatus } from './MessageList.helpers'
 import styles from './MessageList.module.css'
 
 interface Props {
-  message: ChatMessage
+  message: MessageTimelineItem
   userId: string | null
   position: BubblePosition
-  onRetry: (localId: string) => void
 }
 
-export const MessageRow = memo(({ message, userId, position, onRetry }: Props) => {
+export const MessageRow = memo(({ message, userId, position }: Props) => {
   const isOwn = message.sender === userId
-  const canRetry = isOwn && message.failed
+  const canRetry = isOwn && message.sendStatus === 'failed'
   const isGroupEnd = position === 'single' || position === 'last'
 
   return (
     <div className={cn(styles.messageRow, isOwn && styles.own, isGroupEnd && styles.groupEnd)}>
       <MessageActions
-        text={message.body}
+        localId={message.localId}
+        text={message.content.body}
         canRetry={canRetry}
-        onRetry={() => onRetry(message.localId)}
       />
 
       <MessageBubble
         type={isOwn ? 'user' : 'operator'}
         position={position}
         time={formatTime(message.ts)}
-        status={deriveMessageStatus(message)}
+        status={message.sendStatus}
       >
-        {message.body}
+        {message.content.body}
       </MessageBubble>
     </div>
   )

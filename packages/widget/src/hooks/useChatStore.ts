@@ -1,5 +1,5 @@
-import type { ChatUIState } from '../store/model'
 import { selectChatUIState } from '../store/selectors'
+import type { ChatUIState } from '../store/state'
 import { chatStore } from '../store/store'
 
 export function useChatStore<T>(selector: (state: ChatUIState) => T): T {

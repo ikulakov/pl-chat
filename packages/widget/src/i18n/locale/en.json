@@ -24,9 +24,15 @@
   "date.yesterday": "Yesterday",
   "dev.operatorMessagePlaceholder": "Operator message (dev)",
   "dev.operatorMessageSend": "Send",
+  "dev.operatorMessageNotice": "Notice",
   "chat.scroll-down": "Go to bottom",
   "chat.action.menu": "Menu",
   "chat.action.copy": "Copy",
   "chat.action.copied": "Copied",
-  "chat.action.retry": "Retry"
+  "chat.action.retry": "Retry",
+  "system.operatorJoinedHuman": "{name} has joined the chat",
+  "system.operatorJoinedBot": "You're chatting with a bot",
+  "system.operatorLeftCompleted": "The operator has ended the chat",
+  "system.operatorLeftTransferred": "Transferring to another operator",
+  "system.operatorLeftTimeout": "Session ended due to timeout"
 }

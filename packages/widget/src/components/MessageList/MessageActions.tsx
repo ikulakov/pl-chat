@@ -1,15 +1,19 @@
+import { useChatActions } from '../../hooks/useChatActions'
 import { t } from '../../i18n'
 import { Dropdown, DropdownItem } from '../../shared/ui/Dropdown'
 import { IconButton } from '../../shared/ui/IconButton'
 import { CopyIcon, MoreIcon, RetryIcon } from '../../shared/ui/icons'
+import { copyText } from './MessageList.helpers'
 
 interface Props {
+  localId: string
   text: string
   canRetry: boolean
-  onRetry: () => void
 }
 
-export function MessageActions({ text, canRetry, onRetry }: Props) {
+export function MessageActions({ localId, text, canRetry }: Props) {
+  const { resendMessage } = useChatActions()
+
   return (
     <Dropdown
       trigger={(triggerProps) => (
@@ -30,7 +34,7 @@ export function MessageActions({ text, canRetry, onRetry }: Props) {
             <DropdownItem
               icon={<RetryIcon size={18} />}
               onSelect={() => {
-                onRetry()
+                resendMessage(localId)
                 close()
               }}
             >
@@ -41,7 +45,7 @@ export function MessageActions({ text, canRetry, onRetry }: Props) {
           <DropdownItem
             icon={<CopyIcon size={18} />}
             onSelect={() => {
-              void navigator.clipboard.writeText(text)
+              copyText(text)
               close()
             }}
           >

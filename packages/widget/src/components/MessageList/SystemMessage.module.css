@@ -1,0 +1,17 @@
+.systemRow {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.text {
+  max-width: 428px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  background: var(--c-surface-tertiary);
+  color: var(--c-text-tertiary);
+  font-size: 14px;
+  line-height: 14px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}

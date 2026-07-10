@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { chatMessage } from '../shared/testUtils/matrixFixtures'
-import type { ChatMessage } from '../store/model'
+import { textItem } from '../shared/testUtils/matrixFixtures'
+import type { TimelineItem } from '../domain/timeline'
 import { FakeIntersectionObserver } from '../../test.setup'
 import { useChatScroll } from './useChatScroll'
 
@@ -9,10 +9,10 @@ const ME = '@me:bank'
 const OPERATOR = '@op:bank'
 
 let seq = 0
-function message(sender: string): ChatMessage {
+function message(sender: string): TimelineItem {
   seq += 1
   const id = `m${seq}`
-  return chatMessage({ localId: id, eventId: id, sender, body: 'x', ts: seq })
+  return textItem({ localId: id, eventId: id, sender, body: 'x', ts: seq })
 }
 
 // Последний созданный IntersectionObserver — через него эмулируем пересечение сентинела.
@@ -22,7 +22,7 @@ function sentinel(): FakeIntersectionObserver {
   return observer
 }
 
-function setup(initialMessages: ChatMessage[], userId: string | null = ME) {
+function setup(initialTimeline: TimelineItem[], userId: string | null = ME) {
   const container = document.createElement('div')
   const bottom = document.createElement('div')
   container.appendChild(bottom)
@@ -35,9 +35,9 @@ function setup(initialMessages: ChatMessage[], userId: string | null = ME) {
   const bottomRef = { current: bottom }
 
   const view = renderHook(
-    ({ messages }: { messages: ChatMessage[] }) =>
-      useChatScroll({ messages, userId, containerRef, bottomRef }),
-    { initialProps: { messages: initialMessages } },
+    ({ timeline }: { timeline: TimelineItem[] }) =>
+      useChatScroll({ timeline, userId, containerRef, bottomRef }),
+    { initialProps: { timeline: initialTimeline } },
   )
 
   return { ...view, scrollTo }
@@ -57,7 +57,7 @@ describe('useChatScroll', () => {
     act(() => sentinel().trigger(false)) // пользователь ушёл вверх
     scrollTo.mockClear()
 
-    act(() => rerender({ messages: [message(OPERATOR), message(ME)] }))
+    act(() => rerender({ timeline: [message(OPERATOR), message(ME)] }))
 
     expect(scrollTo).toHaveBeenCalled()
   })
@@ -67,7 +67,7 @@ describe('useChatScroll', () => {
     act(() => sentinel().trigger(false))
     scrollTo.mockClear()
 
-    act(() => rerender({ messages: [message(OPERATOR), message(OPERATOR)] }))
+    act(() => rerender({ timeline: [message(OPERATOR), message(OPERATOR)] }))
 
     expect(scrollTo).not.toHaveBeenCalled()
   })
@@ -77,7 +77,7 @@ describe('useChatScroll', () => {
     act(() => sentinel().trigger(true))
     scrollTo.mockClear()
 
-    act(() => rerender({ messages: [message(OPERATOR), message(OPERATOR)] }))
+    act(() => rerender({ timeline: [message(OPERATOR), message(OPERATOR)] }))
 
     expect(scrollTo).toHaveBeenCalled()
   })

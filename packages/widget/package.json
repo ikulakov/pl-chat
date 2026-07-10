@@ -8,7 +8,7 @@
     "dev": "vite",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json && tsc --noEmit",
     "lint": "eslint src"
   },
   "dependencies": {
