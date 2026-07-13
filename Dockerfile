@@ -65,8 +65,7 @@ RUN chmod +x /docker-entrypoint.d/30-matrix-proxy.sh \
 
 ENV NGINX_PORT=8080 \
     NGINX_ENVSUBST_FILTER=^NGINX_ \
-    MATRIX_BACKEND="" \
-    DNS_RESOLVER=127.0.0.11
+    MATRIX_BACKEND="" 
 
 EXPOSE 8080
 
