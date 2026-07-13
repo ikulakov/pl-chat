@@ -65,7 +65,8 @@ RUN chmod +x /docker-entrypoint.d/30-matrix-proxy.sh \
 
 ENV NGINX_PORT=8080 \
     NGINX_ENVSUBST_FILTER=^NGINX_ \
-    MATRIX_BACKEND="" 
+    MATRIX_BACKEND="" \
+    DNS_RESOLVER=kube-dns.kube-system.svc.cluster.local
 
 EXPOSE 8080
 
