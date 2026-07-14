@@ -7,12 +7,40 @@ import {
   textItem,
 } from '../shared/testUtils/matrixFixtures'
 import type { TextTimelineItem } from '../domain/timeline'
-import type { JoinedRoom } from '../matrix/types'
+import type { EphemeralEvent, JoinedRoom } from '../matrix/types'
 import { chatRuntimeReducer } from './reducer'
-import type { Identity } from './state'
+import type { ChatRuntimeState, Identity } from './state'
 import { INITIAL_RUNTIME_STATE } from './store'
 
 const IDENTITY: Identity = { userId: '@user:bank', roomId: '!room:bank' }
+const OPERATOR = '@operator:bank'
+
+function readReceipt(eventId: string, reader: string): EphemeralEvent {
+  return { type: 'm.receipt', content: { [eventId]: { 'm.read': { [reader]: { ts: 1 } } } } }
+}
+
+// connected-состояние с одним своим доставленным ('sent') сообщением $real в таймлайне
+function connectedWithSentMessage(): ChatRuntimeState {
+  return {
+    ...INITIAL_RUNTIME_STATE,
+    phase: 'connected',
+    identity: IDENTITY,
+    cursor: 's1',
+    room: {
+      ...INITIAL_RUNTIME_STATE.room,
+      timeline: [
+        textItem({
+          localId: 'l1',
+          eventId: '$real',
+          sender: IDENTITY.userId,
+          body: 'hi',
+          ts: 1,
+          sendStatus: 'sent',
+        }),
+      ],
+    },
+  }
+}
 
 function joinedRoom(): JoinedRoom {
   return emptyJoinedRoom({
@@ -134,21 +162,23 @@ describe('chatRuntimeReducer', () => {
     expect(recovering.room).toBe(connected.room)
   })
 
-  it('routes optimistic add / sent through the room slice', () => {
+  it('ответ PUT резолвит черновик: реальный eventId + «отправлено»', () => {
+    // 200 от /send по Matrix-спеке = «событие отправлено», как в Element (EventStatus.SENT
+    // ставится по HTTP-ответу, не по echo).
     const withOptimistic = chatRuntimeReducer(
       { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
       { type: 'message.optimisticAdded', message: ownMessage({}) },
     )
     expect(withOptimistic.room.timeline[0]).toMatchObject({ sendStatus: 'sending' })
 
-    const sent = chatRuntimeReducer(withOptimistic, {
+    const resolved = chatRuntimeReducer(withOptimistic, {
       type: 'message.sent',
       localId: 'l1',
       eventId: '$real',
     })
 
-    expect(sent.room.timeline[0]!.eventId).toBe('$real')
-    expect(sent.room.timeline[0]).toMatchObject({ sendStatus: 'sent' })
+    expect(resolved.room.timeline[0]!.eventId).toBe('$real')
+    expect(resolved.room.timeline[0]).toMatchObject({ sendStatus: 'sent' })
   })
 
   it('marks a still-pending optimistic message as failed', () => {
@@ -189,6 +219,108 @@ describe('chatRuntimeReducer', () => {
     expect(failedLate.room.timeline).toHaveLength(1)
     expect(failedLate.room.timeline[0]!.eventId).toBe('$real')
     expect(failedLate.room.timeline[0]).toMatchObject({ sendStatus: 'sent' })
+  })
+
+  it('folds operator read receipt from ephemeral into readReceipts (индикатор — при рендере)', () => {
+    const next = chatRuntimeReducer(connectedWithSentMessage(), {
+      type: 'sync.received',
+      cursor: 's2',
+      joinedRoom: emptyJoinedRoom({ ephemeral: { events: [readReceipt('$real', OPERATOR)] } }),
+    })
+
+    // sendStatus не мутируется — «прочитано» вычисляется в рендере из readReceipts
+    expect(next.room.readReceipts[OPERATOR]).toEqual({ eventId: '$real' })
+    expect(next.room.timeline[0]).toMatchObject({ sendStatus: 'sent' })
+  })
+
+  it('keeps prior read receipts across a later sync without ephemeral', () => {
+    const withReceipt = chatRuntimeReducer(connectedWithSentMessage(), {
+      type: 'sync.received',
+      cursor: 's2',
+      joinedRoom: emptyJoinedRoom({ ephemeral: { events: [readReceipt('$real', OPERATOR)] } }),
+    })
+
+    const resynced = chatRuntimeReducer(withReceipt, {
+      type: 'sync.received',
+      cursor: 's3',
+      joinedRoom: emptyJoinedRoom({
+        timeline: {
+          events: [
+            roomMessageEvent({
+              event_id: '$real',
+              sender: IDENTITY.userId,
+              content: { body: 'hi' },
+            }),
+          ],
+        },
+      }),
+    })
+
+    expect(resynced.room.readReceipts[OPERATOR]).toEqual({ eventId: '$real' })
+  })
+
+  it('receipt.markedRead двигает собственный маркер оптимистично, receipt.sendFailed откатывает', () => {
+    const marked = chatRuntimeReducer(connectedWithSentMessage(), {
+      type: 'receipt.markedRead',
+      userId: IDENTITY.userId,
+      eventId: '$real',
+    })
+    expect(marked.room.readReceipts[IDENTITY.userId]).toEqual({ eventId: '$real' })
+
+    // POST упал → откат до прежнего значения (null = маркера не было → ключ удаляется)
+    const rolledBack = chatRuntimeReducer(marked, {
+      type: 'receipt.sendFailed',
+      userId: IDENTITY.userId,
+      eventId: '$real',
+      rollbackTo: null,
+    })
+    expect(rolledBack.room.readReceipts[IDENTITY.userId]).toBeUndefined()
+  })
+
+  it('receipt.sendFailed не откатывает маркер, уехавший дальше более поздним markRead', () => {
+    const state = chatRuntimeReducer(connectedWithSentMessage(), {
+      type: 'receipt.markedRead',
+      userId: IDENTITY.userId,
+      eventId: '$newer',
+    })
+
+    // провалился СТАРЫЙ POST на $real — маркер уже на $newer, трогать нельзя
+    const next = chatRuntimeReducer(state, {
+      type: 'receipt.sendFailed',
+      userId: IDENTITY.userId,
+      eventId: '$real',
+      rollbackTo: null,
+    })
+
+    expect(next).toBe(state)
+    expect(next.room.readReceipts[IDENTITY.userId]).toEqual({ eventId: '$newer' })
+  })
+
+  it('серверное эхо НЕ откатывает оптимистичный маркер назад по ленте', () => {
+    // лента: [$real, $next]; markRead уже на $next, эхо приносит receipt на $real
+    const base = connectedWithSentMessage()
+    const withNext = chatRuntimeReducer(base, {
+      type: 'sync.received',
+      cursor: 's2',
+      joinedRoom: emptyJoinedRoom({
+        timeline: { events: [roomMessageEvent({ event_id: '$next' })] },
+      }),
+    })
+    const marked = chatRuntimeReducer(withNext, {
+      type: 'receipt.markedRead',
+      userId: IDENTITY.userId,
+      eventId: '$next',
+    })
+
+    const echoed = chatRuntimeReducer(marked, {
+      type: 'sync.received',
+      cursor: 's3',
+      joinedRoom: emptyJoinedRoom({
+        ephemeral: { events: [readReceipt('$real', IDENTITY.userId)] },
+      }),
+    })
+
+    expect(echoed.room.readReceipts[IDENTITY.userId]).toEqual({ eventId: '$next' })
   })
 
   it('retries a failed message in place — sending again, index unchanged', () => {

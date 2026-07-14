@@ -6,10 +6,10 @@
     "resolveJsonModule": true,
     "erasableSyntaxOnly": true,
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "plugins": [{ "name": "typescript-plugin-css-modules" }],
     "paths": {
       "@bankchat/protocol": ["../protocol/src/index.ts"]
     }
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+  "include": ["src"]
 }

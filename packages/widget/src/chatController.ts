@@ -49,6 +49,8 @@ export class ChatController {
 
   resendMessage = (localId: string): Promise<void> => this.matrix.resendMessage(localId)
 
+  markRead = (eventId: string): Promise<void> => this.matrix.markRead(eventId)
+
   reconnect = (): void => {
     void this.matrix.connect()
   }

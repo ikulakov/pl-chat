@@ -26,6 +26,7 @@
   "dev.operatorMessageSend": "Отправить",
   "dev.operatorMessageNotice": "Notice",
   "chat.scroll-down": "Скролл вниз",
+  "chat.scroll-down-unread": "Вниз, непрочитанных: {count}",
   "chat.action.menu": "Меню",
   "chat.action.copy": "Копировать",
   "chat.action.copied": "Скопировано",

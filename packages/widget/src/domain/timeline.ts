@@ -1,6 +1,6 @@
 export type TimelineItemKind = 'text' | 'notice' | 'system'
 
-export type SendStatus = 'sending' | 'sent' | 'failed' | 'read'
+export type SendStatus = 'sending' | 'sent' | 'failed'
 
 export interface TimelineRelation {
   type: 'reply' | 'reference'

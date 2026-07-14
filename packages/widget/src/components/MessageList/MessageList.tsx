@@ -1,29 +1,44 @@
 import { useMemo, useRef } from 'react'
+import { readOwnEventIds } from '../../domain/receipts'
 import { isSystem } from '../../domain/timeline'
 import { useChatScroll } from '../../hooks/useChatScroll'
 import { useChatStore } from '../../hooks/useChatStore'
-import { t } from '../../i18n'
-import { IconButton } from '../../shared/ui/IconButton'
-import { ChevronDownIcon } from '../../shared/ui/icons'
+import { useSendReadReceipts } from '../../hooks/useSendReadReceipts'
+import { selectIsOpen, selectReadReceipts, selectTimeline } from '../../store/selectors'
 import { getPosition, groupTimelineByDate } from './MessageList.helpers'
 import styles from './MessageList.module.css'
 import { MessageRow } from './MessageRow'
+import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { SystemMessage } from './SystemMessage'
 
-export function MessageList() {
-  const userId = useChatStore((s) => s.userId)
-  const timeline = useChatStore((s) => s.timeline)
+interface Props {
+  userId: string
+}
+
+export function MessageList({ userId }: Props) {
+  const isOpen = useChatStore(selectIsOpen)
+  const readReceipts = useChatStore(selectReadReceipts)
+
+  const timeline = useChatStore(selectTimeline)
   const timelineGroupedByDate = useMemo(() => groupTimelineByDate(timeline), [timeline])
+
+  // eventId сообщений, которые уже прочитал оператор
+  const readByOperatorIds = useMemo(
+    () => readOwnEventIds(readReceipts, timeline, userId),
+    [readReceipts, timeline, userId],
+  )
 
   const messagesListRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const { showScrollButton, scrollToBottom } = useChatScroll({
+  const { isNearBottom, scrollToBottom } = useChatScroll({
     timeline,
     userId,
     containerRef: messagesListRef,
     bottomRef,
   })
+
+  useSendReadReceipts({ timeline, isOpen, containerRef: messagesListRef })
 
   return (
     <div className={styles.wrap}>
@@ -54,6 +69,7 @@ export function MessageList() {
                   userId={userId}
                   message={item}
                   position={position}
+                  readByOperator={readByOperatorIds.has(item.eventId)}
                 />
               )
             })}
@@ -65,17 +81,7 @@ export function MessageList() {
         />
       </div>
 
-      {showScrollButton && (
-        <IconButton
-          variant="floating"
-          size="md"
-          className={styles.scrollButton}
-          aria-label={t('chat.scroll-down')}
-          onClick={scrollToBottom}
-        >
-          <ChevronDownIcon />
-        </IconButton>
-      )}
+      {!isNearBottom && <ScrollToBottomButton onClick={scrollToBottom} />}
     </div>
   )
 }

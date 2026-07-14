@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { isSystem, type TimelineItem } from '../domain/timeline'
 import { useIntersectionObserver } from './useIntersectionObserver'
 
@@ -6,7 +6,7 @@ const NEAR_BOTTOM_PX = 80
 
 interface UseChatScrollParams {
   timeline: TimelineItem[]
-  userId: string | null
+  userId: string
   containerRef: React.RefObject<HTMLElement | null>
   bottomRef: React.RefObject<Element | null>
 }
@@ -14,19 +14,31 @@ interface UseChatScrollParams {
 /**
  * Управляет скролл-логикой чата:
  * - Автоскролл при новых сообщениях
- * - Кнопка "скролл вниз"
- * - Прилипание к низу при изменении размера контейнера
+ *  - Прилипание к низу при изменении размера контейнера
+ * - `isNearBottom` (с допуском NEAR_BOTTOM_PX)
+ * - `scrollToBottom` для кнопки «вниз» — контейнер двигает только владелец скролл-состояния
  * - CSS-переменная --scrollbar-w (ширина скроллбара)
  */
 export function useChatScroll({ containerRef, bottomRef, timeline, userId }: UseChatScrollParams): {
-  showScrollButton: boolean
+  isNearBottom: boolean
   scrollToBottom: () => void
 } {
-  const [showScrollButton, setShowScrollButton] = useState(false)
-
+  // Ref источник истины, state намеренно отстаёт: пока идёт плавный автоскролл он заморожен
+  const [isNearBottom, setIsNearBottom] = useState(true)
   const isNearBottomRef = useRef(true)
+
   const isAutoScrollingRef = useRef(false)
   const lastMessageIdRef = useRef<string | null>(null)
+
+  const scrollList = useCallback(
+    (behavior: ScrollBehavior) => {
+      const list = containerRef.current
+      if (!list) return
+
+      list.scrollTo({ top: list.scrollHeight, behavior })
+    },
+    [containerRef],
+  )
 
   // Основная логика скролла при новых сообщениях
   useLayoutEffect(() => {
@@ -44,10 +56,9 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
     if (behavior === 'smooth') {
       isAutoScrollingRef.current = true
     }
-    list.scrollTo({ top: list.scrollHeight, behavior })
-  }, [timeline, userId, containerRef])
+    scrollList(behavior)
+  }, [timeline, userId, containerRef, scrollList])
 
-  // Отслеживание bottom чата
   useIntersectionObserver({
     root: containerRef,
     rootMargin: `0px 0px ${NEAR_BOTTOM_PX}px 0px`,
@@ -55,7 +66,7 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
     callback: ({ isIntersecting }) => {
       isNearBottomRef.current = isIntersecting
       if (!isAutoScrollingRef.current) {
-        setShowScrollButton(!isIntersecting)
+        setIsNearBottom(isIntersecting)
       }
     },
   })
@@ -67,7 +78,7 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
 
     const handleScrollEnd = () => {
       isAutoScrollingRef.current = false
-      setShowScrollButton(!isNearBottomRef.current)
+      setIsNearBottom(isNearBottomRef.current)
     }
     list.addEventListener('scrollend', handleScrollEnd)
     return () => list.removeEventListener('scrollend', handleScrollEnd)
@@ -86,18 +97,14 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
     const observer = new ResizeObserver(() => {
       updateScrollbarWidth()
       if (isNearBottomRef.current) {
-        list.scrollTo({ top: list.scrollHeight, behavior: 'auto' })
+        scrollList('auto')
       }
     })
     observer.observe(list)
     return () => observer.disconnect()
-  }, [containerRef])
+  }, [containerRef, scrollList])
 
-  const scrollToBottom = () => {
-    const list = containerRef.current
-    if (!list) return
-    list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' })
-  }
+  const scrollToBottom = useCallback(() => scrollList('smooth'), [scrollList])
 
-  return { showScrollButton, scrollToBottom }
+  return { isNearBottom, scrollToBottom }
 }

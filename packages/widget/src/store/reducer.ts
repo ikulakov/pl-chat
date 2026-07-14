@@ -1,26 +1,36 @@
 import { timelineEventsToItems } from '../domain/eventMapping'
 import { mergeTimeline } from '../domain/mergeTimeline'
 import { reduceOperator } from '../domain/operator'
+import { mergeReadReceipts } from '../domain/receipts'
 import { isSystem } from '../domain/timeline'
 import type { JoinedRoom } from '../matrix/types'
 import { assertNever } from '../shared/assertNever'
 import type { ChatRuntimeState, RoomState, RuntimeAction } from './state'
 import { INITIAL_RUNTIME_STATE } from './store'
 
+function updateRoom(state: ChatRuntimeState, patch: Partial<RoomState>): ChatRuntimeState {
+  return { ...state, room: { ...state.room, ...patch } }
+}
+
 function updateTimeline(
   state: ChatRuntimeState,
-  updater: (timeline: ChatRuntimeState['room']['timeline']) => ChatRuntimeState['room']['timeline'],
+  updater: (timeline: RoomState['timeline']) => RoomState['timeline'],
 ): ChatRuntimeState {
-  return { ...state, room: { ...state.room, timeline: updater(state.room.timeline) } }
+  return updateRoom(state, { timeline: updater(state.room.timeline) })
 }
 
 function applySync(room: RoomState, joinedRoom: JoinedRoom): RoomState {
-  const timelineEvents = joinedRoom.timeline.events
   const stateEvents = joinedRoom.state.events
+  const timelineEvents = joinedRoom.timeline.events
+  const ephemeralEvents = joinedRoom.ephemeral?.events
+
+  const timeline = mergeTimeline(room.timeline, timelineEventsToItems(timelineEvents))
+
   return {
     ...room,
-    timeline: mergeTimeline(room.timeline, timelineEventsToItems(timelineEvents)),
+    timeline,
     operator: reduceOperator(room.operator, [...stateEvents, ...timelineEvents]),
+    readReceipts: mergeReadReceipts(room.readReceipts, ephemeralEvents, timeline),
   }
 }
 
@@ -86,6 +96,27 @@ export function chatRuntimeReducer(
           !isSystem(m) && m.localId === action.localId ? { ...m, sendStatus: 'sending' } : m,
         ),
       )
+
+    case 'receipt.markedRead':
+      return updateRoom(state, {
+        readReceipts: {
+          ...state.room.readReceipts,
+          [action.userId]: { eventId: action.eventId },
+        },
+      })
+
+    case 'receipt.sendFailed': {
+      if (state.room.readReceipts[action.userId]?.eventId !== action.eventId) return state
+
+      const readReceipts = { ...state.room.readReceipts }
+
+      if (action.rollbackTo === null) {
+        delete readReceipts[action.userId]
+      } else {
+        readReceipts[action.userId] = { eventId: action.rollbackTo }
+      }
+      return updateRoom(state, { readReceipts })
+    }
 
     default:
       return assertNever(action)

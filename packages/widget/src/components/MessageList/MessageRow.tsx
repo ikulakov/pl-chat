@@ -1,24 +1,30 @@
 import { memo } from 'react'
 import type { MessageTimelineItem } from '../../domain/timeline'
+import { RECEIPT_ID_ATTR } from '../../hooks/useSendReadReceipts'
 import { cn } from '../../shared/cn'
 import { formatTime } from '../../shared/formatTime'
 import { MessageActions } from './MessageActions'
 import { MessageBubble, type BubblePosition } from './MessageBubble'
 import styles from './MessageList.module.css'
-
+import { SendStatusIcon } from './SendStatusIcon'
 interface Props {
   message: MessageTimelineItem
-  userId: string | null
+  userId: string
   position: BubblePosition
+  readByOperator: boolean
 }
 
-export const MessageRow = memo(({ message, userId, position }: Props) => {
+export const MessageRow = memo(({ userId, message, position, readByOperator }: Props) => {
   const isOwn = message.sender === userId
   const canRetry = isOwn && message.sendStatus === 'failed'
   const isGroupEnd = position === 'single' || position === 'last'
 
   return (
-    <div className={cn(styles.messageRow, isOwn && styles.own, isGroupEnd && styles.groupEnd)}>
+    <div
+      className={cn(styles.messageRow, isOwn && styles.own, isGroupEnd && styles.groupEnd)}
+      // Маркер для учета прочитанных сообщений клиентом
+      {...{ [RECEIPT_ID_ATTR]: !isOwn ? message.eventId : undefined }}
+    >
       <MessageActions
         localId={message.localId}
         text={message.content.body}
@@ -29,7 +35,14 @@ export const MessageRow = memo(({ message, userId, position }: Props) => {
         type={isOwn ? 'user' : 'operator'}
         position={position}
         time={formatTime(message.ts)}
-        status={message.sendStatus}
+        meta={
+          isOwn ? (
+            <SendStatusIcon
+              sendStatus={message.sendStatus}
+              isRead={readByOperator}
+            />
+          ) : undefined
+        }
       >
         {message.content.body}
       </MessageBubble>
