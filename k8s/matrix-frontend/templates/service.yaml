@@ -11,5 +11,5 @@ spec:
   template:
   ports:
     - name: http
-      port: 443
+      port: 8080
       targetPort: 8080

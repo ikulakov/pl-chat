@@ -18,7 +18,7 @@ spec:
           service:
             name: {{ .Values.deploy.name }}
             port:
-              number: 443
+              number: 8080
   tls:
   - hosts:
     - {{ .Values.deploy.namecluster }}
