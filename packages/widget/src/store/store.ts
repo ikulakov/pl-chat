@@ -20,6 +20,7 @@ export const INITIAL_ROOM_STATE: RoomState = {
     displayName: null,
     isActive: false,
   },
+  readReceipts: {},
 }
 
 export const INITIAL_RUNTIME_STATE: ChatRuntimeState = {
@@ -29,6 +30,8 @@ export const INITIAL_RUNTIME_STATE: ChatRuntimeState = {
   cursor: null,
   room: INITIAL_ROOM_STATE,
 }
+
+const DEVTOOLS_OPT_IN_KEY = 'plchat.devtools'
 
 export function createChatStore() {
   return create<ChatStoreState>()(
@@ -43,9 +46,19 @@ export function createChatStore() {
         closePanel: () => set({ isOpen: false }, false, 'panel.closed'),
         setViewport: (mode) => set({ viewport: mode }, false, 'viewport.changed'),
       }),
-      { name: 'PLChat', enabled: import.meta.env.DEV },
+      { name: 'PLChat', enabled: isDevtoolsEnabled() },
     ),
   )
+}
+
+function isDevtoolsEnabled(): boolean {
+  if (import.meta.env.DEV) return true
+
+  try {
+    return localStorage.getItem(DEVTOOLS_OPT_IN_KEY) === '1'
+  } catch {
+    return false
+  }
 }
 
 export const chatStore = createChatStore()

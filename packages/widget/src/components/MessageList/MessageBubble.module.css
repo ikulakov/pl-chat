@@ -72,19 +72,3 @@
 .user .time {
   color: var(--c-text-invert-dim);
 }
-
-.pendingSpinner {
-  display: inline-flex;
-  /* opacity: 0;
-  animation: pendingReveal 0.05s ease 0.5s forwards; */
-  width: 16px;
-  height: 16px;
-  justify-content: center;
-  align-items: center;
-}
-
-@keyframes pendingReveal {
-  to {
-    opacity: 1;
-  }
-}

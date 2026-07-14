@@ -145,6 +145,7 @@ export function makeMatrixApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
     // parks by default so sync-loop-driven tests stay deterministic unless overridden
     longPollSync: vi.fn<MatrixApi['longPollSync']>().mockReturnValue(new Promise<never>(() => {})),
     sendMessage: vi.fn<MatrixApi['sendMessage']>().mockResolvedValue({ event_id: '$real' }),
+    sendReadReceipt: vi.fn<MatrixApi['sendReadReceipt']>().mockResolvedValue({}),
     ...overrides,
   }
 }

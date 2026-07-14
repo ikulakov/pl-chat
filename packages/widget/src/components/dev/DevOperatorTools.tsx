@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { isSystem } from '../../domain/timeline'
 import { useChatStore } from '../../hooks/useChatStore'
 import { t } from '../../i18n'
+import { selectUserId } from '../../store/selectors'
 import { chatStore } from '../../store/store'
 import styles from './DevOperatorTools.module.css'
 
@@ -11,7 +12,7 @@ const DEV_OPERATOR_FALLBACK_ID = '@operator:bank'
 export function DevOperatorTools() {
   const [text, setText] = useState('')
   const [isNotice, setIsNotice] = useState(false)
-  const userId = useChatStore((s) => s.userId)
+  const userId = useChatStore(selectUserId)
 
   const send = () => {
     const body = text.trim()
