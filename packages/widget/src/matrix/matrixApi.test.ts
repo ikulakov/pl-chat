@@ -43,4 +43,15 @@ describe('createMatrixApi — форма запросов', () => {
 
     expect(request.mock.calls[0]![0]).toBe('/_matrix/client/v3/sync?timeout=0')
   })
+
+  it('sendReadReceipt: POST на receipt/m.read/{eventId}, roomId и eventId url-энкодятся', async () => {
+    const { transport, request } = fakeTransport()
+
+    await createMatrixApi(transport).sendReadReceipt('!room:bank', '$evt:bank')
+
+    const [path, init] = request.mock.calls[0]!
+    expect(path).toBe('/_matrix/client/v3/rooms/!room%3Abank/receipt/m.read/%24evt%3Abank')
+    expect(init).toMatchObject({ method: 'POST' })
+    expect(JSON.parse((init as { body: string }).body)).toEqual({})
+  })
 })

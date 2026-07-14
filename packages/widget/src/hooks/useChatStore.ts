@@ -1,7 +1,5 @@
-import { selectChatUIState } from '../store/selectors'
-import type { ChatUIState } from '../store/state'
-import { chatStore } from '../store/store'
+import { chatStore, type ChatStoreState } from '../store/store'
 
-export function useChatStore<T>(selector: (state: ChatUIState) => T): T {
-  return chatStore((state) => selector(selectChatUIState(state)))
+export function useChatStore<T>(selector: (state: ChatStoreState) => T): T {
+  return chatStore(selector)
 }

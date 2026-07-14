@@ -26,6 +26,7 @@
   "dev.operatorMessageSend": "Send",
   "dev.operatorMessageNotice": "Notice",
   "chat.scroll-down": "Go to bottom",
+  "chat.scroll-down-unread": "Go to bottom, unread: {count}",
   "chat.action.menu": "Menu",
   "chat.action.copy": "Copy",
   "chat.action.copied": "Copied",

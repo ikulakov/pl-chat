@@ -1,8 +1,20 @@
-import type { ChatUIState, ConnectionStatus, Phase, RoomState } from './state'
+import type { ViewportMode } from '@bankchat/protocol'
+import type { ReadReceipt } from '../domain/receipts'
+import { countUnread } from '../domain/receipts'
+import type { TimelineItem } from '../domain/timeline'
+import type { ChatStatus } from './state'
 import type { ChatStoreState } from './store'
 
-function deriveStatus(phase: Phase, room: RoomState): ConnectionStatus {
-  switch (phase) {
+/**
+ * API стора для компонентов: подписываться только через эти селекторы.
+ *
+ * Селектор должен быть дешёвым и возвращать примитив либо стабильную ссылку из стора.
+ * Дорогая деривация с новой коллекцией на выходе (например, Set прочитанных eventId)
+ * селектором быть не может — она живёт в useMemo компонента.
+ */
+
+export function selectStatus(state: ChatStoreState): ChatStatus {
+  switch (state.phase) {
     case 'idle':
       return 'idle'
     case 'connecting':
@@ -11,17 +23,33 @@ function deriveStatus(phase: Phase, room: RoomState): ConnectionStatus {
     case 'error':
       return 'error'
     case 'connected':
-      return room.operator.isActive ? 'active' : 'waiting'
+      return state.room.operator.isActive ? 'active' : 'waiting'
   }
 }
 
-export function selectChatUIState(state: ChatStoreState): ChatUIState {
-  return {
-    isOpen: state.isOpen,
-    status: deriveStatus(state.phase, state.room),
-    userId: state.identity?.userId ?? null,
-    error: state.error,
-    timeline: state.room.timeline,
-    viewport: state.viewport,
-  }
+export function selectUserId(state: ChatStoreState): string | null {
+  return state.identity?.userId ?? null
+}
+
+export function selectIsOpen(state: ChatStoreState): boolean {
+  return state.isOpen
+}
+
+export function selectViewport(state: ChatStoreState): ViewportMode {
+  return state.viewport
+}
+
+export function selectTimeline(state: ChatStoreState): TimelineItem[] {
+  return state.room.timeline
+}
+
+export function selectReadReceipts(state: ChatStoreState): Record<string, ReadReceipt> {
+  return state.room.readReceipts
+}
+
+export function selectUnreadCount(state: ChatStoreState): number {
+  const userId = selectUserId(state)
+  if (userId === null) return 0
+
+  return countUnread(state.room.readReceipts, state.room.timeline, userId)
 }

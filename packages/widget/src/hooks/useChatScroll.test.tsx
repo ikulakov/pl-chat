@@ -22,7 +22,7 @@ function sentinel(): FakeIntersectionObserver {
   return observer
 }
 
-function setup(initialTimeline: TimelineItem[], userId: string | null = ME) {
+function setup(initialTimeline: TimelineItem[], userId: string = ME) {
   const container = document.createElement('div')
   const bottom = document.createElement('div')
   container.appendChild(bottom)
@@ -86,10 +86,10 @@ describe('useChatScroll', () => {
     const { result } = setup([message(OPERATOR)])
 
     act(() => sentinel().trigger(false))
-    expect(result.current.showScrollButton).toBe(true)
+    expect(result.current.isNearBottom).toBe(false)
 
     act(() => sentinel().trigger(true))
-    expect(result.current.showScrollButton).toBe(false)
+    expect(result.current.isNearBottom).toBe(true)
   })
 
   it('scrollToBottom scrolls the container smoothly', () => {

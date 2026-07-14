@@ -1,4 +1,5 @@
 import { createOptimisticTextMessage } from '../domain/optimistic'
+import { canMoveMarker } from '../domain/receipts'
 import { isSystem } from '../domain/timeline'
 import type { ChatRuntimeState, RuntimeAction } from '../store/state'
 import { type MatrixApi } from './matrixApi'
@@ -8,13 +9,14 @@ import { isMatrixAuthError, isUserDeactivatedError } from './transport/matrixErr
 
 export const CONNECTION_FAILED_ERROR = 'Не удалось подключиться'
 
-type AuthErrorContext = 'sync' | 'sendMessage' | 'resendMessage'
+type AuthErrorContext = 'sync' | 'sendMessage' | 'resendMessage' | 'markRead'
 
 export interface MatrixService {
   connect: () => Promise<void>
   disconnect: () => void
   sendMessage: (text: string) => Promise<void>
   resendMessage: (localId: string) => Promise<void>
+  markRead: (eventId: string) => Promise<void>
 }
 
 export interface MatrixControllerDeps {
@@ -105,6 +107,37 @@ export class MatrixController implements MatrixService {
       message.txnId,
       'resendMessage',
     )
+  }
+
+  async markRead(eventId: string): Promise<void> {
+    const { identity, phase, room } = this.getState()
+
+    if (phase !== 'connected' || !identity) return
+
+    const currentMarker = room.readReceipts[identity.userId]?.eventId ?? null
+    if (!canMoveMarker(room.timeline, currentMarker, eventId)) return
+
+    // Двигаем маркер ДО запроса, потому что гард выше смотрит именно в стор.
+    // Иначе, пока летит POST, стор хранит старый маркер, и каждый скан (скролл, новое сообщение)
+    // снова проходил бы гард и слал тот же POST.
+    this.dispatch({ type: 'receipt.markedRead', userId: identity.userId, eventId })
+    const lifecycleId = this.lifecycleId
+
+    try {
+      await this.api.sendReadReceipt(identity.roomId, eventId)
+    } catch (err) {
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      if (this.handleAuthError(err, 'markRead')) {
+        this.dispatch({
+          type: 'receipt.sendFailed',
+          userId: identity.userId,
+          eventId,
+          rollbackTo: currentMarker,
+        })
+        return
+      }
+    }
   }
 
   private async dispatchSend(

@@ -1,5 +1,5 @@
 import type { RegisterResponse, SyncResponse } from './dto'
-import { MATRIX_API_PREFIX, MsgType } from './consts'
+import { MATRIX_API_PREFIX, MsgType, ReceiptType } from './consts'
 import type { MatrixTransport } from './transport/matrixTransport'
 
 export function createMatrixApi(transport: MatrixTransport) {
@@ -34,6 +34,16 @@ export function createMatrixApi(transport: MatrixTransport) {
         {
           method: 'PUT',
           body: JSON.stringify({ msgtype: MsgType.Text, body }),
+        },
+      )
+    },
+
+    sendReadReceipt(roomId: string, eventId: string): Promise<Record<string, never>> {
+      return transport.request<Record<string, never>>(
+        `${MATRIX_API_PREFIX}/rooms/${encodeURIComponent(roomId)}/receipt/${ReceiptType.Read}/${encodeURIComponent(eventId)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({}),
         },
       )
     },

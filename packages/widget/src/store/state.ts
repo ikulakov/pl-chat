@@ -1,5 +1,5 @@
-import type { ViewportMode } from '@bankchat/protocol'
 import type { OperatorState } from '../domain/operator'
+import type { ReadReceipt } from '../domain/receipts'
 import type { TimelineItem } from '../domain/timeline'
 import type { JoinedRoom } from '../matrix/types'
 
@@ -13,9 +13,11 @@ export type RuntimeAction =
   | { type: 'message.sent'; localId: string; eventId: string }
   | { type: 'message.failed'; localId: string }
   | { type: 'message.retrying'; localId: string }
+  | { type: 'receipt.markedRead'; userId: string; eventId: string }
+  | { type: 'receipt.sendFailed'; userId: string; eventId: string; rollbackTo: string | null }
 
 export interface ChatRuntimeState {
-  phase: Phase
+  phase: ConnectionPhase
   error: string | null
   identity: Identity | null
   cursor: string | null
@@ -25,6 +27,8 @@ export interface ChatRuntimeState {
 export interface RoomState {
   timeline: TimelineItem[]
   operator: OperatorState
+  // m.read по юзерам: до какого события каждый дочитал
+  readReceipts: Record<string, ReadReceipt>
 }
 
 export interface Identity {
@@ -32,15 +36,8 @@ export interface Identity {
   roomId: string
 }
 
-export type Phase = 'idle' | 'connecting' | 'recovering' | 'connected' | 'error'
+// Фаза подключения к homeserver — внутреннее состояние стора
+export type ConnectionPhase = 'idle' | 'connecting' | 'recovering' | 'connected' | 'error'
 
-export interface ChatUIState {
-  isOpen: boolean
-  status: ConnectionStatus
-  userId: string | null
-  error: string | null
-  timeline: TimelineItem[]
-  viewport: ViewportMode
-}
-
-export type ConnectionStatus = 'idle' | 'connecting' | 'waiting' | 'active' | 'error'
+// Статус диалога, который видит пользователь
+export type ChatStatus = 'idle' | 'connecting' | 'waiting' | 'active' | 'error'

@@ -2,6 +2,7 @@ import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
 import { Spinner } from '../shared/ui/Spinner'
+import { selectStatus, selectUserId } from '../store/selectors'
 import chatStyles from './ChatPanel.module.css'
 import { DevOperatorTools } from './dev/DevOperatorTools'
 import { Header } from './Header'
@@ -11,7 +12,9 @@ import { StatusScreen } from './StatusScreen'
 import statusStyles from './StatusScreen.module.css'
 
 export function ChatPanel() {
-  const status = useChatStore((s) => s.status)
+  const status = useChatStore(selectStatus)
+  const userId = useChatStore(selectUserId)
+
   const { reconnect } = useChatActions()
 
   return (
@@ -45,9 +48,9 @@ export function ChatPanel() {
         />
       )}
 
-      {(status === 'waiting' || status === 'active') && (
+      {(status === 'waiting' || status === 'active') && userId !== null && (
         <>
-          <MessageList />
+          <MessageList userId={userId} />
           <MessageInput />
         </>
       )}

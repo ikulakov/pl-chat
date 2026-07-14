@@ -96,13 +96,40 @@ describe('mergeTimeline — deduplication invariants', () => {
     expect(mergeTimeline(reconciled, [{ ...base, eventId: '$real', ts: 150 }])).toBe(reconciled)
   })
 
-  it('sync-race: failed message not resolved (only sending matches)', () => {
+  it('echo резолвит failed-черновик, а не показывает сообщение вторым', () => {
+    // PUT отвалился по таймауту УЖЕ ПОСЛЕ того, как сервер событие принял: eventId мы не узнали,
+    // черновик помечен failed. Раз echo пришёл — событие в комнате. Раньше здесь появлялся
+    // дубль: проваленный черновик с кнопкой «повторить» рядом с доставленной копией.
     const failed = { ...base, eventId: 'optimistic:uuid', sendStatus: 'failed' as const }
     const fromSync = { ...base, eventId: '$real', ts: 150 }
 
     const result = mergeTimeline([failed], [fromSync])
 
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({ eventId: '$real', sendStatus: 'sent' })
+  })
+
+  it('echo достаётся живому черновику, а не проваленному — FIFO не ломается', () => {
+    // одинаковый текст: одна отправка провалилась, вторая в полёте. echo принадлежит второй.
+    const failed = {
+      ...base,
+      localId: 'l1',
+      eventId: 'optimistic:1',
+      sendStatus: 'failed' as const,
+    }
+    const sending = {
+      ...base,
+      localId: 'l2',
+      eventId: 'optimistic:2',
+      sendStatus: 'sending' as const,
+    }
+    const fromSync = { ...base, eventId: '$real', ts: 150 }
+
+    const result = mergeTimeline([failed, sending], [fromSync])
+
     expect(result).toHaveLength(2)
+    expect(result.find((m) => m.eventId === '$real')?.localId).toBe('l2')
+    expect(result.find((m) => m.localId === 'l1')).toMatchObject({ sendStatus: 'failed' })
   })
 
   it('returns the same array reference when nothing actually changes (empty or fully-duplicate incoming)', () => {

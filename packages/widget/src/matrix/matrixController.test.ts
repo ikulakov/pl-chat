@@ -10,6 +10,7 @@ import {
   textItem,
 } from '../shared/testUtils/matrixFixtures'
 import type { MatrixApi } from './matrixApi'
+import { chatRuntimeReducer } from '../store/reducer'
 import { CONNECTION_FAILED_ERROR, MatrixController } from './matrixController'
 import { MatrixSessionManager } from './session/sessionManager'
 import { MatrixError } from './transport/matrixError'
@@ -18,18 +19,25 @@ vi.mock('../shared/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 const IDENTITY: Identity = { userId: '@u:bank', roomId: '!r:bank' }
 
-// Контролируемый снимок стора + спай на apply — проверяем, какие доменные
-// действия контроллер диспетчит (стор реальный не подключаем).
+// Стор с реальным редьюсером + спай на apply: проверяем, какие доменные действия контроллер
+// диспетчит, а состояние эволюционирует по-настоящему — контроллер читает из getState()
+// собственные записи (например, read-маркер в markRead), фальшивый статичный снимок это скрыл бы.
 function harness(initial: Partial<ChatRuntimeState> = {}, api: MatrixApi = makeMatrixApi()) {
   const tokens = createFakeTokenStore()
-  const state: ChatRuntimeState = { ...INITIAL_RUNTIME_STATE, ...initial }
+  let state: ChatRuntimeState = { ...INITIAL_RUNTIME_STATE, ...initial }
   const applied: RuntimeAction[] = []
   const dispatch = vi.fn((action: RuntimeAction) => {
     applied.push(action)
+    state = chatRuntimeReducer(state, action)
   })
   const sessionManager = new MatrixSessionManager(api, tokens)
   const controller = new MatrixController({ dispatch, getState: () => state, api, sessionManager })
-  return { controller, dispatch, applied, tokens }
+  // setState — рубильник для сценариев, которых нет в action-модели (например, teardown стора
+  // при destroy виджета): подменяет состояние напрямую, мимо applied.
+  const setState = (partial: Partial<ChatRuntimeState>) => {
+    state = { ...state, ...partial }
+  }
+  return { controller, dispatch, applied, tokens, getState: () => state, setState }
 }
 
 // Общая форма "неудачно отправленного" сообщения для resendMessage-тестов ниже
@@ -51,6 +59,7 @@ function roomWithMessage(message: TextTimelineItem): RoomState {
   return {
     timeline: [message],
     operator: { isActive: false, id: null, displayName: null },
+    readReceipts: {},
   }
 }
 
@@ -219,12 +228,15 @@ describe('MatrixController (orchestrator)', () => {
       }
       return new Promise<never>(() => {})
     })
-    const { controller, applied } = harness({}, api)
+    const { controller, applied, setState } = harness({}, api)
 
     await controller.connect()
     await vi.waitFor(() => expect(api.initialSync).toHaveBeenCalledTimes(2))
 
     controller.disconnect()
+    // disconnect — lifecycle-рубильник, стор он не трогает (фаза осталась 'recovering');
+    // в реальном приложении destroy пересоздаёт стор — имитируем свежий старт
+    setState({ phase: 'idle' })
     await controller.connect()
 
     staleRecoverySync.resolve(syncResponse('stale'))
@@ -254,7 +266,7 @@ describe('MatrixController (orchestrator)', () => {
     expect(api.longPollSync).not.toHaveBeenCalled()
   })
 
-  it('sendMessage dispatches optimisticAdded then sent', async () => {
+  it('sendMessage dispatches optimisticAdded then optimisticResolved', async () => {
     const { controller, applied } = harness({
       phase: 'connected',
       identity: IDENTITY,
@@ -374,7 +386,7 @@ describe('MatrixController (orchestrator)', () => {
     expect(applied.some((action) => action.type === 'message.sent')).toBe(false)
   })
 
-  it('resendMessage dispatches retrying then sent under the same localId', async () => {
+  it('resendMessage dispatches retrying then optimisticResolved under the same localId', async () => {
     const { controller, applied } = harness({
       phase: 'connected',
       identity: IDENTITY,
@@ -384,7 +396,11 @@ describe('MatrixController (orchestrator)', () => {
     await controller.resendMessage('local-1')
 
     expect(applied[0]).toEqual({ type: 'message.retrying', localId: 'local-1' })
-    expect(applied[1]).toEqual({ type: 'message.sent', localId: 'local-1', eventId: '$real' })
+    expect(applied[1]).toEqual({
+      type: 'message.sent',
+      localId: 'local-1',
+      eventId: '$real',
+    })
   })
 
   it('resendMessage reuses the original txnId so the server can dedup the retry', async () => {
@@ -471,5 +487,98 @@ describe('MatrixController (orchestrator)', () => {
     expect(applied.filter((action) => action.type === 'message.optimisticAdded')).toHaveLength(1)
     expect(applied.some((action) => action.type === 'message.failed')).toBe(false)
     expect(api.registerGuest).not.toHaveBeenCalled()
+  })
+
+  it('markRead moves the store marker optimistically and posts the receipt', async () => {
+    const api = makeMatrixApi()
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.markRead('$op1')
+
+    expect(api.sendReadReceipt).toHaveBeenCalledExactlyOnceWith(IDENTITY.roomId, '$op1')
+    // маркер в сторе — единственный источник «докуда отчитались»
+    expect(getState().room.readReceipts[IDENTITY.userId]).toEqual({ eventId: '$op1' })
+  })
+
+  it('markRead deduplicates repeat calls for the same eventId (throttle on re-sync)', async () => {
+    const api = makeMatrixApi()
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.markRead('$op1')
+    await controller.markRead('$op1')
+
+    expect(api.sendReadReceipt).toHaveBeenCalledOnce()
+  })
+
+  it('markRead skips the POST when the marker was rehydrated from the sync echo (после F5)', async () => {
+    // initial sync вернул наш же receipt эхом → маркер уже в сторе → пере-POST не нужен
+    const api = makeMatrixApi()
+    const { controller } = harness(
+      {
+        phase: 'connected',
+        identity: IDENTITY,
+        room: {
+          ...INITIAL_RUNTIME_STATE.room,
+          readReceipts: { [IDENTITY.userId]: { eventId: '$op1' } },
+        },
+      },
+      api,
+    )
+
+    await controller.markRead('$op1')
+
+    expect(api.sendReadReceipt).not.toHaveBeenCalled()
+  })
+
+  it('markRead does nothing when not connected', async () => {
+    const api = makeMatrixApi()
+    const { controller } = harness({ phase: 'connecting', identity: IDENTITY }, api)
+
+    await controller.markRead('$op1')
+
+    expect(api.sendReadReceipt).not.toHaveBeenCalled()
+  })
+
+  it('markRead keeps the optimistic marker on a non-auth failure and does not re-POST', async () => {
+    // M_NOT_FOUND: writer ещё не персистнул событие. Откат заставил бы каждый следующий скан
+    // повторно слать тот же receipt (цикл move→POST→rollback). Маркер остаётся сдвинутым.
+    const api = makeMatrixApi({
+      sendReadReceipt: vi
+        .fn<MatrixApi['sendReadReceipt']>()
+        .mockRejectedValue(new MatrixError('M_NOT_FOUND', 'not persisted yet')),
+    })
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.markRead('$op1')
+    expect(getState().room.readReceipts[IDENTITY.userId]).toEqual({ eventId: '$op1' })
+
+    // повторный скан того же события не шлёт новый POST — гард видит маркер на месте
+    await controller.markRead('$op1')
+    expect(api.sendReadReceipt).toHaveBeenCalledOnce()
+  })
+
+  it('markRead rolls the marker back after a failure and escalates auth errors', async () => {
+    const api = makeMatrixApi({
+      sendReadReceipt: vi
+        .fn<MatrixApi['sendReadReceipt']>()
+        .mockRejectedValueOnce(new MatrixError('M_UNKNOWN_TOKEN', 'expired'))
+        .mockResolvedValueOnce({}),
+    })
+    const { controller, applied, getState } = harness(
+      { phase: 'connected', identity: IDENTITY },
+      api,
+    )
+
+    await controller.markRead('$op1')
+    // маркер откатился — ближайший скан повторит POST
+    expect(getState().room.readReceipts[IDENTITY.userId]).toBeUndefined()
+    // auth-ошибка эскалирует восстановление сессии; ждём её завершения (phase снова connected)
+    await vi.waitFor(() => expect(applied).toContainEqual({ type: 'session.recovering' }))
+    await vi.waitFor(() => expect(getState().phase).toBe('connected'))
+
+    await controller.markRead('$op1')
+
+    expect(api.sendReadReceipt).toHaveBeenCalledTimes(2)
+    controller.disconnect()
   })
 })

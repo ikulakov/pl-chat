@@ -56,7 +56,7 @@
 
 .messageRow {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 4px;
   margin-bottom: 4px;
 
@@ -87,10 +87,4 @@
     opacity: 1;
     pointer-events: auto;
   }
-}
-
-.scrollButton {
-  position: absolute;
-  right: 16px;
-  bottom: 8px;
 }

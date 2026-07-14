@@ -10,7 +10,7 @@ if (!Element.prototype.scrollTo) {
 
 // jsdom не реализует IntersectionObserver — нужен MessageList для видимости кнопки "вниз".
 // Управляемая заглушка: тесты дёргают trigger() на последнем инстансе, чтобы эмулировать
-// пересечение сентинела без реального layout (см. MessageList.test.tsx).
+// пересечение сентинела без реального layout (см. useChatScroll.test.tsx).
 export class FakeIntersectionObserver implements IntersectionObserver {
   static instances: FakeIntersectionObserver[] = []
 

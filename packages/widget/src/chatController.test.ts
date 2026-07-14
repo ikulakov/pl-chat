@@ -21,6 +21,7 @@ function makeMatrix(): MatrixService {
     disconnect: vi.fn(),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     resendMessage: vi.fn().mockResolvedValue(undefined),
+    markRead: vi.fn().mockResolvedValue(undefined),
   }
 }
 

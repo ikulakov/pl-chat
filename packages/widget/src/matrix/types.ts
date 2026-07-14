@@ -64,6 +64,23 @@ export type ClientEvent =
   | OperatorLeftEvent
   | GenericClientEvent
 
+export interface ReceiptEvent {
+  type: typeof MatrixEventType.Receipt
+  content: Record<
+    string,
+    {
+      'm.read'?: Record<string, { ts?: number }>
+    }
+  >
+}
+
+export interface GenericEphemeralEvent {
+  type: string
+  content: Record<string, unknown>
+}
+
+export type EphemeralEvent = ReceiptEvent | GenericEphemeralEvent
+
 export interface RoomTimeline {
   events: ClientEvent[]
   limited?: boolean
@@ -73,5 +90,5 @@ export interface RoomTimeline {
 export interface JoinedRoom {
   state: { events: ClientEvent[] }
   timeline: RoomTimeline
-  ephemeral?: { events: ClientEvent[] }
+  ephemeral?: { events: EphemeralEvent[] }
 }
