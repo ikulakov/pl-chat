@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import { cn } from '../cn'
 import styles from './IconButton.module.css'
 
-type Variant = 'surface' | 'floating' | 'ghost' | 'accent'
+type Variant = 'surface' | 'floating' | 'ghost' | 'accent' | 'contrast'
 type Size = 'sm' | 'md'
 
 type AccessibleName = { 'aria-label': string } | { 'aria-labelledby': string }

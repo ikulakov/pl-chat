@@ -8,6 +8,7 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/_matrix': 'http://localhost:3001',
+      '/_dev': 'http://localhost:3001',
     },
   },
 })

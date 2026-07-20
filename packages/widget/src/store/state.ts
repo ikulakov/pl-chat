@@ -15,6 +15,9 @@ export type RuntimeAction =
   | { type: 'message.retrying'; localId: string }
   | { type: 'receipt.markedRead'; userId: string; eventId: string }
   | { type: 'receipt.sendFailed'; userId: string; eventId: string; rollbackTo: string | null }
+  | { type: 'history.loading' }
+  | { type: 'history.loaded'; items: TimelineItem[]; prevBatch: string | null }
+  | { type: 'history.settled' }
 
 export interface ChatRuntimeState {
   phase: ConnectionPhase
@@ -29,6 +32,9 @@ export interface RoomState {
   operator: OperatorState
   // m.read по юзерам: до какого события каждый дочитал
   readReceipts: Record<string, ReadReceipt>
+  // курсор следующей страницы истории назад
+  prevBatch: string | null
+  isLoadingHistory: boolean
 }
 
 export interface Identity {

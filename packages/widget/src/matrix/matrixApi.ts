@@ -1,5 +1,5 @@
-import type { RegisterResponse, SyncResponse } from './dto'
-import { MATRIX_API_PREFIX, MsgType, ReceiptType } from './consts'
+import { HISTORY_PAGE_SIZE, MATRIX_API_PREFIX, MsgType, ReceiptType } from './consts'
+import type { MessagesResponse, RegisterResponse, SyncResponse } from './dto'
 import type { MatrixTransport } from './transport/matrixTransport'
 
 export function createMatrixApi(transport: MatrixTransport) {
@@ -26,6 +26,18 @@ export function createMatrixApi(transport: MatrixTransport) {
       return transport.request<SyncResponse>(`${MATRIX_API_PREFIX}/sync?${params}`, {
         signal: options?.signal ?? null,
       })
+    },
+
+    getRoomHistory(roomId: string, from: string, signal?: AbortSignal): Promise<MessagesResponse> {
+      const params = new URLSearchParams({
+        dir: 'b',
+        from,
+        limit: String(HISTORY_PAGE_SIZE),
+      })
+      return transport.request<MessagesResponse>(
+        `${MATRIX_API_PREFIX}/rooms/${encodeURIComponent(roomId)}/messages?${params}`,
+        { signal: signal ?? null },
+      )
     },
 
     sendMessage(roomId: string, txnId: string, body: string): Promise<{ event_id: string }> {

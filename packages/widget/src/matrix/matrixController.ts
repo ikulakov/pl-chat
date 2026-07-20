@@ -2,14 +2,17 @@ import { createOptimisticTextMessage } from '../domain/optimistic'
 import { canMoveMarker } from '../domain/receipts'
 import { isSystem } from '../domain/timeline'
 import type { ChatRuntimeState, RuntimeAction } from '../store/state'
+import { MatrixHistoryLoader } from './history/historyLoader'
 import { type MatrixApi } from './matrixApi'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
-import { isMatrixAuthError, isUserDeactivatedError } from './transport/matrixError'
+import {
+  isMatrixAuthError,
+  isUserDeactivatedError,
+  type AuthErrorContext,
+} from './transport/matrixError'
 
 export const CONNECTION_FAILED_ERROR = 'Не удалось подключиться'
-
-type AuthErrorContext = 'sync' | 'sendMessage' | 'resendMessage' | 'markRead'
 
 export interface MatrixService {
   connect: () => Promise<void>
@@ -17,6 +20,8 @@ export interface MatrixService {
   sendMessage: (text: string) => Promise<void>
   resendMessage: (localId: string) => Promise<void>
   markRead: (eventId: string) => Promise<void>
+  loadMoreHistory: () => Promise<void>
+  stopLoadingHistory: () => void
 }
 
 export interface MatrixControllerDeps {
@@ -29,6 +34,7 @@ export interface MatrixControllerDeps {
 export class MatrixController implements MatrixService {
   private readonly api: MatrixApi
   private readonly syncLoop: MatrixSyncLoop
+  private readonly historyLoader: MatrixHistoryLoader
   private readonly sessionManager: MatrixSessionManager
 
   private readonly dispatch: (action: RuntimeAction) => void
@@ -40,6 +46,11 @@ export class MatrixController implements MatrixService {
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
     this.syncLoop = new MatrixSyncLoop(deps.api)
+    this.historyLoader = new MatrixHistoryLoader({
+      api: deps.api,
+      dispatch: deps.dispatch,
+      onAuthError: (err) => this.handleAuthError(err, 'loadHistory'),
+    })
     this.sessionManager = deps.sessionManager
     this.dispatch = deps.dispatch
     this.getState = deps.getState
@@ -66,6 +77,7 @@ export class MatrixController implements MatrixService {
   }
 
   disconnect(): void {
+    this.stopLoadingHistory()
     this.nextLifecycle()
     this.syncLoop.stop()
   }
@@ -138,6 +150,27 @@ export class MatrixController implements MatrixService {
         return
       }
     }
+  }
+
+  // Механика догрузки живёт в MatrixHistoryLoader; контроллер даёт ей только сессионный
+  // контекст — откуда тянуть (getContext) и когда цикл устарел (isStale по поколению сессии).
+  async loadMoreHistory(): Promise<void> {
+    const lifecycleId = this.lifecycleId
+
+    await this.historyLoader.load({
+      getContext: () => {
+        const { identity, phase, room } = this.getState()
+
+        if (phase !== 'connected' || !identity || room.prevBatch === null) return null
+
+        return { roomId: identity.roomId, prevBatch: room.prevBatch }
+      },
+      isStale: () => !this.isCurrentLifecycle(lifecycleId),
+    })
+  }
+
+  stopLoadingHistory(): void {
+    this.historyLoader.stop()
   }
 
   private async dispatchSend(
@@ -230,6 +263,7 @@ export class MatrixController implements MatrixService {
 
   private recoverFromAuthError(err: unknown, context: AuthErrorContext): void {
     console.error(`[PLChat] ${context} auth error:`, err)
+    this.stopLoadingHistory()
     this.syncLoop.stop()
     this.startSessionRecovery(this.lifecycleId)
   }
@@ -252,6 +286,7 @@ export class MatrixController implements MatrixService {
   }
 
   private failSession(): void {
+    this.stopLoadingHistory()
     this.nextLifecycle()
     this.syncLoop.stop()
     this.sessionManager.clearSession()

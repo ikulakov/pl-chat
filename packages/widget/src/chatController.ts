@@ -51,6 +51,10 @@ export class ChatController {
 
   markRead = (eventId: string): Promise<void> => this.matrix.markRead(eventId)
 
+  loadMoreHistory = (): Promise<void> => this.matrix.loadMoreHistory()
+
+  stopLoadingHistory = (): void => this.matrix.stopLoadingHistory()
+
   reconnect = (): void => {
     void this.matrix.connect()
   }

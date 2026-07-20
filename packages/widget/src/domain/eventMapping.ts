@@ -55,6 +55,7 @@ function eventToItem(event: ClientEvent): TimelineItem | undefined {
         kind: 'text',
         localId: event.event_id,
         eventId: event.event_id,
+        ...(event.unsigned?.transaction_id ? { txnId: event.unsigned.transaction_id } : {}),
         sender: event.sender,
         ts: event.origin_server_ts,
         sendStatus: 'sent',

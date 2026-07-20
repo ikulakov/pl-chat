@@ -7,6 +7,8 @@ export function useChatActions() {
     sendMessage: controller.sendMessage,
     resendMessage: controller.resendMessage,
     markRead: controller.markRead,
+    loadMoreHistory: controller.loadMoreHistory,
+    stopLoadingHistory: controller.stopLoadingHistory,
     reconnect: controller.reconnect,
     open: controller.open,
     close: controller.close,
