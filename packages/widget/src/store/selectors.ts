@@ -1,6 +1,7 @@
 import type { ViewportMode } from '@bankchat/protocol'
 import type { ReadReceipt } from '../domain/receipts'
 import { countUnread } from '../domain/receipts'
+import type { OperatorState } from '../domain/operator'
 import type { TimelineItem } from '../domain/timeline'
 import type { ChatStatus } from './state'
 import type { ChatStoreState } from './store'
@@ -27,6 +28,10 @@ export function selectStatus(state: ChatStoreState): ChatStatus {
   }
 }
 
+export function selectOperator(state: ChatStoreState): OperatorState {
+  return state.room.operator
+}
+
 export function selectUserId(state: ChatStoreState): string | null {
   return state.identity?.userId ?? null
 }
@@ -45,6 +50,10 @@ export function selectTimeline(state: ChatStoreState): TimelineItem[] {
 
 export function selectReadReceipts(state: ChatStoreState): Record<string, ReadReceipt> {
   return state.room.readReceipts
+}
+
+export function selectIsLoadingHistory(state: ChatStoreState): boolean {
+  return state.room.isLoadingHistory
 }
 
 export function selectUnreadCount(state: ChatStoreState): number {

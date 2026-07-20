@@ -2,9 +2,11 @@ import type { MatrixEventType, MsgType } from './consts'
 
 interface BaseClientEvent {
   event_id: string
+  // Наличие поля (даже '') — признак state event
   state_key?: string
   sender: string
   origin_server_ts: number
+  unsigned?: { transaction_id?: string }
 }
 
 interface TextMessageContent {

@@ -21,6 +21,8 @@ export const INITIAL_ROOM_STATE: RoomState = {
     isActive: false,
   },
   readReceipts: {},
+  prevBatch: null,
+  isLoadingHistory: false,
 }
 
 export const INITIAL_RUNTIME_STATE: ChatRuntimeState = {

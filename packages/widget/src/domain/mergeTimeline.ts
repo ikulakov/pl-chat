@@ -1,20 +1,23 @@
-import { isSystem, type MessageTimelineItem, type SendStatus, type TimelineItem } from './timeline'
+import { isSystem, type TimelineItem } from './timeline'
 
-const isDraftOf = (
-  item: TimelineItem,
-  incoming: MessageTimelineItem,
-  status: SendStatus,
-): boolean =>
-  !isSystem(item) &&
-  item.sendStatus === status &&
-  item.sender === incoming.sender &&
-  item.content.body === incoming.content.body
+function findDraftIndex(items: TimelineItem[], incoming: TimelineItem): number {
+  if (isSystem(incoming) || !incoming.txnId) return -1
 
-function findDraftIndex(items: TimelineItem[], incoming: MessageTimelineItem): number {
-  const sending = items.findIndex((item) => isDraftOf(item, incoming, 'sending'))
-  if (sending !== -1) return sending
+  return items.findIndex(
+    (item) =>
+      !isSystem(item) &&
+      (item.sendStatus === 'sending' || item.sendStatus === 'failed') &&
+      item.txnId === incoming.txnId,
+  )
+}
 
-  return items.findIndex((item) => isDraftOf(item, incoming, 'failed'))
+export function prependTimeline(existing: TimelineItem[], older: TimelineItem[]): TimelineItem[] {
+  const knownEventIds = new Set(existing.map((item) => item.eventId))
+  const fresh = older.filter((item) => !knownEventIds.has(item.eventId))
+
+  if (fresh.length === 0) return existing
+
+  return [...fresh, ...existing]
 }
 
 export function mergeTimeline(existing: TimelineItem[], incoming: TimelineItem[]): TimelineItem[] {
@@ -34,7 +37,7 @@ export function mergeTimeline(existing: TimelineItem[], incoming: TimelineItem[]
     // копия на первое реальное изменение
     if (result === existing) result = [...existing]
 
-    const draftIdx = !isSystem(incomingItem) ? findDraftIndex(result, incomingItem) : -1
+    const draftIdx = findDraftIndex(result, incomingItem)
     const draft = result[draftIdx]
 
     if (draft && !isSystem(draft)) {

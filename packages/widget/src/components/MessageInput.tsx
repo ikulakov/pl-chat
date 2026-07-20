@@ -77,23 +77,17 @@ export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
           />
         </div>
         <div className={styles.rightBtns}>
-          {/* <div className={styles.slot}>
-            <IconButton variant="ghost" size="sm" aria-label={t('input.stickers')}>
-              <StickerIcon />
+          <div className={styles.slot}>
+            <IconButton
+              variant="contrast"
+              className={styles.sendBtn}
+              aria-label={t('input.send')}
+              onClick={submit}
+              disabled={!hasText}
+            >
+              <SendIcon />
             </IconButton>
-          </div> */}
-          {hasText && (
-            <div className={styles.slot}>
-              <IconButton
-                variant="accent"
-                className={styles.sendBtn}
-                aria-label={t('input.send')}
-                onClick={submit}
-              >
-                <SendIcon />
-              </IconButton>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

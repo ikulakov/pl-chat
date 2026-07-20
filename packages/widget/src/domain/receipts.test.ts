@@ -216,3 +216,24 @@ describe('countUnread', () => {
     expect(countUnread(receipts, timeline, OWN)).toBe(2)
   })
 })
+
+// Подгрузка истории вверх кладёт старые события ПЕРЕД маркером. Ни countUnread, ни canMoveMarker
+// специального кода под это не имеют — инварианты держатся на позиции маркера, и рефакторинг
+// (например, обрезка ленты) их легко сломает. Пиним.
+describe('read-маркер переживает подгрузку истории вверх', () => {
+  it('счётчик непрочитанных не растёт от старых чужих сообщений перед маркером', () => {
+    const timeline = [opMsg('$1', 1), opMsg('$2', 2)]
+    const receipts = { [OWN]: { eventId: '$1' } }
+    const withHistory = [opMsg('$old1', -2), opMsg('$old2', -1), ...timeline]
+
+    expect(countUnread(receipts, withHistory, OWN)).toBe(countUnread(receipts, timeline, OWN))
+  })
+
+  it('скан ленты после подгрузки не откатывает маркер на старое сообщение', () => {
+    // пользователь стоит наверху, DOM-скан находит старое сообщение и зовёт markRead —
+    // маркер обязан остаться там, где был
+    const timeline = [opMsg('$old', -1), opMsg('$1', 1), opMsg('$2', 2)]
+
+    expect(canMoveMarker(timeline, '$2', '$old')).toBe(false)
+  })
+})

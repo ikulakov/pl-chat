@@ -7,9 +7,15 @@ import { MessageList } from './MessageList'
 
 const ME = '@me:bank'
 
-// resendMessage дёргает ChatController → MatrixService, которые в этом тесте не поднимаются
+// Экшены дёргают ChatController → MatrixService, которые в этом тесте не поднимаются
+const loadMoreHistory = vi.fn()
 vi.mock('../../hooks/useChatActions', () => ({
-  useChatActions: () => ({ resendMessage: vi.fn(), markRead: vi.fn() }),
+  useChatActions: () => ({
+    resendMessage: vi.fn(),
+    markRead: vi.fn(),
+    loadMoreHistory,
+    stopLoadingHistory: vi.fn(),
+  }),
 }))
 
 function message(
@@ -28,6 +34,7 @@ describe('MessageList', () => {
     // сброс стора до рендера: в afterEach setState перерисовал бы ещё
     // смонтированный компонент вне act() (cleanup RTL идёт позже) → warning
     chatStore.setState({ room: INITIAL_ROOM_STATE })
+    loadMoreHistory.mockClear()
     vi.useFakeTimers()
     // "сейчас" далеко впереди дат сообщений — чтобы формат не съехал в "Сегодня"/"Вчера"
     vi.setSystemTime(new Date('2026-08-15T12:00:00'))
@@ -133,6 +140,40 @@ describe('MessageList', () => {
     const candidates = [...container.querySelectorAll('[data-receipt-id]')]
 
     expect(candidates.map((el) => el.getAttribute('data-receipt-id'))).toEqual(['$op'])
+  })
+
+  it('history has no retry button — recovery is scroll-driven, spinner only while loading', () => {
+    // догрузка управляется скроллом (бесконечный backoff у верха), кнопки повтора в UI нет
+    const ts = new Date('2026-07-01T10:00:00').getTime()
+
+    chatStore.setState({
+      room: {
+        ...INITIAL_ROOM_STATE,
+        timeline: [message({ localId: 'a', eventId: '$a', ts, body: 'hi' })],
+      },
+    })
+
+    render(<MessageList userId={ME} />)
+
+    expect(screen.queryByRole('button', { name: 'Повторить' })).not.toBeInTheDocument()
+    // и спиннера нет — загрузка не идёт
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('shows history spinner while a page is loading', () => {
+    const ts = new Date('2026-07-01T10:00:00').getTime()
+
+    chatStore.setState({
+      room: {
+        ...INITIAL_ROOM_STATE,
+        timeline: [message({ localId: 'a', eventId: '$a', ts, body: 'hi' })],
+        isLoadingHistory: true,
+      },
+    })
+
+    render(<MessageList userId={ME} />)
+
+    expect(screen.getByRole('status')).toBeInTheDocument()
   })
 
   it('renders a system message as a plain badge, without message actions or bubble status', () => {

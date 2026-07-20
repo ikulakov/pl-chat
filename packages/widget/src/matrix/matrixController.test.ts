@@ -1,16 +1,18 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ChatRuntimeState, Identity, RoomState, RuntimeAction } from '../store/state'
 import type { TextTimelineItem } from '../domain/timeline'
-import { INITIAL_RUNTIME_STATE } from '../store/store'
 import {
   createFakeTokenStore,
   deferred,
   makeMatrixApi,
+  messagesResponse,
+  roomMessageEvent,
   syncResponse,
   textItem,
 } from '../shared/testUtils/matrixFixtures'
-import type { MatrixApi } from './matrixApi'
 import { chatRuntimeReducer } from '../store/reducer'
+import type { ChatRuntimeState, Identity, RoomState, RuntimeAction } from '../store/state'
+import { INITIAL_RUNTIME_STATE } from '../store/store'
+import type { MatrixApi } from './matrixApi'
 import { CONNECTION_FAILED_ERROR, MatrixController } from './matrixController'
 import { MatrixSessionManager } from './session/sessionManager'
 import { MatrixError } from './transport/matrixError'
@@ -57,9 +59,8 @@ function failedMessage(
 
 function roomWithMessage(message: TextTimelineItem): RoomState {
   return {
+    ...INITIAL_RUNTIME_STATE.room,
     timeline: [message],
-    operator: { isActive: false, id: null, displayName: null },
-    readReceipts: {},
   }
 }
 
@@ -580,5 +581,89 @@ describe('MatrixController (orchestrator)', () => {
 
     expect(api.sendReadReceipt).toHaveBeenCalledTimes(2)
     controller.disconnect()
+  })
+})
+
+describe('MatrixController — подгрузка истории вверх', () => {
+  function connected(prevBatch: string | null, api: MatrixApi) {
+    return harness(
+      {
+        phase: 'connected',
+        identity: IDENTITY,
+        room: { ...INITIAL_RUNTIME_STATE.room, prevBatch },
+      },
+      api,
+    )
+  }
+
+  it('disconnect обрывает догрузку в полёте — страница уже не префиксит ленту', async () => {
+    // виджет закрыли посреди загрузки: запрос абортится, флаг снимается, а резолв прерванной
+    // страницы (пришедший позже) в ленту попасть не должен
+    const page = deferred<Awaited<ReturnType<MatrixApi['getRoomHistory']>>>()
+    const api = makeMatrixApi({
+      getRoomHistory: vi.fn<MatrixApi['getRoomHistory']>().mockReturnValue(page.promise),
+    })
+    const { controller, getState } = connected('p1', api)
+
+    const inFlight = controller.loadMoreHistory()
+    controller.disconnect()
+
+    const signal = vi.mocked(api.getRoomHistory).mock.calls[0]![2]
+    expect(signal!.aborted).toBe(true)
+    expect(getState().room.isLoadingHistory).toBe(false)
+
+    page.resolve(messagesResponse([roomMessageEvent({ event_id: '$old' })], 'p2'))
+    await inFlight
+
+    expect(getState().room.timeline).toHaveLength(0)
+    expect(getState().room.prevBatch).toBe('p1')
+  })
+
+  it('recovery по auth-ошибке из другого вызова обрывает догрузку истории', async () => {
+    // Ошибка прилетела из отправки, а не из истории. Recovery НЕ бампает lifecycle,
+    // поэтому isStale остаётся false — единственное, что снимает догрузку, это
+    // stopLoadingHistory в recoverFromAuthError. Без него страница старой комнаты
+    // догрузится уже после пересоздания сессии.
+    const page = deferred<Awaited<ReturnType<MatrixApi['getRoomHistory']>>>()
+    const api = makeMatrixApi({
+      getRoomHistory: vi.fn<MatrixApi['getRoomHistory']>().mockReturnValue(page.promise),
+      sendMessage: vi
+        .fn<MatrixApi['sendMessage']>()
+        .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
+    })
+    const { controller, getState } = connected('p1', api)
+
+    const inFlight = controller.loadMoreHistory()
+    await controller.sendMessage('hi')
+
+    const signal = vi.mocked(api.getRoomHistory).mock.calls[0]![2]
+    expect(signal!.aborted).toBe(true)
+
+    page.resolve(messagesResponse([roomMessageEvent({ event_id: '$old' })], 'p2'))
+    await inFlight
+
+    expect(getState().room.timeline.map((item) => item.eventId)).not.toContain('$old')
+    controller.disconnect()
+  })
+
+  it('смена lifecycle во время retry не пишет в новый стор', async () => {
+    // между попытками сессия пересоздалась (disconnect) — устаревший retry должен молчать
+    const page = deferred<Awaited<ReturnType<MatrixApi['getRoomHistory']>>>()
+    const api = makeMatrixApi({
+      getRoomHistory: vi
+        .fn<MatrixApi['getRoomHistory']>()
+        .mockRejectedValueOnce(new MatrixError('M_UNKNOWN', 'boom'))
+        .mockReturnValueOnce(page.promise),
+    })
+    const { controller, getState } = connected('p1', api)
+
+    const inFlight = controller.loadMoreHistory()
+    // рвём lifecycle до того, как retry успеет записать settled
+    controller.disconnect()
+    page.resolve(messagesResponse([roomMessageEvent({ event_id: '$old' })], 'p2'))
+    await inFlight
+
+    // устаревший цикл не тронул стор
+    expect(getState().room.timeline).toEqual([])
   })
 })

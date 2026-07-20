@@ -195,19 +195,20 @@ describe('chatRuntimeReducer', () => {
   it('does not mark a message failed after sync already resolved it', () => {
     const withOptimistic = chatRuntimeReducer(
       { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
-      { type: 'message.optimisticAdded', message: ownMessage({}) },
+      { type: 'message.optimisticAdded', message: ownMessage({ txnId: 'txn-1' }) },
     )
     const resolvedBySync = chatRuntimeReducer(withOptimistic, {
       type: 'sync.received',
       cursor: 's1',
       joinedRoom: emptyJoinedRoom({
-        // тело совпадает с оптимистичным ('hi') — иначе mergeTimeline не свяжет черновик с реальным событием
+        // txnId совпадает с оптимистичным — иначе mergeTimeline не свяжет черновик с реальным событием
         timeline: {
           events: [
             roomMessageEvent({
               event_id: '$real',
               sender: IDENTITY.userId,
               content: { body: 'hi' },
+              unsigned: { transaction_id: 'txn-1' },
             }),
           ],
         },
@@ -347,5 +348,122 @@ describe('chatRuntimeReducer', () => {
     expect(retried.room.timeline).toHaveLength(2)
     expect(retried.room.timeline[0]).toMatchObject({ localId: 'l1', sendStatus: 'sending' })
     expect(retried.room.timeline[1]).toMatchObject({ localId: 'l2', sendStatus: 'sent' })
+  })
+})
+
+describe('chatRuntimeReducer — курсор истории', () => {
+  function started(): ChatRuntimeState {
+    return chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'session.started',
+      identity: IDENTITY,
+      cursor: 's1',
+      joinedRoom: joinedRoom(),
+    })
+  }
+
+  it('берёт prev_batch из initial sync', () => {
+    expect(started().room.prevBatch).toBe('p1')
+  })
+
+  it('без prev_batch (комната короче лимита) подгружать нечего', () => {
+    const next = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'session.started',
+      identity: IDENTITY,
+      cursor: 's1',
+      joinedRoom: emptyJoinedRoom({ timeline: { events: [roomMessageEvent()] } }),
+    })
+
+    expect(next.room.prevBatch).toBeNull()
+  })
+
+  it('sync.received не трогает курсор истории', () => {
+    // инкрементальный sync prev_batch не присылает; курсор двигает только сама подгрузка
+    const paginated = chatRuntimeReducer(started(), {
+      type: 'history.loaded',
+      items: [],
+      prevBatch: 'p2',
+    })
+
+    const synced = chatRuntimeReducer(paginated, {
+      type: 'sync.received',
+      cursor: 's2',
+      joinedRoom: emptyJoinedRoom({
+        timeline: { events: [roomMessageEvent({ event_id: '$m2' })] },
+      }),
+    })
+
+    expect(synced.room.prevBatch).toBe('p2')
+  })
+
+  it('resume той же комнаты сохраняет продвинутый курсор, а не откатывает его к низу ленты', () => {
+    // свежий initial sync принесёт prev_batch на «низ» ленты — приняв его, мы запросили бы
+    // заново уже загруженные страницы
+    const paginated = chatRuntimeReducer(started(), {
+      type: 'history.loaded',
+      items: [],
+      prevBatch: 'p2',
+    })
+
+    const resumed = chatRuntimeReducer(paginated, {
+      type: 'session.started',
+      identity: IDENTITY,
+      cursor: 's9',
+      joinedRoom: joinedRoom(),
+    })
+
+    expect(resumed.room.prevBatch).toBe('p2')
+  })
+
+  it('новая комната берёт свой курсор с нуля', () => {
+    const resumed = chatRuntimeReducer(started(), {
+      type: 'session.started',
+      identity: { userId: '@user2:bank', roomId: '!other:bank' },
+      cursor: 's9',
+      joinedRoom: joinedRoom(),
+    })
+
+    expect(resumed.room.prevBatch).toBe('p1')
+  })
+
+  it('session.started снимает флаг загрузки, зависший от прерванной подгрузки', () => {
+    // подгрузку оборвала пересборка сессии — иначе флаг остался бы взведён навсегда
+    const loading = chatRuntimeReducer(started(), { type: 'history.loading' })
+
+    const resumed = chatRuntimeReducer(loading, {
+      type: 'session.started',
+      identity: IDENTITY,
+      cursor: 's9',
+      joinedRoom: joinedRoom(),
+    })
+
+    expect(loading.room.isLoadingHistory).toBe(true)
+    expect(resumed.room.isLoadingHistory).toBe(false)
+  })
+
+  it('history.loaded не снимает флаг загрузки — цикл может продолжиться', () => {
+    // страница без отображаемых событий: контроллер тут же тянет следующую, и гард
+    // ре-энтранси обязан удержаться до history.settled
+    const loading = chatRuntimeReducer(started(), { type: 'history.loading' })
+
+    const loaded = chatRuntimeReducer(loading, {
+      type: 'history.loaded',
+      items: [],
+      prevBatch: 'p2',
+    })
+    const settled = chatRuntimeReducer(loaded, { type: 'history.settled' })
+
+    expect(loaded.room.isLoadingHistory).toBe(true)
+    expect(settled.room.isLoadingHistory).toBe(false)
+  })
+
+  it('history.loaded кладёт события в начало ленты', () => {
+    const loaded = chatRuntimeReducer(started(), {
+      type: 'history.loaded',
+      items: [textItem({ localId: '$old', eventId: '$old', body: 'старое', ts: 0 })],
+      prevBatch: null,
+    })
+
+    expect(loaded.room.timeline.map((item) => item.eventId)).toEqual(['$old', '$m1'])
+    expect(loaded.room.prevBatch).toBeNull()
   })
 })

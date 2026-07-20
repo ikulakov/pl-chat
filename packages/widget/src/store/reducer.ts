@@ -1,12 +1,12 @@
 import { timelineEventsToItems } from '../domain/eventMapping'
-import { mergeTimeline } from '../domain/mergeTimeline'
+import { mergeTimeline, prependTimeline } from '../domain/mergeTimeline'
 import { reduceOperator } from '../domain/operator'
 import { mergeReadReceipts } from '../domain/receipts'
 import { isSystem } from '../domain/timeline'
 import type { JoinedRoom } from '../matrix/types'
 import { assertNever } from '../shared/assertNever'
 import type { ChatRuntimeState, RoomState, RuntimeAction } from './state'
-import { INITIAL_RUNTIME_STATE } from './store'
+import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from './store'
 
 function updateRoom(state: ChatRuntimeState, patch: Partial<RoomState>): ChatRuntimeState {
   return { ...state, room: { ...state.room, ...patch } }
@@ -34,6 +34,22 @@ function applySync(room: RoomState, joinedRoom: JoinedRoom): RoomState {
   }
 }
 
+function startRoom(joinedRoom: JoinedRoom): RoomState {
+  return {
+    ...applySync(INITIAL_ROOM_STATE, joinedRoom),
+    prevBatch: joinedRoom.timeline.prev_batch ?? null,
+  }
+}
+
+function continueRoom(room: RoomState, joinedRoom: JoinedRoom): RoomState {
+  return {
+    ...applySync(room, joinedRoom),
+    // курсор истории держим свой — из снимка он откатит подгрузку к низу ленты
+    prevBatch: room.prevBatch,
+    isLoadingHistory: false,
+  }
+}
+
 export function chatRuntimeReducer(
   state: ChatRuntimeState,
   action: RuntimeAction,
@@ -49,8 +65,10 @@ export function chatRuntimeReducer(
       return { ...INITIAL_RUNTIME_STATE, phase: 'error', error: action.error }
 
     case 'session.started': {
-      const baseRoom =
-        state.identity?.roomId === action.identity.roomId ? state.room : INITIAL_RUNTIME_STATE.room
+      // isSameRoom достижим только в авторизованной зоне:
+      // при протухшем токене re-auth авторизованному пользователю вернёт ту же комнату при живой ленте;
+      // гостю re-auth всегда даёт новую комнату.
+      const isSameRoom = state.identity?.roomId === action.identity.roomId
 
       return {
         ...state,
@@ -58,7 +76,9 @@ export function chatRuntimeReducer(
         error: null,
         identity: action.identity,
         cursor: action.cursor,
-        room: applySync(baseRoom, action.joinedRoom),
+        room: isSameRoom
+          ? continueRoom(state.room, action.joinedRoom)
+          : startRoom(action.joinedRoom),
       }
     }
 
@@ -117,6 +137,18 @@ export function chatRuntimeReducer(
       }
       return updateRoom(state, { readReceipts })
     }
+
+    case 'history.loading':
+      return updateRoom(state, { isLoadingHistory: true })
+
+    case 'history.loaded':
+      return updateRoom(state, {
+        timeline: prependTimeline(state.room.timeline, action.items),
+        prevBatch: action.prevBatch,
+      })
+
+    case 'history.settled':
+      return updateRoom(state, { isLoadingHistory: false })
 
     default:
       return assertNever(action)

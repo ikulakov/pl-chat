@@ -6,9 +6,15 @@
 
 .list {
   height: 100%;
+  position: relative;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
+  /* Chrome/Firefox сами компенсируют вставку контента сверху, WebKit — нет 
+     Держим позицию сами в useLoadMoreHistory, 
+     а браузерную компенсацию выключаем
+   */
+  overflow-anchor: none;
   padding-left: 8px;
   padding-right: max(0px, calc(8px - var(--scrollbar-w, 0px)));
   scrollbar-width: thin;
@@ -20,14 +26,19 @@
   }
 }
 
+.datesBelowSpinner {
+  --date-separator-top: 24px;
+}
+
 .dateSeparator {
   position: sticky;
-  top: 12px;
+  top: var(--date-separator-top, 12px);
   z-index: 1;
   display: flex;
   justify-content: center;
   margin: 12px 0;
   pointer-events: none;
+  transition: top 0.15s;
 }
 
 .dateSeparatorLabel {
@@ -52,6 +63,18 @@
 
 .bottomSentinel {
   height: 1px;
+}
+
+.historySpinnerWrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+  pointer-events: none;
 }
 
 .messageRow {

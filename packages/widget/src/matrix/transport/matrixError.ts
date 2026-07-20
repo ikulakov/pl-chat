@@ -29,3 +29,5 @@ export function isMatrixAuthError(err: unknown): boolean {
 export function isUserDeactivatedError(err: unknown): boolean {
   return isMatrixError(err, MatrixErrCode.UserDeactivated)
 }
+
+export type AuthErrorContext = 'sync' | 'sendMessage' | 'resendMessage' | 'markRead' | 'loadHistory'

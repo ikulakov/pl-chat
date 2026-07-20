@@ -19,7 +19,7 @@ fi
 # сохраняет исходный путь /_matrix/... целиком (rewrite не нужен).
 cat > "$SNIPPET" <<EOF
 location /_matrix/ {
-    resolver ${DNS_RESOLVER:-127.0.0.11} valid=30s;
+    resolver ${DNS_RESOLVER:-kube-dns.kube-system.svc.cluster.local} valid=30s ipv6=off;
     set \$matrix_upstream "${MATRIX_BACKEND}";
     proxy_pass        \$matrix_upstream\$request_uri;
     proxy_http_version 1.1;

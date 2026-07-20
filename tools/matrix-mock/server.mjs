@@ -8,6 +8,10 @@
 // Покрывает весь клиентский MVP: переписка, статусы, typing, ✓✓ (receipts),
 // история, медиа-заглушки, стикеры, Adaptive Cards, завершение чата.
 //
+// История: ~480 осмысленных реплик из scenario.json → historyTopics, растянутых на 10 дней
+// (работают date-разделители). Объём: MOCK_HISTORY_MESSAGES=1000 pnpm dev
+// Временно выключить: галочка «История» в dev-панели виджета (GET/POST /_dev/history-toggle).
+//
 // Команды в поле ввода для тестирования сценариев:
 //   /card    — оператор шлёт Adaptive Card с полем ввода
 //   /notice  — системная плашка (m.notice)
@@ -56,9 +60,13 @@ let lastReadEventId = null;
 let receiptVersion = 0;
 let waiters = [];
 
-function push(type, sender, content, stateKey) {
+function push(type, sender, content, stateKey, txnId) {
   const ev = { event_id: nextId(), type, sender, origin_server_ts: Date.now(), content };
   if (stateKey !== undefined) ev.state_key = stateKey;
+  // unsigned.transaction_id — как на реальном MatrixKC: виден только паре, которая отправила
+  // событие. Мок однопользовательский (один гость), поэтому scoping по (user, device) не нужен —
+  // достаточно прокинуть txnId, если он был передан отправителем.
+  if (txnId !== undefined) ev.unsigned = { transaction_id: txnId };
   events.push(ev);
   wake();
   return ev;
@@ -87,6 +95,13 @@ for (const e of scenario.seed) {
   push(e.type, e.sender, e.content, "state_key" in e ? e.state_key : undefined);
 }
 
+// Как реальный MatrixKC (SyncServiceImpl.INITIAL_TIMELINE_LIMIT): initial sync отдаёт
+// только последние N живых timeline-событий. Мок-процесс живёт долго (гость и комната
+// в dev фиксированы, scenario.json), events копится на каждый reload/переоткрытие
+// виджета — без капа initial sync рано или поздно возвращает ВСЮ сессионную переписку
+// одним ответом, чего реальный сервер никогда не делает.
+const INITIAL_TIMELINE_LIMIT = 50;
+
 // ── Построение /sync-ответа от курсора "n.tv.rv" ────────────────────────────
 function buildSync(n, tv, rv) {
   const newEvents = events.slice(n);
@@ -105,10 +120,22 @@ function buildSync(n, tv, rv) {
   const hasDelta = newEvents.length > 0 || typingVersion > tv || receiptVersion > rv;
   const timeline = { events: timelineEvents };
   if (n === 0) {
-    // Initial sync: limited=true + prev_batch → клиент показывает «Загрузить ещё».
-    // На инкрементальных НЕ шлём limited — иначе клиентский hasMore сбросится в false.
-    timeline.limited = true;
-    timeline.prev_batch = "h0";
+    // Кап живых событий — ВСЕГДА, независимо от тумблера «История»: реальный сервер режет
+    // initial sync до INITIAL_TIMELINE_LIMIT безусловно (это защита от раздутого ответа, а не
+    // фича истории). Иначе выключенный тумблер продолжал бы отдавать всю накопленную за
+    // dev-сессию переписку одним sync — ровно баг, который тумблер должен был исключить.
+    const overflow = Math.max(0, timelineEvents.length - INITIAL_TIMELINE_LIMIT);
+    if (overflow > 0) {
+      timeline.events = timelineEvents.slice(-INITIAL_TIMELINE_LIMIT);
+    }
+    // limited/prev_batch — курсор докачки. Тумблер «История» регулирует ТОЛЬКО присутствие
+    // синтетического корпуса HISTORY (см. combinedTimeline) — живой overflow (сообщения этой
+    // dev-сессии сверх лимита) должен докачиваться независимо от тумблера, иначе выключение
+    // истории делало бы недостижимыми реально отправленные сообщения.
+    if (overflow > 0 || historyEnabled) {
+      timeline.limited = true;
+      timeline.prev_batch = `i${historyBaseLength() + overflow}`;
+    }
   }
   return {
     hasDelta,
@@ -123,26 +150,115 @@ function buildSync(n, tv, rv) {
   };
 }
 
-// ── Подгрузка истории (dir=b, страницы h0→h1→h2, потом конец) ────────────────
-const HISTORY_PAGES = 3;
-const HISTORY_PER = 8;
-function historyPage(from) {
-  const page = from && from.startsWith("h") ? Number(from.slice(1)) : 0;
-  if (page >= HISTORY_PAGES) return { chunk: [], start: from || "h0" };
-  const baseTs = Date.now() - (page + 1) * 3_600_000;
-  const chunk = [];
-  for (let i = 0; i < HISTORY_PER; i++) {
-    const idx = page * HISTORY_PER + i;
-    chunk.push({
-      event_id: `$hist_${page}_${i}`,
+// ── История комнаты (для GET /messages) ─────────────────────────────────────
+// Воспроизводим поведение реального MatrixKC:
+//   • токен пагинации — строгая граница по позиции события (у сервера это streamOrdering,
+//     здесь — индекс в HISTORY); dir=b отдаёт события СТРОГО ЛЕВЕЕ границы;
+//   • chunk — newest-first;
+//   • `end` отдаётся ВСЕГДА, кроме пустого chunk. Значит признак «дошли до начала комнаты» —
+//     именно пустой chunk, а не отсутствие `end` (клиент делает один холостой запрос);
+//   • limit считается по СЫРЫМ событиям, поэтому страница может не дать ни одного
+//     отображаемого сообщения — см. блок невидимых событий ниже.
+const HISTORY_DAYS = 10; // на сколько дней назад растянута переписка (date-разделители)
+const HISTORY_MESSAGES = Number(process.env.MOCK_HISTORY_MESSAGES ?? 480);
+const HISTORY_DELAY_MS = 600; // чтобы спиннер подгрузки был виден
+
+// Размер клиентской страницы (widget: HISTORY_PAGE_SIZE). Нужен, чтобы блок невидимых
+// событий лёг ровно в границы одной страницы — иначе сценарий «страница без сообщений»
+// не воспроизведётся.
+const CLIENT_PAGE_SIZE = 50;
+const INVISIBLE_PAGE_INDEX = 2; // третья страница с конца — целиком нерендерящаяся
+
+const DAY_MS = 86_400_000;
+
+// Реплики тем идут по кругу: получается длинная переписка «клиент возвращался много раз».
+function buildHistoryMessages(total) {
+  const lines = scenario.historyTopics.flat();
+  const perDay = Math.ceil(total / HISTORY_DAYS);
+  const midnight = new Date().setHours(0, 0, 0, 0);
+  const out = [];
+
+  for (let i = 0; i < total; i++) {
+    const daysAgo = HISTORY_DAYS - Math.floor(i / perDay); // от HISTORY_DAYS до 1 (вчера)
+    const dayStart = midnight - daysAgo * DAY_MS + 10 * 3_600_000; // диалоги с 10:00
+    const [who, text] = lines[i % lines.length];
+
+    out.push({
+      event_id: `$hist${i}`,
       type: "m.room.message",
-      sender: idx % 2 === 0 ? OP : GUEST,
-      origin_server_ts: baseTs - i * 60_000, // newest-first (dir=b)
-      content: { msgtype: "m.text", body: `Сообщение из истории #${idx + 1}` },
+      sender: who === "op" ? OP : GUEST,
+      origin_server_ts: dayStart + (i % perDay) * 5 * 60_000, // реплика раз в 5 минут
+      content: { msgtype: "m.text", body: text },
     });
   }
-  const end = page + 1 < HISTORY_PAGES ? `h${page + 1}` : undefined;
-  return { chunk, start: from || "h0", end };
+  return out; // ASC: от самого старого к новому
+}
+
+function buildInvisibleBlock(size, afterTs) {
+  return Array.from({ length: size }, (_, i) => ({
+    event_id: `$react${i}`,
+    type: "m.reaction",
+    sender: OP,
+    origin_server_ts: afterTs + (i + 1) * 1000,
+    content: { "m.relates_to": { rel_type: "m.annotation", event_id: "$ev6", key: "👍" } },
+  }));
+}
+
+// HISTORY — синтетическая «допроцессная» лента комнаты в хронологическом порядке (ASC).
+const HISTORY = buildHistoryMessages(HISTORY_MESSAGES);
+
+// Блок событий, которые виджет не рендерит, — ровно на границе страницы INVISIBLE_PAGE_INDEX.
+// Клиент обязан сам дотянуть следующую страницу, иначе IntersectionObserver «залипнет»:
+// лента не изменилась → состояние пересечения тоже → повторного выстрела не будет.
+const invisibleAt = HISTORY.length - INVISIBLE_PAGE_INDEX * CLIENT_PAGE_SIZE;
+if (invisibleAt > 0) {
+  const afterTs = HISTORY[invisibleAt - 1].origin_server_ts;
+  HISTORY.splice(invisibleAt, 0, ...buildInvisibleBlock(CLIENT_PAGE_SIZE, afterTs));
+}
+
+// Флаг для dev-панели: временно скрыть историю без перезапуска мока и без урезания
+// самого массива HISTORY (он используется в findLast ниже для read receipt).
+let historyEnabled = true;
+
+// Оператор уже дочитал переписку до последнего сообщения гостя. Реальный сервер отдаёт на initial
+// sync СНИМОК receipts комнаты (SyncServiceImpl: isInitial → receiptMapper.findCurrentByRoom),
+// поэтому ✓✓ на старых своих сообщениях видны сразу. Без этой строки мок присылал receipt только
+// реактивно — после первой отправки, — и подгруженная история выглядела непрочитанной.
+lastReadEventId = HISTORY.findLast((e) => e.sender === GUEST)?.event_id ?? null;
+
+// Единая адресуемая лента для GET /messages: синтетическая HISTORY (индексы [0, HISTORY.length))
+// + всё, что реально прошло через комнату за жизнь процесса (индексы после неё). Живые события
+// нужны здесь, а не только в /sync, — иначе initial sync (см. INITIAL_TIMELINE_LIMIT) обрежет
+// накопленную за долгую dev-сессию переписку, а докачать обрезанный хвост будет неоткуда.
+//
+// Тумблер «История» из dev-панели регулирует ТОЛЬКО присутствие синтетического корпуса —
+// живой overflow остаётся докачиваемым в любом случае (это реально отправленные сообщения,
+// а не декорация мока).
+function liveTimelineEvents() {
+  return events.filter((e) => e.state_key === undefined);
+}
+
+function historyBaseLength() {
+  return historyEnabled ? HISTORY.length : 0;
+}
+
+function combinedTimeline() {
+  return historyEnabled ? [...HISTORY, ...liveTimelineEvents()] : liveTimelineEvents();
+}
+
+function currentHead() {
+  return `i${combinedTimeline().length}`;
+}
+
+function historyPage(from, limit) {
+  const all = combinedTimeline();
+  const upTo = from && from.startsWith("i") ? Number(from.slice(1)) : all.length;
+  if (upTo <= 0) return { chunk: [], start: from ?? currentHead() }; // начало комнаты (или её видимой части)
+
+  const start = Math.max(0, upTo - limit);
+  const chunk = all.slice(start, upTo).reverse(); // dir=b → newest-first
+
+  return { chunk, start: from ?? currentHead(), end: `i${start}` };
 }
 
 // ── Авто-поведение оператора ─────────────────────────────────────────────────
@@ -269,6 +385,17 @@ const server = createServer(async (req, res) => {
 
   if (method === "OPTIONS") return send(res, 204, "");
 
+  // Dev-панель виджета: временно скрыть историю без перезапуска мока.
+  if (path === "/_dev/history-toggle") {
+    if (method === "GET") return send(res, 200, { enabled: historyEnabled });
+    if (method === "POST") {
+      const body = await readBody(req);
+      historyEnabled = body.enabled !== false;
+      console.log(`[matrix-mock] история ${historyEnabled ? "включена" : "выключена"}`);
+      return send(res, 200, { enabled: historyEnabled });
+    }
+  }
+
   // Auth / session
   if (path.endsWith("/v3/register")) return send(res, 200, scenario.guest);
   if (path.endsWith("/v3/refresh")) {
@@ -305,7 +432,18 @@ const server = createServer(async (req, res) => {
 
   // История: GET /rooms/{id}/messages?dir=b&from=&limit=
   if (/\/rooms\/[^/]+\/messages$/.test(path) && method === "GET") {
-    return send(res, 200, historyPage(url.searchParams.get("from")));
+    // Реальный сервер валидирует limit ∈ [1,100] и dir ∈ {b,f} — ловим косяки клиента здесь же.
+    const limit = Number(url.searchParams.get("limit") ?? "10");
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      return send(res, 400, { errcode: "M_INVALID_PARAM", error: `bad limit: ${limit}` });
+    }
+    const dir = url.searchParams.get("dir") ?? "b";
+    if (dir !== "b" && dir !== "f") {
+      return send(res, 400, { errcode: "M_INVALID_PARAM", error: `bad dir: ${dir}` });
+    }
+
+    const page = historyPage(url.searchParams.get("from"), limit);
+    return delay(HISTORY_DELAY_MS, () => send(res, 200, page));
   }
 
   // KC-расширение: POST /createRoom/{txnId}
@@ -314,11 +452,12 @@ const server = createServer(async (req, res) => {
   }
 
   // PUT /rooms/{id}/send/{type}/{txnId}
-  const sendMatch = path.match(/\/rooms\/[^/]+\/send\/([^/]+)\/[^/]+$/);
+  const sendMatch = path.match(/\/rooms\/[^/]+\/send\/([^/]+)\/([^/]+)$/);
   if (sendMatch && method === "PUT") {
     const type = decodeURIComponent(sendMatch[1]);
+    const txnId = decodeURIComponent(sendMatch[2]);
     const content = await readBody(req);
-    const ev = push(type, GUEST, content);
+    const ev = push(type, GUEST, content, undefined, txnId);
     // Оператор «прочитал» — ✓✓.
     if (type === "m.room.message" || type === "m.sticker") {
       delay(600, () => operatorRead(ev.event_id));

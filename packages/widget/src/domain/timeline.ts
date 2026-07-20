@@ -12,7 +12,7 @@ interface BaseTimelineItem {
   localId: string
   // id события в комнате от сервера; до ответа — placeholder `optimistic:{localId}`
   eventId: string
-  // idempotency-ключ PUT /send; сейчас только у optimistic-item'ов
+  // idempotency-ключ PUT /send — по нему mergeTimeline резолвит черновик в реальное событие.
   txnId?: string
   sender: string
   ts: number

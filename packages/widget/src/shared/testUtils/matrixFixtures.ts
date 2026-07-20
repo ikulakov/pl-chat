@@ -1,10 +1,11 @@
 import { vi } from 'vitest'
 import type { SystemTimelineItem, TextTimelineItem } from '../../domain/timeline'
 import { MatrixEventType, MsgType, OperatorStatus } from '../../matrix/consts'
-import type { SyncResponse } from '../../matrix/dto'
+import type { MessagesResponse, SyncResponse } from '../../matrix/dto'
 import type { MatrixApi } from '../../matrix/matrixApi'
 import type { SessionInit } from '../../matrix/session/types'
 import type {
+  ClientEvent,
   JoinedRoom,
   OperatorCurrentEvent,
   OperatorJoinedEvent,
@@ -136,6 +137,14 @@ export function syncResponse(next: string, room: JoinedRoom = emptyJoinedRoom())
   return { next_batch: next, rooms: { join: { [ROOM_ID]: room } } }
 }
 
+export function messagesResponse(
+  chunk: ClientEvent[] = [],
+  end?: string,
+  start = 's100',
+): MessagesResponse {
+  return { chunk, start, ...(end !== undefined && { end }) }
+}
+
 export function makeMatrixApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
   return {
     registerGuest: vi
@@ -144,6 +153,7 @@ export function makeMatrixApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
     initialSync: vi.fn<MatrixApi['initialSync']>().mockResolvedValue(syncResponse('s1')),
     // parks by default so sync-loop-driven tests stay deterministic unless overridden
     longPollSync: vi.fn<MatrixApi['longPollSync']>().mockReturnValue(new Promise<never>(() => {})),
+    getRoomHistory: vi.fn<MatrixApi['getRoomHistory']>().mockResolvedValue(messagesResponse()),
     sendMessage: vi.fn<MatrixApi['sendMessage']>().mockResolvedValue({ event_id: '$real' }),
     sendReadReceipt: vi.fn<MatrixApi['sendReadReceipt']>().mockResolvedValue({}),
     ...overrides,

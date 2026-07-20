@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { textItem } from '../shared/testUtils/matrixFixtures'
-import { mergeTimeline } from './mergeTimeline'
+import { mergeTimeline, prependTimeline } from './mergeTimeline'
 
 const base = textItem({ localId: '$a', eventId: '$a', sender: '@op:bank.ru', body: 'hi', ts: 100 })
 
@@ -19,9 +19,14 @@ describe('mergeTimeline — deduplication invariants', () => {
     expect(result).toHaveLength(1)
   })
 
-  it('sync-race: sending message with matching sender+body resolved, no duplicate', () => {
-    const pending = { ...base, eventId: 'optimistic:uuid', sendStatus: 'sending' as const }
-    const fromSync = { ...base, eventId: '$real', ts: 150 }
+  it('sync-race: черновик резолвится по совпавшему txnId, без дубля', () => {
+    const pending = {
+      ...base,
+      eventId: 'optimistic:uuid',
+      txnId: 'txn-1',
+      sendStatus: 'sending' as const,
+    }
+    const fromSync = { ...base, eventId: '$real', txnId: 'txn-1', ts: 150 }
 
     const result = mergeTimeline([pending], [fromSync])
 
@@ -30,51 +35,49 @@ describe('mergeTimeline — deduplication invariants', () => {
     expect(result[0]).toMatchObject({ sendStatus: 'sent' })
   })
 
-  it('sync-race: duplicate sending messages with the same body resolve only one draft', () => {
+  it('sync-race: два черновика с одинаковым телом резолвятся по своему txnId, не по FIFO', () => {
     const first = {
       ...base,
       localId: 'local-1',
       eventId: 'optimistic:1',
+      txnId: 'txn-1',
       sendStatus: 'sending' as const,
     }
     const second = {
       ...base,
       localId: 'local-2',
       eventId: 'optimistic:2',
+      txnId: 'txn-2',
       sendStatus: 'sending' as const,
       ts: 101,
     }
-    const fromSync = { ...base, eventId: '$real', ts: 150 }
+    // echo принадлежит ВТОРОЙ отправке — раньше (по эвристике sender+body) достался бы первому
+    // черновику; точный txnId это больше не путает.
+    const fromSync = { ...base, eventId: '$real', txnId: 'txn-2', ts: 150 }
 
     const result = mergeTimeline([first, second], [fromSync])
 
     expect(result).toHaveLength(2)
-    expect(result.filter((message) => message.eventId === '$real')).toHaveLength(1)
-    expect(
-      result.filter((message) => 'sendStatus' in message && message.sendStatus === 'sending'),
-    ).toHaveLength(1)
+    expect(result.find((message) => message.eventId === '$real')?.localId).toBe('local-2')
+    expect(result.find((message) => message.localId === 'local-1')).toMatchObject({
+      sendStatus: 'sending',
+    })
   })
 
-  it('sync-race: при одинаковом теле реальный event достаётся ПЕРВОМУ черновику (known txnId-less gap)', () => {
-    const first = {
+  it('sync-race: echo без transaction_id (чужой отправитель) не резолвит черновик, а добавляется отдельно', () => {
+    // unsigned.transaction_id виден только отправившей паре (user, device) — если он отсутствует,
+    // событие не может быть эхом НАШЕГО черновика, даже при совпавшем теле.
+    const pending = {
       ...base,
-      localId: 'local-1',
-      eventId: 'optimistic:1',
+      eventId: 'optimistic:uuid',
+      txnId: 'txn-1',
       sendStatus: 'sending' as const,
-      ts: 100,
-    }
-    const second = {
-      ...base,
-      localId: 'local-2',
-      eventId: 'optimistic:2',
-      sendStatus: 'sending' as const,
-      ts: 101,
     }
     const fromSync = { ...base, eventId: '$real', ts: 150 }
 
-    const result = mergeTimeline([first, second], [fromSync])
+    const result = mergeTimeline([pending], [fromSync])
 
-    expect(result.find((message) => message.eventId === '$real')?.localId).toBe('local-1')
+    expect(result).toHaveLength(2)
   })
 
   it('PUT-first: серверный ts из sync вытесняет клиентский у уже отправленного сообщения', () => {
@@ -100,8 +103,13 @@ describe('mergeTimeline — deduplication invariants', () => {
     // PUT отвалился по таймауту УЖЕ ПОСЛЕ того, как сервер событие принял: eventId мы не узнали,
     // черновик помечен failed. Раз echo пришёл — событие в комнате. Раньше здесь появлялся
     // дубль: проваленный черновик с кнопкой «повторить» рядом с доставленной копией.
-    const failed = { ...base, eventId: 'optimistic:uuid', sendStatus: 'failed' as const }
-    const fromSync = { ...base, eventId: '$real', ts: 150 }
+    const failed = {
+      ...base,
+      eventId: 'optimistic:uuid',
+      txnId: 'txn-1',
+      sendStatus: 'failed' as const,
+    }
+    const fromSync = { ...base, eventId: '$real', txnId: 'txn-1', ts: 150 }
 
     const result = mergeTimeline([failed], [fromSync])
 
@@ -109,21 +117,23 @@ describe('mergeTimeline — deduplication invariants', () => {
     expect(result[0]).toMatchObject({ eventId: '$real', sendStatus: 'sent' })
   })
 
-  it('echo достаётся живому черновику, а не проваленному — FIFO не ломается', () => {
-    // одинаковый текст: одна отправка провалилась, вторая в полёте. echo принадлежит второй.
+  it('echo достаётся черновику со своим txnId, а не проваленному с чужим', () => {
+    // одинаковый текст: одна отправка провалилась, вторая в полёте. echo принадлежит второй по txnId.
     const failed = {
       ...base,
       localId: 'l1',
       eventId: 'optimistic:1',
+      txnId: 'txn-1',
       sendStatus: 'failed' as const,
     }
     const sending = {
       ...base,
       localId: 'l2',
       eventId: 'optimistic:2',
+      txnId: 'txn-2',
       sendStatus: 'sending' as const,
     }
-    const fromSync = { ...base, eventId: '$real', ts: 150 }
+    const fromSync = { ...base, eventId: '$real', txnId: 'txn-2', ts: 150 }
 
     const result = mergeTimeline([failed, sending], [fromSync])
 
@@ -138,5 +148,44 @@ describe('mergeTimeline — deduplication invariants', () => {
 
     expect(mergeTimeline(existing, [])).toBe(existing)
     expect(mergeTimeline(existing, [base])).toBe(existing)
+  })
+})
+
+describe('prependTimeline — подгрузка истории вверх', () => {
+  const older = textItem({ localId: '$old', eventId: '$old', body: 'старое', ts: 1 })
+
+  it('кладёт историю ПЕРЕД лентой, сохраняя порядок страницы', () => {
+    const second = { ...older, localId: '$old2', eventId: '$old2', ts: 2 }
+
+    const result = prependTimeline([base], [older, second])
+
+    expect(result.map((item) => item.eventId)).toEqual(['$old', '$old2', '$a'])
+  })
+
+  it('дедуплицирует пересечение страницы с тем, что уже приехало через sync', () => {
+    // сервер отдаёт страницу по stream-курсору, она может захватить уже показанные события
+    const result = prependTimeline([base], [older, base])
+
+    expect(result.map((item) => item.eventId)).toEqual(['$old', '$a'])
+  })
+
+  it('не склеивает историю с optimistic-черновиком, даже если совпали sender и body', () => {
+    // в отличие от mergeTimeline: в истории черновиков быть не может, совпадение текста — случайность
+    const draft = { ...base, eventId: 'optimistic:uuid', sendStatus: 'sending' as const }
+    const fromHistory = { ...base, localId: '$hist', eventId: '$hist', ts: 1 }
+
+    const result = prependTimeline([draft], [fromHistory])
+
+    expect(result).toHaveLength(2)
+    expect(result[0]).toMatchObject({ eventId: '$hist' })
+    expect(result[1]).toMatchObject({ eventId: 'optimistic:uuid', sendStatus: 'sending' })
+  })
+
+  it('возвращает ту же ссылку, когда новых событий не осталось', () => {
+    // холостая страница (все события уже в ленте) не должна перерисовывать весь список
+    const existing = [base]
+
+    expect(prependTimeline(existing, [])).toBe(existing)
+    expect(prependTimeline(existing, [base])).toBe(existing)
   })
 })

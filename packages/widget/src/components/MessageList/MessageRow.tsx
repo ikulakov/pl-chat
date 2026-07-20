@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import type { MessageTimelineItem } from '../../domain/timeline'
+import { ITEM_ID_ATTR } from '../../hooks/useLoadMoreHistory'
 import { RECEIPT_ID_ATTR } from '../../hooks/useSendReadReceipts'
 import { cn } from '../../shared/cn'
 import { formatTime } from '../../shared/formatTime'
@@ -24,6 +25,8 @@ export const MessageRow = memo(({ userId, message, position, readByOperator }: P
       className={cn(styles.messageRow, isOwn && styles.own, isGroupEnd && styles.groupEnd)}
       // Маркер для учета прочитанных сообщений клиентом
       {...{ [RECEIPT_ID_ATTR]: !isOwn ? message.eventId : undefined }}
+      // Якорь удержания позиции при подгрузке истории
+      {...{ [ITEM_ID_ATTR]: message.localId }}
     >
       <MessageActions
         localId={message.localId}
