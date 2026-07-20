@@ -4,6 +4,8 @@ import { useIntersectionObserver } from './useIntersectionObserver'
 
 const NEAR_BOTTOM_PX = 80
 
+const SMOOTH_TAIL_PX = 200
+
 interface UseChatScrollParams {
   timeline: TimelineItem[]
   userId: string
@@ -16,7 +18,7 @@ interface UseChatScrollParams {
  * - Автоскролл при новых сообщениях
  *  - Прилипание к низу при изменении размера контейнера
  * - `isNearBottom` (с допуском NEAR_BOTTOM_PX)
- * - `scrollToBottom` для кнопки «вниз» — контейнер двигает только владелец скролл-состояния
+ * - `scrollToBottom` для кнопки «вниз»
  * - CSS-переменная --scrollbar-w (ширина скроллбара)
  */
 export function useChatScroll({ containerRef, bottomRef, timeline, userId }: UseChatScrollParams): {
@@ -104,7 +106,16 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
     return () => observer.disconnect()
   }, [containerRef, scrollList])
 
-  const scrollToBottom = useCallback(() => scrollList('smooth'), [scrollList])
+  const scrollToBottom = useCallback(() => {
+    const list = containerRef.current
+    if (!list) return
+
+    const maxTop = list.scrollHeight - list.clientHeight
+    if (maxTop - list.scrollTop > SMOOTH_TAIL_PX) {
+      list.scrollTop = maxTop - SMOOTH_TAIL_PX
+    }
+    scrollList('smooth')
+  }, [containerRef, scrollList])
 
   return { isNearBottom, scrollToBottom }
 }

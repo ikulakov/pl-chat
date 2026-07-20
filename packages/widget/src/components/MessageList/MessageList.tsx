@@ -3,7 +3,10 @@ import { readOwnEventIds } from '../../domain/receipts'
 import { isSystem } from '../../domain/timeline'
 import { useChatScroll } from '../../hooks/useChatScroll'
 import { useChatStore } from '../../hooks/useChatStore'
+import { useLoadMoreHistory } from '../../hooks/useLoadMoreHistory'
 import { useSendReadReceipts } from '../../hooks/useSendReadReceipts'
+import { cn } from '../../shared/cn'
+import { Spinner } from '../../shared/ui/Spinner'
 import { selectIsOpen, selectReadReceipts, selectTimeline } from '../../store/selectors'
 import { getPosition, groupTimelineByDate } from './MessageList.helpers'
 import styles from './MessageList.module.css'
@@ -38,13 +41,18 @@ export function MessageList({ userId }: Props) {
     bottomRef,
   })
 
+  const { showHistorySpinner } = useLoadMoreHistory({
+    timeline,
+    containerRef: messagesListRef,
+  })
+
   useSendReadReceipts({ timeline, isOpen, containerRef: messagesListRef })
 
   return (
     <div className={styles.wrap}>
       <div
         ref={messagesListRef}
-        className={styles.list}
+        className={cn(styles.list, showHistorySpinner && styles.datesBelowSpinner)}
       >
         {timelineGroupedByDate.map(({ key, label, items }) => (
           <div
@@ -60,7 +68,14 @@ export function MessageList({ userId }: Props) {
 
             {items.map((item, index, arr) => {
               if (isSystem(item)) {
-                return <SystemMessage key={item.localId}>{item.content.body}</SystemMessage>
+                return (
+                  <SystemMessage
+                    key={item.localId}
+                    itemId={item.localId}
+                  >
+                    {item.content.body}
+                  </SystemMessage>
+                )
               }
               const position = getPosition(arr[index - 1], item, arr[index + 1])
               return (
@@ -81,6 +96,11 @@ export function MessageList({ userId }: Props) {
         />
       </div>
 
+      {showHistorySpinner && (
+        <div className={styles.historySpinnerWrap}>
+          <Spinner size="inline" />
+        </div>
+      )}
       {!isNearBottom && <ScrollToBottomButton onClick={scrollToBottom} />}
     </div>
   )
