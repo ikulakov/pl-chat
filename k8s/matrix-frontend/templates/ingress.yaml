@@ -13,6 +13,13 @@ spec:
     http:
       paths:
       - pathType: Prefix
+        path: "/_matrix"
+        backend:
+          service:
+            name: {{ .Values.matrixkc.serviceName }}
+            port:
+              number: 8080
+      - pathType: Prefix
         path: "/"
         backend:
           service:
