@@ -1,2 +1,6 @@
 matrixkc:
   serviceName: matrixkc-develop
+
+env:
+ - name: TZ
+   value: Europe/Moscow
