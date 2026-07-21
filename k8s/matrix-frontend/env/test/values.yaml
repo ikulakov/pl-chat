@@ -1,3 +1,2 @@
-env:
- - name: MATRIX_BACKEND
-   value: "http://matrixkc-develop.plchat.svc.cluster.local:8080"
+matrixkc:
+  serviceName: matrixkc-develop
