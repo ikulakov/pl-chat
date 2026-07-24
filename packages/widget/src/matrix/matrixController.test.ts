@@ -276,7 +276,7 @@ describe('MatrixController (orchestrator)', () => {
     await controller.sendMessage('hi')
 
     expect(applied[0]!.type).toBe('message.optimisticAdded')
-    expect(applied[1]).toEqual({
+    expect(applied.at(-1)).toEqual({
       type: 'message.sent',
       localId: expect.any(String),
       eventId: '$real',
@@ -417,8 +417,29 @@ describe('MatrixController (orchestrator)', () => {
 
     await controller.resendMessage('local-1')
 
-    const [, txnId] = vi.mocked(api.sendMessage).mock.calls[0]!
+    const [{ txnId }] = vi.mocked(api.sendMessage).mock.calls[0]!
     expect(txnId).toBe('txn-original')
+  })
+
+  it('resendMessage упавшего ответа сохраняет связь с родителем', async () => {
+    // связь легко потерять при ретрае: контроллер собирает запрос заново и должен
+    // перечитать relation из самого сообщения, а не из (уже сброшенной) цели ответа
+    const api = makeMatrixApi()
+    const { controller } = harness(
+      {
+        phase: 'connected',
+        identity: IDENTITY,
+        room: roomWithMessage(
+          failedMessage({ txnId: 'txn-original', relation: { type: 'reply', eventId: '$parent' } }),
+        ),
+      },
+      api,
+    )
+
+    await controller.resendMessage('local-1')
+
+    const [{ replyToEventId }] = vi.mocked(api.sendMessage).mock.calls[0]!
+    expect(replyToEventId).toBe('$parent')
   })
 
   it('resendMessage does nothing when the failed message has no txnId', async () => {

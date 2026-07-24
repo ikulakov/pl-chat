@@ -9,9 +9,15 @@ interface BaseClientEvent {
   unsigned?: { transaction_id?: string }
 }
 
-interface TextMessageContent {
+// Связь события с другим. Reply по Matrix-спеке — без rel_type, только вложенный m.in_reply_to
+export interface RelatesTo {
+  'm.in_reply_to'?: { event_id: string }
+}
+
+export interface TextMessageContent {
   msgtype: typeof MsgType.Text
   body: string
+  'm.relates_to'?: RelatesTo
 }
 
 interface NoticeMessageContent {

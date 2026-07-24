@@ -1,16 +1,5 @@
-import { getChatController } from '../chatController'
+import { type ChatActions, getChatController } from '../chatController'
 
-export function useChatActions() {
-  const controller = getChatController()
-
-  return {
-    sendMessage: controller.sendMessage,
-    resendMessage: controller.resendMessage,
-    markRead: controller.markRead,
-    loadMoreHistory: controller.loadMoreHistory,
-    stopLoadingHistory: controller.stopLoadingHistory,
-    reconnect: controller.reconnect,
-    open: controller.open,
-    close: controller.close,
-  }
+export function useChatActions(): ChatActions {
+  return getChatController().actions
 }

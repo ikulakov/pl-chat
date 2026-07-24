@@ -2,11 +2,28 @@ import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService } from './matrix/matrixController'
+import type { ReplyTarget } from './store/state'
 import { chatStore } from './store/store'
+
+export interface ChatActions {
+  sendMessage: (text: string, replyToEventId?: string) => Promise<void>
+  resendMessage: (localId: string) => Promise<void>
+  replyTo: (target: ReplyTarget) => void
+  cancelReply: () => void
+  markRead: (eventId: string) => Promise<void>
+  loadMoreHistory: () => Promise<void>
+  stopLoadingHistory: () => void
+  reconnect: () => void
+  open: () => void
+  close: () => void
+}
 
 export class ChatController {
   private readonly bridge: HostBridge
   private readonly matrix: MatrixService
+
+  // Стабильная ссылка — собирается в конструкторе, не пересоздаётся на рендер.
+  readonly actions: ChatActions
 
   constructor(bridge: HostBridge, matrix?: MatrixService) {
     this.bridge = bridge
@@ -19,6 +36,19 @@ export class ChatController {
         dispatch: (action) => chatStore.getState().dispatch(action),
         getState: chatStore.getState,
       })
+    }
+
+    this.actions = {
+      sendMessage: this.sendMessage,
+      resendMessage: this.resendMessage,
+      replyTo: this.replyTo,
+      cancelReply: this.cancelReply,
+      markRead: this.markRead,
+      loadMoreHistory: this.loadMoreHistory,
+      stopLoadingHistory: this.stopLoadingHistory,
+      reconnect: this.reconnect,
+      open: this.open,
+      close: this.close,
     }
   }
 
@@ -45,7 +75,16 @@ export class ChatController {
     }
   }
 
-  sendMessage = (text: string): Promise<void> => this.matrix.sendMessage(text)
+  sendMessage = (text: string, replyToEventId?: string): Promise<void> =>
+    this.matrix.sendMessage(text, replyToEventId)
+
+  replyTo = (target: ReplyTarget): void => {
+    chatStore.getState().dispatch({ type: 'reply.targeted', target })
+  }
+
+  cancelReply = (): void => {
+    chatStore.getState().dispatch({ type: 'reply.cleared' })
+  }
 
   resendMessage = (localId: string): Promise<void> => this.matrix.resendMessage(localId)
 

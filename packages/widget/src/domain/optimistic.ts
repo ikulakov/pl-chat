@@ -11,7 +11,11 @@ export interface OutgoingText {
   txnId: string
 }
 
-export function createOptimisticTextMessage(sender: string, text: string): OutgoingText {
+export function createOptimisticTextMessage(
+  sender: string,
+  text: string,
+  replyToEventId?: string,
+): OutgoingText {
   const localId = crypto.randomUUID()
   const txnId = crypto.randomUUID()
   return {
@@ -20,10 +24,15 @@ export function createOptimisticTextMessage(sender: string, text: string): Outgo
       localId,
       eventId: `${OPTIMISTIC_PREFIX}${localId}`,
       txnId,
-      sender,
       ts: Date.now(),
       sendStatus: 'sending',
+      sender,
       content: { body: text },
+      ...(replyToEventId
+        ? {
+            relation: { type: 'reply', eventId: replyToEventId },
+          }
+        : {}),
     },
     txnId,
   }

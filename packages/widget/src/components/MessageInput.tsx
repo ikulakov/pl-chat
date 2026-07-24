@@ -1,9 +1,12 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useChatActions } from '../hooks/useChatActions'
+import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
 import { IconButton } from '../shared/ui/IconButton'
-import { AttachIcon, SendIcon } from '../shared/ui/icons'
+import { AttachIcon, CloseIcon, SendIcon } from '../shared/ui/icons'
+import { selectOperatorName, selectReplyTarget, selectUserId } from '../store/selectors'
 import styles from './MessageInput.module.css'
+import { QuotedMessage } from './QuotedMessage'
 
 interface Props {
   placeholder?: string
@@ -27,7 +30,15 @@ export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
   const [hasText, setHasText] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const { sendMessage } = useChatActions()
+  const { sendMessage, cancelReply } = useChatActions()
+
+  const replyTarget = useChatStore(selectReplyTarget)
+  const userId = useChatStore(selectUserId)
+  const operatorName = useChatStore(selectOperatorName)
+
+  useEffect(() => {
+    if (replyTarget) textareaRef.current?.focus()
+  }, [replyTarget])
 
   function handleInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const el = e.currentTarget
@@ -39,6 +50,11 @@ export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       submit()
+      return
+    }
+    if (e.key === 'Escape' && replyTarget) {
+      e.preventDefault()
+      cancelReply()
     }
   }
 
@@ -52,11 +68,30 @@ export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
     resize(el)
     setHasText(false)
 
-    void sendMessage(text)
+    void sendMessage(text, replyTarget?.eventId)
   }
 
   return (
     <div className={styles.wrap}>
+      {replyTarget && (
+        <div className={styles.replyRow}>
+          <div className={styles.replyPreview}>
+            <QuotedMessage
+              author={replyTarget.sender === userId ? t('chat.reply.you') : operatorName}
+              text={replyTarget.body}
+            />
+          </div>
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label={t('chat.reply.cancel')}
+            onClick={cancelReply}
+          >
+            <CloseIcon size={18} />
+          </IconButton>
+        </div>
+      )}
+
       <div className={styles.field}>
         <div className={styles.main}>
           <IconButton

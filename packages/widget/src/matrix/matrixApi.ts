@@ -40,12 +40,26 @@ export function createMatrixApi(transport: MatrixTransport) {
       )
     },
 
-    sendMessage(roomId: string, txnId: string, body: string): Promise<{ event_id: string }> {
+    sendMessage(params: {
+      txnId: string
+      roomId: string
+      body: string
+      replyToEventId?: string
+    }): Promise<{ event_id: string }> {
+      const { roomId, txnId, body, replyToEventId } = params
+
       return transport.request<{ event_id: string }>(
         `${MATRIX_API_PREFIX}/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
         {
           method: 'PUT',
-          body: JSON.stringify({ msgtype: MsgType.Text, body }),
+          body: JSON.stringify({
+            msgtype: MsgType.Text,
+            body,
+            // reply по спеке — только m.relates_to; rich-reply фоллбек в body не пишем
+            ...(replyToEventId
+              ? { 'm.relates_to': { 'm.in_reply_to': { event_id: replyToEventId } } }
+              : {}),
+          }),
         },
       )
     },

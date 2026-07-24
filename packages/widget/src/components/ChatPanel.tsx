@@ -2,7 +2,7 @@ import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
 import { Spinner } from '../shared/ui/Spinner'
-import { selectOperator, selectStatus, selectUserId } from '../store/selectors'
+import { selectOperator, selectOperatorName, selectStatus, selectUserId } from '../store/selectors'
 import chatStyles from './ChatPanel.module.css'
 import { DevOperatorTools } from './dev/DevOperatorTools'
 import { Header } from './Header'
@@ -15,6 +15,7 @@ export function ChatPanel() {
   const status = useChatStore(selectStatus)
   const userId = useChatStore(selectUserId)
   const operator = useChatStore(selectOperator)
+  const operatorName = useChatStore(selectOperatorName)
 
   const { reconnect } = useChatActions()
 
@@ -23,7 +24,7 @@ export function ChatPanel() {
       {import.meta.env.DEV && <DevOperatorTools />}
 
       <Header
-        name={operator.isActive && operator.displayName ? operator.displayName : t('header.name')}
+        name={operatorName}
         subtitle={operator.isActive ? t('header.operatorSubtitle') : t('header.subtitle')}
       />
 

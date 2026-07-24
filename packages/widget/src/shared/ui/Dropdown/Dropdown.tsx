@@ -1,15 +1,16 @@
 import type { ReactNode } from 'react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { t } from '../../../i18n'
 import { computeDropdownPosition } from './computeDropdownPosition'
+import { DropdownContext } from './context'
 import styles from './Dropdown.module.css'
 import { resolveRoot } from './helpers'
 import type { DropdownTriggerProps } from './types'
-import { t } from '../../../i18n'
 
 interface Props {
   trigger: (props: DropdownTriggerProps) => ReactNode
-  children: (props: { close: () => void }) => ReactNode
+  children: ReactNode
 }
 
 export function Dropdown({ trigger, children }: Props) {
@@ -29,9 +30,8 @@ export function Dropdown({ trigger, children }: Props) {
     setIsOpen(true)
   }
 
-  // ref-free намеренно: передаётся в children и вызывается во время их рендера, а
-  // react-compiler запрещает доступ к ref в рендере. Возврат фокуса — в эффекте ниже.
-  const close = () => setIsOpen(false)
+  const close = useCallback(() => setIsOpen(false), [])
+  const contextValue = useMemo(() => ({ close }), [close])
 
   // позицию считаем после рендера портала — нужны реальные размеры меню для коллизии с краями
   useLayoutEffect(() => {
@@ -93,7 +93,7 @@ export function Dropdown({ trigger, children }: Props) {
       document.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('scroll', onScroll, true)
     }
-  }, [isOpen])
+  }, [close, isOpen])
 
   const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const items = Array.from(
@@ -154,7 +154,7 @@ export function Dropdown({ trigger, children }: Props) {
               visibility: position ? 'visible' : 'hidden',
             }}
           >
-            {children({ close })}
+            <DropdownContext value={contextValue}>{children}</DropdownContext>
           </div>,
           container,
         )}

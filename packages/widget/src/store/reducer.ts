@@ -65,20 +65,20 @@ export function chatRuntimeReducer(
       return { ...INITIAL_RUNTIME_STATE, phase: 'error', error: action.error }
 
     case 'session.started': {
+      const { identity, cursor, joinedRoom } = action
+
       // isSameRoom достижим только в авторизованной зоне:
       // при протухшем токене re-auth авторизованному пользователю вернёт ту же комнату при живой ленте;
       // гостю re-auth всегда даёт новую комнату.
-      const isSameRoom = state.identity?.roomId === action.identity.roomId
+      const isSameRoom = state.identity?.roomId === identity.roomId
 
       return {
         ...state,
         phase: 'connected',
         error: null,
-        identity: action.identity,
-        cursor: action.cursor,
-        room: isSameRoom
-          ? continueRoom(state.room, action.joinedRoom)
-          : startRoom(action.joinedRoom),
+        identity,
+        cursor,
+        room: isSameRoom ? continueRoom(state.room, joinedRoom) : startRoom(joinedRoom),
       }
     }
 
@@ -126,26 +126,37 @@ export function chatRuntimeReducer(
       })
 
     case 'receipt.sendFailed': {
-      if (state.room.readReceipts[action.userId]?.eventId !== action.eventId) return state
+      const { userId, eventId, rollbackTo } = action
+
+      if (state.room.readReceipts[userId]?.eventId !== eventId) return state
 
       const readReceipts = { ...state.room.readReceipts }
 
-      if (action.rollbackTo === null) {
-        delete readReceipts[action.userId]
+      if (rollbackTo === null) {
+        delete readReceipts[userId]
       } else {
-        readReceipts[action.userId] = { eventId: action.rollbackTo }
+        readReceipts[userId] = { eventId: rollbackTo }
       }
       return updateRoom(state, { readReceipts })
     }
 
+    case 'reply.targeted':
+      return updateRoom(state, { replyTarget: action.target })
+
+    case 'reply.cleared':
+      return state.room.replyTarget === null ? state : updateRoom(state, { replyTarget: null })
+
     case 'history.loading':
       return updateRoom(state, { isLoadingHistory: true })
 
-    case 'history.loaded':
+    case 'history.loaded': {
+      const { items, prevBatch } = action
+
       return updateRoom(state, {
-        timeline: prependTimeline(state.room.timeline, action.items),
-        prevBatch: action.prevBatch,
+        timeline: prependTimeline(state.room.timeline, items),
+        prevBatch,
       })
+    }
 
     case 'history.settled':
       return updateRoom(state, { isLoadingHistory: false })

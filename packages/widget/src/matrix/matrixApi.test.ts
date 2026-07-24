@@ -13,7 +13,11 @@ describe('createMatrixApi — форма запросов', () => {
   it('sendMessage: PUT на send/m.room.message/{txnId}, roomId url-энкодится, тело m.text', async () => {
     const { transport, request } = fakeTransport()
 
-    await createMatrixApi(transport).sendMessage('!room:bank', 'txn-1', 'привет')
+    await createMatrixApi(transport).sendMessage({
+      roomId: '!room:bank',
+      txnId: 'txn-1',
+      body: 'привет',
+    })
 
     const [path, init] = request.mock.calls[0]!
     // roomId содержит : — без encodeURIComponent (%3A) двоеточие распадётся на лишний сегмент пути

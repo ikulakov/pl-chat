@@ -4,9 +4,11 @@ import type {
   ClientEvent,
   OperatorJoinedEvent,
   OperatorLeftEvent,
+  RelatesTo,
   RoomMessageEvent,
+  TextMessageContent,
 } from '../matrix/types'
-import type { TimelineItem } from './timeline'
+import type { TimelineItem, TimelineRelation } from './timeline'
 
 function isRoomMessage(event: ClientEvent): event is RoomMessageEvent {
   return event.type === MatrixEventType.RoomMessage
@@ -31,6 +33,11 @@ function operatorLeftText(reason: OperatorLeftEvent['content']['reason']): strin
   }
 }
 
+function toRelation(content: { 'm.relates_to'?: RelatesTo }): TimelineRelation | undefined {
+  const eventId = content['m.relates_to']?.['m.in_reply_to']?.event_id
+  return eventId ? { type: 'reply', eventId } : undefined
+}
+
 function createPlaqueItem(
   kind: 'system' | 'notice',
   event: ClientEvent,
@@ -45,26 +52,32 @@ function createPlaqueItem(
   }
 }
 
+function textMessageToItem(event: RoomMessageEvent, content: TextMessageContent): TimelineItem {
+  const relation = toRelation(content)
+
+  return {
+    kind: 'text',
+    localId: event.event_id,
+    eventId: event.event_id,
+    sender: event.sender,
+    ts: event.origin_server_ts,
+    sendStatus: 'sent',
+    content: { body: content.body },
+    ...(event.unsigned?.transaction_id ? { txnId: event.unsigned.transaction_id } : {}),
+    ...(relation ? { relation } : {}),
+  }
+}
+
 function eventToItem(event: ClientEvent): TimelineItem | undefined {
   if (isRoomMessage(event)) {
     if (event.content.msgtype === MsgType.Notice) {
       return createPlaqueItem('notice', event, event.content.body)
     }
     if (event.content.msgtype === MsgType.Text) {
-      return {
-        kind: 'text',
-        localId: event.event_id,
-        eventId: event.event_id,
-        ...(event.unsigned?.transaction_id ? { txnId: event.unsigned.transaction_id } : {}),
-        sender: event.sender,
-        ts: event.origin_server_ts,
-        sendStatus: 'sent',
-        content: { body: event.content.body },
-      }
+      return textMessageToItem(event, event.content)
     }
     return undefined
   }
-
   if (isOperatorJoined(event)) {
     const body =
       event.content.role === 'bot'
@@ -74,9 +87,8 @@ function eventToItem(event: ClientEvent): TimelineItem | undefined {
     return createPlaqueItem('system', event, body)
   }
 
-  if (isOperatorLeft(event)) {
+  if (isOperatorLeft(event))
     return createPlaqueItem('system', event, operatorLeftText(event.content.reason))
-  }
 
   return undefined
 }

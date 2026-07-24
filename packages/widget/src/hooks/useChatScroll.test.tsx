@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { textItem } from '../shared/testUtils/matrixFixtures'
 import type { TimelineItem } from '../domain/timeline'
 import { FakeIntersectionObserver } from '../../test.setup'
+import { ITEM_ID_ATTR } from './useLoadMoreHistory'
 import { useChatScroll } from './useChatScroll'
 
 const ME = '@me:bank'
@@ -40,7 +41,7 @@ function setup(initialTimeline: TimelineItem[], userId: string = ME) {
     { initialProps: { timeline: initialTimeline } },
   )
 
-  return { ...view, scrollTo }
+  return { ...view, scrollTo, container }
 }
 
 describe('useChatScroll', () => {
@@ -99,5 +100,34 @@ describe('useChatScroll', () => {
     act(() => result.current.scrollToBottom())
 
     expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }))
+  })
+
+  it('scrollToItem resolves the row by its id, scrolls to it, and returns it', () => {
+    const { result, scrollTo, container } = setup([message(OPERATOR)])
+    const row = document.createElement('div')
+    row.setAttribute(ITEM_ID_ATTR, 'target')
+    container.appendChild(row)
+    scrollTo.mockClear()
+
+    let returned: HTMLElement | null = null
+    act(() => {
+      returned = result.current.scrollToItem('target')
+    })
+
+    expect(returned).toBe(row)
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }))
+  })
+
+  it('scrollToItem returns null and does not scroll when the row is absent', () => {
+    const { result, scrollTo } = setup([message(OPERATOR)])
+    scrollTo.mockClear()
+
+    let returned: HTMLElement | null = null
+    act(() => {
+      returned = result.current.scrollToItem('missing')
+    })
+
+    expect(returned).toBeNull()
+    expect(scrollTo).not.toHaveBeenCalled()
   })
 })

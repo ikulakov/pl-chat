@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { cn } from '../../shared/cn'
 import styles from './MessageBubble.module.css'
 
@@ -8,16 +9,18 @@ interface Props {
   type: BubbleType
   position?: BubblePosition
   time: string
-  meta?: React.ReactNode
-  children: React.ReactNode
+  meta?: ReactNode
+  quote?: ReactNode
+  children: ReactNode
 }
 
-export function MessageBubble({ type, position = 'single', time, meta, children }: Props) {
+export function MessageBubble({ type, position = 'single', time, meta, quote, children }: Props) {
   return (
     <div
       className={cn(styles.bubble, styles[type], styles[position])}
       data-role="message-bubble"
     >
+      {quote}
       <p className={styles.text}>
         {children}
         <span className={styles.meta}>

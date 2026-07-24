@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { isSystem, type TimelineItem } from '../domain/timeline'
 import { useIntersectionObserver } from './useIntersectionObserver'
+import { ITEM_ID_ATTR } from './useLoadMoreHistory'
 
 const NEAR_BOTTOM_PX = 80
 
@@ -24,6 +25,7 @@ interface UseChatScrollParams {
 export function useChatScroll({ containerRef, bottomRef, timeline, userId }: UseChatScrollParams): {
   isNearBottom: boolean
   scrollToBottom: () => void
+  scrollToItem: (localId: string) => HTMLElement | null
 } {
   // Ref источник истины, state намеренно отстаёт: пока идёт плавный автоскролл он заморожен
   const [isNearBottom, setIsNearBottom] = useState(true)
@@ -106,16 +108,49 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
     return () => observer.disconnect()
   }, [containerRef, scrollList])
 
+  // Плавный скролл к позиции: длинную дистанцию проскакиваем мгновенно
+  const smoothScrollTo = useCallback(
+    (targetTop: number) => {
+      const list = containerRef.current
+      if (!list) return
+
+      const maxTop = list.scrollHeight - list.clientHeight
+      const clamped = Math.max(0, Math.min(targetTop, maxTop))
+      const distance = clamped - list.scrollTop
+      if (Math.abs(distance) > SMOOTH_TAIL_PX) {
+        list.scrollTop = clamped - Math.sign(distance) * SMOOTH_TAIL_PX
+      }
+      list.scrollTo({ top: clamped, behavior: 'smooth' })
+    },
+    [containerRef],
+  )
+
   const scrollToBottom = useCallback(() => {
     const list = containerRef.current
     if (!list) return
 
-    const maxTop = list.scrollHeight - list.clientHeight
-    if (maxTop - list.scrollTop > SMOOTH_TAIL_PX) {
-      list.scrollTop = maxTop - SMOOTH_TAIL_PX
-    }
-    scrollList('smooth')
-  }, [containerRef, scrollList])
+    smoothScrollTo(list.scrollHeight - list.clientHeight)
+  }, [containerRef, smoothScrollTo])
 
-  return { isNearBottom, scrollToBottom }
+  // Скролл к сообщению по localId с центрированием в видимой области; возвращает строку для подсветки
+  const scrollToItem = useCallback(
+    (localId: string): HTMLElement | null => {
+      const list = containerRef.current
+      if (!list) return null
+
+      const row = list.querySelector<HTMLElement>(`[${ITEM_ID_ATTR}="${CSS.escape(localId)}"]`)
+      if (!row) return null
+
+      const offset =
+        row.getBoundingClientRect().top -
+        list.getBoundingClientRect().top -
+        (list.clientHeight - row.offsetHeight) / 2
+
+      smoothScrollTo(list.scrollTop + offset)
+      return row
+    },
+    [containerRef, smoothScrollTo],
+  )
+
+  return { isNearBottom, scrollToBottom, scrollToItem }
 }
