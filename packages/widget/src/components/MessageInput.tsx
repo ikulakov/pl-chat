@@ -5,7 +5,7 @@ import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
 import { IconButton } from '../shared/ui/IconButton'
 import { AttachIcon, CloseIcon, SendIcon } from '../shared/ui/icons'
-import { selectOperatorName, selectReplyTarget, selectUserId } from '../store/selectors'
+import { selectReplyTarget, selectUserId } from '../store/selectors'
 import styles from './MessageInput.module.css'
 import { QuotedMessage } from './QuotedMessage'
 
@@ -35,7 +35,6 @@ export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
 
   const replyTarget = useChatStore(selectReplyTarget)
   const userId = useChatStore(selectUserId)
-  const operatorName = useChatStore(selectOperatorName)
 
   useEffect(() => {
     if (replyTarget) textareaRef.current?.focus()
@@ -78,7 +77,7 @@ export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
         <div className={styles.replyRow}>
           <div className={styles.replyPreview}>
             <QuotedMessage
-              author={quoteAuthorLabel(replyTarget.sender, userId, operatorName)}
+              author={quoteAuthorLabel(replyTarget.sender, userId)}
               text={replyTarget.body}
             />
           </div>

@@ -36,6 +36,7 @@
   "chat.action.retry": "Повторить отправку",
   "chat.action.reply": "Ответить",
   "chat.reply.you": "Вы",
+  "chat.reply.operator": "Оператор",
   "chat.reply.unavailable": "Сообщение недоступно",
   "chat.reply.cancel": "Отменить ответ",
   "chat.reply.goToOriginal": "Перейти к исходному сообщению",

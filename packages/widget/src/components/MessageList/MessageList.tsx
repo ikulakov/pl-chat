@@ -7,12 +7,7 @@ import { useLoadMoreHistory } from '../../hooks/useLoadMoreHistory'
 import { useSendReadReceipts } from '../../hooks/useSendReadReceipts'
 import { cn } from '../../shared/cn'
 import { Spinner } from '../../shared/ui/Spinner'
-import {
-  selectIsOpen,
-  selectOperatorName,
-  selectReadReceipts,
-  selectTimeline,
-} from '../../store/selectors'
+import { selectIsOpen, selectReadReceipts, selectTimeline } from '../../store/selectors'
 import {
   getPosition,
   getQuotePreview,
@@ -31,7 +26,6 @@ interface Props {
 export function MessageList({ userId }: Props) {
   const isOpen = useChatStore(selectIsOpen)
   const readReceipts = useChatStore(selectReadReceipts)
-  const quoteAuthorName = useChatStore(selectOperatorName)
 
   const timeline = useChatStore(selectTimeline)
   const timelineGroupedByDate = useMemo(() => groupTimelineByDate(timeline), [timeline])
@@ -94,7 +88,6 @@ export function MessageList({ userId }: Props) {
                 index: messagesByEventId,
                 message: item,
                 userId,
-                operatorName: quoteAuthorName,
               })
               return (
                 <MessageRow
