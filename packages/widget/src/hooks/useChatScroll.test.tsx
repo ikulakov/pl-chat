@@ -54,13 +54,14 @@ describe('useChatScroll', () => {
   })
 
   it('auto-scrolls to a freshly sent own message even when the user has scrolled up', () => {
-    const { rerender, scrollTo } = setup([message(OPERATOR)])
+    const { rerender, scrollTo, container } = setup([message(OPERATOR)])
     act(() => sentinel().trigger(false)) // пользователь ушёл вверх
     scrollTo.mockClear()
 
     act(() => rerender({ timeline: [message(OPERATOR), message(ME)] }))
 
-    expect(scrollTo).toHaveBeenCalled()
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(container.scrollTop).toBe(1000)
   })
 
   it('does not auto-scroll on an incoming message while the user is scrolled up', () => {
@@ -113,6 +114,7 @@ describe('useChatScroll', () => {
     Object.defineProperty(row, 'offsetHeight', { value: 40, configurable: true })
     container.getBoundingClientRect = () => ({ top: 100 }) as DOMRect
     row.getBoundingClientRect = () => ({ top: 500 }) as DOMRect
+    container.scrollTop = 0
     scrollTo.mockClear()
 
     act(() => result.current.scrollToItem('target'))
