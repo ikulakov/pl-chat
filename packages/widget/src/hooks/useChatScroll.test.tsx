@@ -1,10 +1,10 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { textItem } from '../shared/testUtils/matrixFixtures'
-import type { TimelineItem } from '../domain/timeline'
 import { FakeIntersectionObserver } from '../../test.setup'
-import { ITEM_ID_ATTR } from './useLoadMoreHistory'
+import type { TimelineItem } from '../domain/timeline'
+import { textItem } from '../shared/testUtils/matrixFixtures'
 import { useChatScroll } from './useChatScroll'
+import { ITEM_ID_ATTR } from './useLoadMoreHistory'
 
 const ME = '@me:bank'
 const OPERATOR = '@op:bank'
@@ -102,32 +102,35 @@ describe('useChatScroll', () => {
     expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }))
   })
 
-  it('scrollToItem resolves the row by its id, scrolls to it, and returns it', () => {
+  it('scrollToItem resolves the row by its id, jumps to it, and highlights it', () => {
     const { result, scrollTo, container } = setup([message(OPERATOR)])
     const row = document.createElement('div')
+    const animate = vi.fn()
     row.setAttribute(ITEM_ID_ATTR, 'target')
+    row.animate = animate as unknown as typeof row.animate
     container.appendChild(row)
+    Object.defineProperty(container, 'clientHeight', { value: 200, configurable: true })
+    Object.defineProperty(row, 'offsetHeight', { value: 40, configurable: true })
+    container.getBoundingClientRect = () => ({ top: 100 }) as DOMRect
+    row.getBoundingClientRect = () => ({ top: 500 }) as DOMRect
     scrollTo.mockClear()
 
-    let returned: HTMLElement | null = null
-    act(() => {
-      returned = result.current.scrollToItem('target')
-    })
+    act(() => result.current.scrollToItem('target'))
 
-    expect(returned).toBe(row)
-    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }))
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(container.scrollTop).toBe(320)
+    expect(animate).toHaveBeenCalledWith([{ opacity: 0.78 }, { opacity: 1 }], {
+      duration: 1600,
+      easing: 'ease-out',
+    })
   })
 
   it('scrollToItem returns null and does not scroll when the row is absent', () => {
     const { result, scrollTo } = setup([message(OPERATOR)])
     scrollTo.mockClear()
 
-    let returned: HTMLElement | null = null
-    act(() => {
-      returned = result.current.scrollToItem('missing')
-    })
+    act(() => result.current.scrollToItem('missing'))
 
-    expect(returned).toBeNull()
     expect(scrollTo).not.toHaveBeenCalled()
   })
 })

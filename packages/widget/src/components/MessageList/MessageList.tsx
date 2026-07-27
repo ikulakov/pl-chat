@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { readOwnEventIds } from '../../domain/receipts'
 import { isSystem } from '../../domain/timeline'
 import { useChatScroll } from '../../hooks/useChatScroll'
@@ -60,19 +60,6 @@ export function MessageList({ userId }: Props) {
 
   useSendReadReceipts({ timeline, isOpen, containerRef: messagesListRef })
 
-  const scrollToMessage = useCallback(
-    (localId: string) => {
-      const row = scrollToItem(localId)
-
-      if (row)
-        row.animate([{ opacity: 0.78 }, { opacity: 1 }], {
-          duration: 1600,
-          easing: 'ease-out',
-        })
-    },
-    [scrollToItem],
-  )
-
   return (
     <div className={styles.wrap}>
       <div
@@ -119,7 +106,7 @@ export function MessageList({ userId }: Props) {
                   quotedAuthor={quote?.author}
                   quotedText={quote?.text}
                   quotedTargetId={quote?.targetId}
-                  onQuoteClick={scrollToMessage}
+                  onQuoteClick={scrollToItem}
                 />
               )
             })}
