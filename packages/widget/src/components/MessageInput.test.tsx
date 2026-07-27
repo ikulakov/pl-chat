@@ -82,11 +82,11 @@ describe('MessageInput — режим ответа', () => {
     expect(sendMessage).toHaveBeenCalledExactlyOnceWith('да, подходит', '$parent')
   })
 
-  it('показывает превью цитаты: имя оператора и текст исходного сообщения', () => {
+  it('показывает превью цитаты: оператора и текст исходного сообщения', () => {
     setReply({ eventId: '$parent', sender: OPERATOR, body: 'исходное сообщение' })
     render(<MessageInput />)
 
-    expect(screen.getByText('Оля')).toBeInTheDocument()
+    expect(screen.getByText(t('chat.reply.operator'))).toBeInTheDocument()
     expect(screen.getByText('исходное сообщение')).toBeInTheDocument()
   })
 

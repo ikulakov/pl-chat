@@ -6,10 +6,6 @@
   padding-left: 8px;
   border-left: 2px solid currentColor;
   transition: opacity 0.15s;
-
-  &:hover {
-    opacity: 0.9;
-  }
 }
 
 .clickable {
@@ -24,6 +20,10 @@
   text-align: left;
   width: 100%;
   cursor: pointer;
+
+  &:hover {
+    opacity: 0.9;
+  }
 }
 
 .author {

@@ -36,6 +36,7 @@
   "chat.action.retry": "Retry",
   "chat.action.reply": "Reply",
   "chat.reply.you": "You",
+  "chat.reply.operator": "Operator",
   "chat.reply.unavailable": "Message unavailable",
   "chat.reply.cancel": "Cancel reply",
   "chat.reply.goToOriginal": "Go to the original message",

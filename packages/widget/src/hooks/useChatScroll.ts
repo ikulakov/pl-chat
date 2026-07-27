@@ -147,7 +147,7 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
 
       scrollListTo({ element: row, block: 'center' }, 'auto')
 
-      row.animate?.([{ opacity: 0.78 }, { opacity: 1 }], {
+      row.animate([{ opacity: 0.78 }, { opacity: 1 }], {
         duration: 1600,
         easing: 'ease-out',
       })

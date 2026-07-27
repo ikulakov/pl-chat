@@ -70,14 +70,12 @@ interface GetQuotePreviewParams {
   index: Map<string, MessageTimelineItem>
   message: MessageTimelineItem
   userId: string
-  operatorName: string
 }
 
 export function getQuotePreview({
   index,
   message,
   userId,
-  operatorName,
 }: GetQuotePreviewParams): QuotedPreview | undefined {
   if (message.relation?.type !== 'reply') return
 
@@ -90,7 +88,7 @@ export function getQuotePreview({
   }
 
   return {
-    author: quoteAuthorLabel(parent.sender, userId, operatorName),
+    author: quoteAuthorLabel(parent.sender, userId),
     text: parent.content.body,
     targetId: parent.localId,
   }

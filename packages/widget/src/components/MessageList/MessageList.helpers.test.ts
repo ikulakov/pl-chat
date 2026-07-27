@@ -45,7 +45,7 @@ describe('getPosition', () => {
 
 describe('getQuotePreview', () => {
   const USER = '@me:bank'
-  const OPERATOR_NAME = 'Оля'
+  const OPERATOR = '@op:bank'
 
   function reply(parentEventId: string): TextTimelineItem {
     return {
@@ -62,7 +62,6 @@ describe('getQuotePreview', () => {
         index: indexMessagesByEventId([plain]),
         message: plain,
         userId: USER,
-        operatorName: OPERATOR_NAME,
       }),
     ).toBeUndefined()
   })
@@ -75,7 +74,6 @@ describe('getQuotePreview', () => {
       index: indexMessagesByEventId([item]),
       message: item,
       userId: USER,
-      operatorName: OPERATOR_NAME,
     })
 
     expect(quote).toEqual({ text: t('chat.reply.unavailable') })
@@ -90,7 +88,6 @@ describe('getQuotePreview', () => {
       index: indexMessagesByEventId([parent, item]),
       message: item,
       userId: USER,
-      operatorName: OPERATOR_NAME,
     })
 
     expect(quote).toEqual({ text: t('chat.reply.unavailable') })
@@ -109,7 +106,6 @@ describe('getQuotePreview', () => {
       index: indexMessagesByEventId([parent, reply('$parent')]),
       message: reply('$parent'),
       userId: USER,
-      operatorName: OPERATOR_NAME,
     })
 
     expect(quote?.targetId).toBe('p1')
@@ -120,28 +116,46 @@ describe('getQuotePreview', () => {
       index: indexMessagesByEventId([reply('$missing')]),
       message: reply('$missing'),
       userId: USER,
-      operatorName: OPERATOR_NAME,
     })
 
     expect(quote?.targetId).toBeUndefined()
   })
 
-  it('автор цитаты — «Вы» для своего сообщения и имя оператора для чужого', () => {
+  it('автор цитаты — «Вы» для своего сообщения и «Оператор» для чужого', () => {
     const own = textItem({ eventId: '$own', sender: USER, body: 'мой вопрос' })
-    const foreign = textItem({ eventId: '$foreign', sender: '@op:bank', body: 'ответ оператора' })
+    const foreign = textItem({ eventId: '$foreign', sender: OPERATOR, body: 'ответ оператора' })
     const index = indexMessagesByEventId([own, foreign])
 
     expect(
-      getQuotePreview({ index, message: reply('$own'), userId: USER, operatorName: OPERATOR_NAME })
-        ?.author,
+      getQuotePreview({
+        index,
+        message: reply('$own'),
+        userId: USER,
+      })?.author,
     ).toBe(t('chat.reply.you'))
     expect(
       getQuotePreview({
         index,
         message: reply('$foreign'),
         userId: USER,
-        operatorName: OPERATOR_NAME,
       })?.author,
-    ).toBe(OPERATOR_NAME)
+    ).toBe(t('chat.reply.operator'))
+  })
+
+  it('автор цитаты от другого оператора — тоже нейтральный оператор', () => {
+    const oldOperatorMessage = textItem({
+      eventId: '$old',
+      sender: '@old-op:bank',
+      body: 'старый ответ',
+    })
+    const index = indexMessagesByEventId([oldOperatorMessage])
+
+    expect(
+      getQuotePreview({
+        index,
+        message: reply('$old'),
+        userId: USER,
+      })?.author,
+    ).toBe(t('chat.reply.operator'))
   })
 })
