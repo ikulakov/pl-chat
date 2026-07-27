@@ -29,6 +29,24 @@ describe('createMatrixApi — форма запросов', () => {
     })
   })
 
+  it('sendMessage: reply кладёт m.relates_to.m.in_reply_to.event_id и не пишет fallback в body', async () => {
+    const { transport, request } = fakeTransport()
+
+    await createMatrixApi(transport).sendMessage({
+      roomId: '!room:bank',
+      txnId: 'txn-1',
+      body: 'ок',
+      replyToEventId: '$parent:bank',
+    })
+
+    const [, init] = request.mock.calls[0]!
+    expect(JSON.parse((init as { body: string }).body)).toEqual({
+      msgtype: 'm.text',
+      body: 'ок',
+      'm.relates_to': { 'm.in_reply_to': { event_id: '$parent:bank' } },
+    })
+  })
+
   it('longPollSync: since + timeout в query, abort-signal пробрасывается', async () => {
     const { transport, request } = fakeTransport()
     const signal = new AbortController().signal

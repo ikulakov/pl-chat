@@ -14,7 +14,6 @@ import {
   selectTimeline,
 } from '../../store/selectors'
 import {
-  flashHighlight,
   getPosition,
   getQuotePreview,
   groupTimelineByDate,
@@ -64,7 +63,12 @@ export function MessageList({ userId }: Props) {
   const scrollToMessage = useCallback(
     (localId: string) => {
       const row = scrollToItem(localId)
-      if (row) flashHighlight(row, styles.highlight)
+
+      if (row)
+        row.animate([{ opacity: 0.78 }, { opacity: 1 }], {
+          duration: 1600,
+          easing: 'ease-out',
+        })
     },
     [scrollToItem],
   )

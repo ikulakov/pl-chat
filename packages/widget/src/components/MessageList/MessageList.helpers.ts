@@ -1,4 +1,10 @@
-import { isSystem, type MessageTimelineItem, type TimelineItem } from '../../domain/timeline'
+import { quoteAuthorLabel } from '../../domain/quote'
+import {
+  hasBody,
+  isSystem,
+  type MessageTimelineItem,
+  type TimelineItem,
+} from '../../domain/timeline'
 import { t } from '../../i18n'
 import { formatDateLabel, startOfDay } from '../../shared/formatDate'
 import type { BubblePosition } from './MessageBubble'
@@ -7,15 +13,6 @@ interface DayGroup {
   key: string
   label: string
   items: TimelineItem[]
-}
-
-export function flashHighlight(row: HTMLElement, className: string | undefined): void {
-  if (!className) return
-
-  row.classList.remove(className)
-  void row.offsetWidth
-  row.classList.add(className)
-  row.addEventListener('animationend', () => row.classList.remove(className), { once: true })
 }
 
 export function groupTimelineByDate(timeline: TimelineItem[]): DayGroup[] {
@@ -87,14 +84,13 @@ export function getQuotePreview({
   // цитата резолвится только из загруженной ленты
   const parent = index.get(message.relation.eventId)
 
-  // пустой body — это отредактированное сообщение: бэкенд вычищает content при редакции,
-  // для пользователя оно так же недоступно, как и не загруженное
-  if (!parent || parent.content.body.trim() === '') {
+  // пустой body (отредактированное/вычищенное сообщение) недоступно так же, как не загруженное
+  if (!parent || !hasBody(parent)) {
     return { text: t('chat.reply.unavailable') }
   }
 
   return {
-    author: parent.sender === userId ? t('chat.reply.you') : operatorName,
+    author: quoteAuthorLabel(parent.sender, userId, operatorName),
     text: parent.content.body,
     targetId: parent.localId,
   }

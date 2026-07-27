@@ -91,6 +91,19 @@ describe('MessageActions', () => {
     expect(screen.queryByText(t('chat.action.reply'))).not.toBeInTheDocument()
   })
 
+  it('прячет «Ответить» у сообщения с пустым body — очищенное/недоступное, цитата на него бессмысленна', () => {
+    render(
+      <MessageActions
+        message={textItem({ eventId: '$m1', sender: '@operator:bank', body: '   ' })}
+        isOwn={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+
+    expect(screen.queryByText(t('chat.action.reply'))).not.toBeInTheDocument()
+  })
+
   it('«Ответить» у отправленного сообщения передаёт цель ответа целиком (eventId, автор, текст)', () => {
     render(
       <MessageActions

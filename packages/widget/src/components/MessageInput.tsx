@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { quoteAuthorLabel } from '../domain/quote'
 import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
@@ -77,7 +78,7 @@ export function MessageInput({ placeholder = t('input.placeholder') }: Props) {
         <div className={styles.replyRow}>
           <div className={styles.replyPreview}>
             <QuotedMessage
-              author={replyTarget.sender === userId ? t('chat.reply.you') : operatorName}
+              author={quoteAuthorLabel(replyTarget.sender, userId, operatorName)}
               text={replyTarget.body}
             />
           </div>

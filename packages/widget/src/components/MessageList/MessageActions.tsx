@@ -1,11 +1,12 @@
 import { isOptimistic } from '../../domain/optimistic'
+import { hasBody } from '../../domain/timeline'
 import type { MessageTimelineItem } from '../../domain/timeline'
 import { useChatActions } from '../../hooks/useChatActions'
 import { t } from '../../i18n'
+import { copyText } from '../../shared/clipboard'
 import { Dropdown, DropdownItem } from '../../shared/ui/Dropdown'
 import { IconButton } from '../../shared/ui/IconButton'
 import { CopyIcon, MoreIcon, ReplyIcon, RetryIcon } from '../../shared/ui/icons'
-import { copyText } from '../../shared/clipboard'
 
 interface Props {
   message: MessageTimelineItem
@@ -16,7 +17,7 @@ export function MessageActions({ message, isOwn }: Props) {
   const { resendMessage, replyTo } = useChatActions()
 
   const canRetry = isOwn && message.sendStatus === 'failed'
-  const canReply = !isOptimistic(message.eventId)
+  const canReply = !isOptimistic(message.eventId) && hasBody(message)
 
   return (
     <Dropdown

@@ -234,7 +234,7 @@ export function ReplyIcon(props: IconProps) {
     >
       <path
         d="M15 13.0743V14.5L14.058 13.1964C12.5672 11.1336 10.1767 9.91176 7.63158 9.91176V12.1196C7.63158 13.0057 6.56439 13.454 5.93159 12.8337L1 8L5.93159 3.16626C6.56439 2.54601 7.63158 2.99433 7.63158 3.88041V5.70588C11.701 5.70588 15 9.00484 15 13.0743Z"
-        stroke="#222222"
+        stroke="currentColor"
         strokeWidth="1.2"
         strokeLinecap="round"
         strokeLinejoin="round"

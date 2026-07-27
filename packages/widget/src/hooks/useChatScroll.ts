@@ -5,7 +5,7 @@ import { ITEM_ID_ATTR } from './useLoadMoreHistory'
 
 const NEAR_BOTTOM_PX = 80
 
-const SMOOTH_TAIL_PX = 200
+const SMOOTH_TAIL_PX = 150
 
 interface UseChatScrollParams {
   timeline: TimelineItem[]
