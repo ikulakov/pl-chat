@@ -39,3 +39,5 @@ export type TimelineItem = MessageTimelineItem | SystemTimelineItem
 
 export const isSystem = (item: TimelineItem): item is SystemTimelineItem =>
   item.kind === 'system' || item.kind === 'notice'
+
+export const hasBody = (item: MessageTimelineItem): boolean => item.content.body.trim() !== ''

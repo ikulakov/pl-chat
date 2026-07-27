@@ -21,6 +21,7 @@ export const INITIAL_ROOM_STATE: RoomState = {
     isActive: false,
   },
   readReceipts: {},
+  replyTarget: null,
   prevBatch: null,
   isLoadingHistory: false,
 }

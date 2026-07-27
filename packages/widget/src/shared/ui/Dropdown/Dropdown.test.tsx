@@ -16,12 +16,8 @@ function renderDropdown() {
         </button>
       )}
     >
-      {({ close }) => (
-        <>
-          <DropdownItem onSelect={close}>one</DropdownItem>
-          <DropdownItem onSelect={close}>two</DropdownItem>
-        </>
-      )}
+      <DropdownItem onSelect={() => {}}>one</DropdownItem>
+      <DropdownItem onSelect={() => {}}>two</DropdownItem>
     </Dropdown>,
   )
 }
@@ -67,6 +63,15 @@ describe('Dropdown a11y', () => {
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(trigger).not.toHaveFocus()
+  })
+
+  it('closes itself when an item is selected (DropdownItem owns close)', () => {
+    renderDropdown()
+    fireEvent.click(screen.getByRole('button', { name: 'menu' }))
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'one' }))
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('navigates items with ArrowDown/ArrowUp and wraps around', () => {

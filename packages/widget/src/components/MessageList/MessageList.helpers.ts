@@ -1,4 +1,11 @@
-import { isSystem, type MessageTimelineItem, type TimelineItem } from '../../domain/timeline'
+import { quoteAuthorLabel } from '../../domain/quote'
+import {
+  hasBody,
+  isSystem,
+  type MessageTimelineItem,
+  type TimelineItem,
+} from '../../domain/timeline'
+import { t } from '../../i18n'
 import { formatDateLabel, startOfDay } from '../../shared/formatDate'
 import type { BubblePosition } from './MessageBubble'
 
@@ -43,12 +50,48 @@ export function getPosition(
   return 'last'
 }
 
-export function copyText(text: string): void {
-  if (!navigator.clipboard?.writeText) {
-    console.warn('[PLChat] clipboard API unavailable — copy skipped')
-    return
+export function indexMessagesByEventId(timeline: TimelineItem[]): Map<string, MessageTimelineItem> {
+  const index = new Map<string, MessageTimelineItem>()
+
+  for (const item of timeline) {
+    if (!isSystem(item)) index.set(item.eventId, item)
   }
-  navigator.clipboard.writeText(text).catch((err: unknown) => {
-    console.warn('[PLChat] clipboard write failed:', err)
-  })
+
+  return index
+}
+
+export interface QuotedPreview {
+  author?: string
+  text: string
+  targetId?: string
+}
+
+interface GetQuotePreviewParams {
+  index: Map<string, MessageTimelineItem>
+  message: MessageTimelineItem
+  userId: string
+  operatorName: string
+}
+
+export function getQuotePreview({
+  index,
+  message,
+  userId,
+  operatorName,
+}: GetQuotePreviewParams): QuotedPreview | undefined {
+  if (message.relation?.type !== 'reply') return
+
+  // цитата резолвится только из загруженной ленты
+  const parent = index.get(message.relation.eventId)
+
+  // пустой body (отредактированное/вычищенное сообщение) недоступно так же, как не загруженное
+  if (!parent || !hasBody(parent)) {
+    return { text: t('chat.reply.unavailable') }
+  }
+
+  return {
+    author: quoteAuthorLabel(parent.sender, userId, operatorName),
+    text: parent.content.body,
+    targetId: parent.localId,
+  }
 }

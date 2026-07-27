@@ -209,17 +209,33 @@ export function ChecksIcon(props: IconProps) {
 
 export function RetryIcon(props: IconProps) {
   return (
-    <Icon {...props}>
+    <Icon
+      size={16}
+      viewBox="0 0 16 16"
+      {...props}
+    >
       <path
-        d="M20 12a8 8 0 10-2.34 5.66"
+        d="M2.37281 7.3517C2.03018 10.3048 4.04863 13.0497 7.01725 13.5731C10.098 14.1164 13.0354 12.0615 13.5781 8.98349C14.1208 5.90548 12.0634 2.96989 8.98267 2.42667C7.33061 2.13537 5.71977 2.5912 4.49732 3.55129L3.8012 3.97631M5.24634 4.2963L3.8012 3.97631L4.13123 2.48868"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.2"
         strokeLinecap="round"
+        strokeLinejoin="round"
       />
+    </Icon>
+  )
+}
+
+export function ReplyIcon(props: IconProps) {
+  return (
+    <Icon
+      size={16}
+      viewBox="0 0 16 16"
+      {...props}
+    >
       <path
-        d="M20 8v4h-4"
+        d="M15 13.0743V14.5L14.058 13.1964C12.5672 11.1336 10.1767 9.91176 7.63158 9.91176V12.1196C7.63158 13.0057 6.56439 13.454 5.93159 12.8337L1 8L5.93159 3.16626C6.56439 2.54601 7.63158 2.99433 7.63158 3.88041V5.70588C11.701 5.70588 15 9.00484 15 13.0743Z"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -229,20 +245,15 @@ export function RetryIcon(props: IconProps) {
 
 export function CopyIcon(props: IconProps) {
   return (
-    <Icon {...props}>
-      <rect
-        x="8"
-        y="8"
-        width="12"
-        height="12"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
+    <Icon
+      size={16}
+      viewBox="0 0 16 16"
+      {...props}
+    >
       <path
-        d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"
+        d="M10 2H5.33333C3.49238 2 2 3.49238 2 5.33333V10M6.66667 14H12C13.1046 14 14 13.1046 14 12V6.66667C14 5.5621 13.1046 4.66667 12 4.66667H6.66667C5.5621 4.66667 4.66667 5.5621 4.66667 6.66667V12C4.66667 13.1046 5.5621 14 6.66667 14Z"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -258,8 +269,8 @@ export function FailedIcon(props: IconProps) {
       {...props}
     >
       <path
-        fill-rule="evenodd"
-        clip-rule="evenodd"
+        fillRule="evenodd"
+        clipRule="evenodd"
         d="M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C11.3137 2 14 4.68629 14 8ZM8 4.25C8.41421 4.25 8.75 4.58579 8.75 5V8.5C8.75 8.91421 8.41421 9.25 8 9.25C7.58579 9.25 7.25 8.91421 7.25 8.5V5C7.25 4.58579 7.58579 4.25 8 4.25ZM8 11.75C8.41421 11.75 8.75 11.4142 8.75 11C8.75 10.5858 8.41421 10.25 8 10.25C7.58579 10.25 7.25 10.5858 7.25 11C7.25 11.4142 7.58579 11.75 8 11.75Z"
         fill="#C51E37"
       />

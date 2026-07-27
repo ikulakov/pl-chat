@@ -15,6 +15,8 @@ export type RuntimeAction =
   | { type: 'message.retrying'; localId: string }
   | { type: 'receipt.markedRead'; userId: string; eventId: string }
   | { type: 'receipt.sendFailed'; userId: string; eventId: string; rollbackTo: string | null }
+  | { type: 'reply.targeted'; target: ReplyTarget }
+  | { type: 'reply.cleared' }
   | { type: 'history.loading' }
   | { type: 'history.loaded'; items: TimelineItem[]; prevBatch: string | null }
   | { type: 'history.settled' }
@@ -32,9 +34,17 @@ export interface RoomState {
   operator: OperatorState
   // m.read по юзерам: до какого события каждый дочитал
   readReceipts: Record<string, ReadReceipt>
+  // сообщение, на которое пользователь отвечает (превью в композере)
+  replyTarget: ReplyTarget | null
   // курсор следующей страницы истории назад
   prevBatch: string | null
   isLoadingHistory: boolean
+}
+
+export interface ReplyTarget {
+  eventId: string
+  sender: string
+  body: string
 }
 
 export interface Identity {

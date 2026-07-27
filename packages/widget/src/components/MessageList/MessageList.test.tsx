@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { systemItem, textItem } from '../../shared/testUtils/matrixFixtures'
 import type { TextTimelineItem } from '../../domain/timeline'
+import { systemItem, textItem } from '../../shared/testUtils/matrixFixtures'
 import { INITIAL_ROOM_STATE, chatStore } from '../../store/store'
 import { MessageList } from './MessageList'
 
@@ -174,6 +174,24 @@ describe('MessageList', () => {
     render(<MessageList userId={ME} />)
 
     expect(screen.getByRole('status')).toBeInTheDocument()
+  })
+
+  it('a reply to a not-loaded original renders an unavailable quote that is not clickable', () => {
+    // родитель вне загруженной ленты → заглушка без цели скролла, кнопки-цитаты нет
+    const ts = new Date('2026-07-01T10:00:00').getTime()
+    const reply: TextTimelineItem = {
+      ...message({ localId: 'r1', eventId: 'r1', sender: ME, ts, body: 'ответ' }),
+      relation: { type: 'reply', eventId: '$missing' },
+    }
+
+    chatStore.setState({ room: { ...INITIAL_ROOM_STATE, timeline: [reply] } })
+
+    render(<MessageList userId={ME} />)
+
+    expect(screen.getByText('Сообщение недоступно')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Перейти к исходному сообщению' }),
+    ).not.toBeInTheDocument()
   })
 
   it('renders a system message as a plain badge, without message actions or bubble status', () => {

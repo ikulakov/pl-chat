@@ -17,7 +17,7 @@ export const CONNECTION_FAILED_ERROR = 'Не удалось подключить
 export interface MatrixService {
   connect: () => Promise<void>
   disconnect: () => void
-  sendMessage: (text: string) => Promise<void>
+  sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   resendMessage: (localId: string) => Promise<void>
   markRead: (eventId: string) => Promise<void>
   loadMoreHistory: () => Promise<void>
@@ -82,21 +82,23 @@ export class MatrixController implements MatrixService {
     this.syncLoop.stop()
   }
 
-  async sendMessage(text: string): Promise<void> {
+  async sendMessage(text: string, replyToEventId?: string): Promise<void> {
     const { identity, phase } = this.getState()
 
     if (phase !== 'connected' || !identity) return
 
-    const { message, txnId } = createOptimisticTextMessage(identity.userId, text)
+    const { message, txnId } = createOptimisticTextMessage(identity.userId, text, replyToEventId)
     this.dispatch({ type: 'message.optimisticAdded', message })
+    this.dispatch({ type: 'reply.cleared' })
 
-    await this.dispatchSend(
-      identity.roomId,
-      message.localId,
-      message.content.body,
+    await this.dispatchSend({
+      roomId: identity.roomId,
+      localId: message.localId,
+      body: message.content.body,
       txnId,
-      'sendMessage',
-    )
+      context: 'sendMessage',
+      ...(replyToEventId ? { replyToEventId } : {}),
+    })
   }
 
   async resendMessage(localId: string): Promise<void> {
@@ -112,13 +114,14 @@ export class MatrixController implements MatrixService {
 
     this.dispatch({ type: 'message.retrying', localId })
 
-    await this.dispatchSend(
-      identity.roomId,
+    await this.dispatchSend({
+      roomId: identity.roomId,
       localId,
-      message.content.body,
-      message.txnId,
-      'resendMessage',
-    )
+      body: message.content.body,
+      txnId: message.txnId,
+      context: 'resendMessage',
+      ...(message.relation?.type === 'reply' ? { replyToEventId: message.relation.eventId } : {}),
+    })
   }
 
   async markRead(eventId: string): Promise<void> {
@@ -173,17 +176,24 @@ export class MatrixController implements MatrixService {
     this.historyLoader.stop()
   }
 
-  private async dispatchSend(
-    roomId: string,
-    localId: string,
-    body: string,
-    txnId: string,
-    context: AuthErrorContext,
-  ): Promise<void> {
+  private async dispatchSend(params: {
+    roomId: string
+    localId: string
+    body: string
+    txnId: string
+    context: AuthErrorContext
+    replyToEventId?: string
+  }): Promise<void> {
+    const { roomId, localId, body, txnId, context, replyToEventId } = params
     const lifecycleId = this.lifecycleId
 
     try {
-      const { event_id } = await this.api.sendMessage(roomId, txnId, body)
+      const { event_id } = await this.api.sendMessage({
+        roomId,
+        txnId,
+        body,
+        ...(replyToEventId ? { replyToEventId } : {}),
+      })
       if (!this.isCurrentLifecycle(lifecycleId)) return
 
       this.dispatch({ type: 'message.sent', localId, eventId: event_id })
