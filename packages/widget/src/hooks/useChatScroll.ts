@@ -1,16 +1,29 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { isSystem, type TimelineItem } from '../domain/timeline'
 import { useIntersectionObserver } from './useIntersectionObserver'
+import { ITEM_ID_ATTR } from './useLoadMoreHistory'
 
 const NEAR_BOTTOM_PX = 80
-
 const SMOOTH_TAIL_PX = 200
+
+type ScrollTarget = 'bottom' | { element: HTMLElement; block: 'center' }
 
 interface UseChatScrollParams {
   timeline: TimelineItem[]
   userId: string
   containerRef: React.RefObject<HTMLElement | null>
   bottomRef: React.RefObject<Element | null>
+}
+
+function getScrollTopForTarget(list: HTMLElement, target: ScrollTarget): number {
+  if (target === 'bottom') return list.scrollHeight - list.clientHeight
+
+  return (
+    list.scrollTop +
+    target.element.getBoundingClientRect().top -
+    list.getBoundingClientRect().top -
+    (list.clientHeight - target.element.offsetHeight) / 2
+  )
 }
 
 /**
@@ -24,6 +37,7 @@ interface UseChatScrollParams {
 export function useChatScroll({ containerRef, bottomRef, timeline, userId }: UseChatScrollParams): {
   isNearBottom: boolean
   scrollToBottom: () => void
+  scrollToItem: (localId: string) => void
 } {
   // Ref источник истины, state намеренно отстаёт: пока идёт плавный автоскролл он заморожен
   const [isNearBottom, setIsNearBottom] = useState(true)
@@ -32,12 +46,24 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
   const isAutoScrollingRef = useRef(false)
   const lastMessageIdRef = useRef<string | null>(null)
 
-  const scrollList = useCallback(
-    (behavior: ScrollBehavior) => {
+  const scrollListTo = useCallback(
+    (target: ScrollTarget, behavior: ScrollBehavior): void => {
       const list = containerRef.current
       if (!list) return
 
-      list.scrollTo({ top: list.scrollHeight, behavior })
+      const targetTop = getScrollTopForTarget(list, target)
+      const maxTop = list.scrollHeight - list.clientHeight
+      const top = Math.max(0, Math.min(targetTop, maxTop))
+
+      if (behavior === 'smooth') {
+        const distance = top - list.scrollTop
+        if (Math.abs(distance) > SMOOTH_TAIL_PX) {
+          list.scrollTop = top - Math.sign(distance) * SMOOTH_TAIL_PX
+        }
+        list.scrollTo({ top, behavior })
+      } else {
+        list.scrollTop = top
+      }
     },
     [containerRef],
   )
@@ -58,8 +84,8 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
     if (behavior === 'smooth') {
       isAutoScrollingRef.current = true
     }
-    scrollList(behavior)
-  }, [timeline, userId, containerRef, scrollList])
+    scrollListTo('bottom', behavior)
+  }, [timeline, userId, containerRef, scrollListTo])
 
   useIntersectionObserver({
     root: containerRef,
@@ -99,23 +125,35 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
     const observer = new ResizeObserver(() => {
       updateScrollbarWidth()
       if (isNearBottomRef.current) {
-        scrollList('auto')
+        scrollListTo('bottom', 'auto')
       }
     })
     observer.observe(list)
     return () => observer.disconnect()
-  }, [containerRef, scrollList])
+  }, [containerRef, scrollListTo])
 
   const scrollToBottom = useCallback(() => {
-    const list = containerRef.current
-    if (!list) return
+    scrollListTo('bottom', 'smooth')
+  }, [scrollListTo])
 
-    const maxTop = list.scrollHeight - list.clientHeight
-    if (maxTop - list.scrollTop > SMOOTH_TAIL_PX) {
-      list.scrollTop = maxTop - SMOOTH_TAIL_PX
-    }
-    scrollList('smooth')
-  }, [containerRef, scrollList])
+  // Скролл к сообщению по localId с центрированием в видимой области
+  const scrollToItem = useCallback(
+    (localId: string): void => {
+      const list = containerRef.current
+      if (!list) return
 
-  return { isNearBottom, scrollToBottom }
+      const row = list.querySelector<HTMLElement>(`[${ITEM_ID_ATTR}="${CSS.escape(localId)}"]`)
+      if (!row) return
+
+      scrollListTo({ element: row, block: 'center' }, 'auto')
+
+      row.animate([{ opacity: 0.78 }, { opacity: 1 }], {
+        duration: 1600,
+        easing: 'ease-out',
+      })
+    },
+    [containerRef, scrollListTo],
+  )
+
+  return { isNearBottom, scrollToBottom, scrollToItem }
 }

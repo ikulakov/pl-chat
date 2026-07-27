@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useDropdownClose } from './context'
 import styles from './DropdownItem.module.css'
 
 interface Props {
@@ -8,12 +9,17 @@ interface Props {
 }
 
 export function DropdownItem({ onSelect, icon, children }: Props) {
+  const close = useDropdownClose()
+
   return (
     <button
       type="button"
       role="menuitem"
       className={styles.item}
-      onClick={onSelect}
+      onClick={() => {
+        onSelect()
+        close()
+      }}
     >
       {icon}
       {children}

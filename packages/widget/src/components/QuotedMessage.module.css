@@ -1,0 +1,44 @@
+.quote {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 2px solid currentColor;
+  transition: opacity 0.15s;
+}
+
+.clickable {
+  appearance: none;
+  margin: 0;
+  padding: 0 0 0 8px;
+  border: none;
+  border-left: 2px solid currentColor;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+
+  &:hover {
+    opacity: 0.9;
+  }
+}
+
+.author {
+  font-size: 14px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.text {
+  font-size: 14px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.7;
+}

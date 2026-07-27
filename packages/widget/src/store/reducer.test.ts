@@ -113,6 +113,40 @@ describe('chatRuntimeReducer', () => {
     ])
   })
 
+  it('цель ответа переживает re-auth в ту же комнату и сбрасывается при новой', () => {
+    // ровно тот инвариант, ради которого replyTarget лежит в RoomState, а не рядом с isOpen
+    const connected = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'session.started',
+      identity: IDENTITY,
+      cursor: 's1',
+      joinedRoom: joinedRoom(),
+    })
+    const withTarget = chatRuntimeReducer(connected, {
+      type: 'reply.targeted',
+      target: { eventId: '$parent', sender: OPERATOR, body: 'исходное' },
+    })
+
+    const sameRoom = chatRuntimeReducer(withTarget, {
+      type: 'session.started',
+      identity: IDENTITY,
+      cursor: 's2',
+      joinedRoom: emptyJoinedRoom(),
+    })
+    const newRoom = chatRuntimeReducer(withTarget, {
+      type: 'session.started',
+      identity: { userId: '@new:bank', roomId: '!new:bank' },
+      cursor: 's2',
+      joinedRoom: emptyJoinedRoom(),
+    })
+
+    expect(sameRoom.room.replyTarget).toEqual({
+      eventId: '$parent',
+      sender: OPERATOR,
+      body: 'исходное',
+    })
+    expect(newRoom.room.replyTarget).toBeNull()
+  })
+
   it('sync.received WITHOUT a roomAction keeps the same room reference', () => {
     const connected = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
       type: 'session.started',

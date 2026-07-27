@@ -8,7 +8,12 @@ import { useSendReadReceipts } from '../../hooks/useSendReadReceipts'
 import { cn } from '../../shared/cn'
 import { Spinner } from '../../shared/ui/Spinner'
 import { selectIsOpen, selectReadReceipts, selectTimeline } from '../../store/selectors'
-import { getPosition, groupTimelineByDate } from './MessageList.helpers'
+import {
+  getPosition,
+  getQuotePreview,
+  groupTimelineByDate,
+  indexMessagesByEventId,
+} from './MessageList.helpers'
 import styles from './MessageList.module.css'
 import { MessageRow } from './MessageRow'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
@@ -24,6 +29,7 @@ export function MessageList({ userId }: Props) {
 
   const timeline = useChatStore(selectTimeline)
   const timelineGroupedByDate = useMemo(() => groupTimelineByDate(timeline), [timeline])
+  const messagesByEventId = useMemo(() => indexMessagesByEventId(timeline), [timeline])
 
   // eventId сообщений, которые уже прочитал оператор
   const readByOperatorIds = useMemo(
@@ -34,7 +40,7 @@ export function MessageList({ userId }: Props) {
   const messagesListRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const { isNearBottom, scrollToBottom } = useChatScroll({
+  const { isNearBottom, scrollToBottom, scrollToItem } = useChatScroll({
     timeline,
     userId,
     containerRef: messagesListRef,
@@ -78,6 +84,11 @@ export function MessageList({ userId }: Props) {
                 )
               }
               const position = getPosition(arr[index - 1], item, arr[index + 1])
+              const quote = getQuotePreview({
+                index: messagesByEventId,
+                message: item,
+                userId,
+              })
               return (
                 <MessageRow
                   key={item.localId}
@@ -85,6 +96,10 @@ export function MessageList({ userId }: Props) {
                   message={item}
                   position={position}
                   readByOperator={readByOperatorIds.has(item.eventId)}
+                  quotedAuthor={quote?.author}
+                  quotedText={quote?.text}
+                  quotedTargetId={quote?.targetId}
+                  onQuoteClick={scrollToItem}
                 />
               )
             })}

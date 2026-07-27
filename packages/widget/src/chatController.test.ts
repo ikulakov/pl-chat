@@ -158,7 +158,15 @@ describe('ChatController — wiring', () => {
     void controller.sendMessage('hi')
     controller.reconnect()
 
-    expect(matrix.sendMessage).toHaveBeenCalledWith('hi')
+    expect(matrix.sendMessage).toHaveBeenCalledWith('hi', undefined)
     expect(matrix.connect).toHaveBeenCalledOnce()
+  })
+
+  // actions раздаётся как стабильная ссылка (не геттер, пересоздающий объект) —
+  // на этом держится безопасность деструктуризации и deps в useChatActions.
+  it('exposes actions as a stable reference', () => {
+    const controller = new ChatController(makeBridge(), makeMatrix())
+
+    expect(controller.actions).toBe(controller.actions)
   })
 })

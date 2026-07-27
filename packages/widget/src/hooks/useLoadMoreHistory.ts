@@ -27,12 +27,14 @@ interface Anchor {
 function calcPosition(list: HTMLElement): {
   isLoadZone: boolean
   isCancelZone: boolean
+  isAtTop: boolean
   isAtBottom: boolean
 } {
   const first = list.querySelector<HTMLElement>(`[${ITEM_ID_ATTR}]`)
   const distanceToTop = list.scrollTop - (first?.offsetTop ?? 0)
   return {
     isAtBottom: list.scrollHeight - list.clientHeight - list.scrollTop <= SCROLL_EDGE_EPS_PX,
+    isAtTop: distanceToTop <= SCROLL_EDGE_EPS_PX,
     isLoadZone: distanceToTop <= list.clientHeight * LOAD_AHEAD_SCREENS + SCROLL_EDGE_EPS_PX,
     isCancelZone: distanceToTop > list.clientHeight * ABORT_AFTER_SCREENS,
   }
@@ -79,15 +81,15 @@ export function useLoadMoreHistory({ timeline, containerRef }: UseLoadMoreHistor
   const firstItemIdRef = useRef<string | null>(null)
 
   const wasAtBottomRef = useRef(true)
-  const [isLoadZone, setIsLoadZone] = useState(false)
+  const [isAtTop, setIsAtTop] = useState(false)
 
   const handlePositionChange = useEffectEvent(() => {
     const list = containerRef.current
     if (!list) return
 
-    const { isLoadZone, isCancelZone, isAtBottom } = calcPosition(list)
+    const { isLoadZone, isCancelZone, isAtTop, isAtBottom } = calcPosition(list)
     wasAtBottomRef.current = isAtBottom
-    setIsLoadZone(isLoadZone)
+    setIsAtTop(isAtTop)
 
     if (isCancelZone) {
       // Пользователь ушёл от верха — активная retry-цепочка обрывается
@@ -139,10 +141,10 @@ export function useLoadMoreHistory({ timeline, containerRef }: UseLoadMoreHistor
     anchorRef.current = pickAnchor(list)
 
     // Пересчет edge триггеров после prepend
-    const { isLoadZone, isAtBottom } = calcPosition(list)
+    const { isAtTop, isAtBottom } = calcPosition(list)
     wasAtBottomRef.current = isAtBottom
-    setIsLoadZone(isLoadZone)
+    setIsAtTop(isAtTop)
   }, [timeline, containerRef])
 
-  return { showHistorySpinner: isLoadingHistory && isLoadZone }
+  return { showHistorySpinner: isLoadingHistory && isAtTop }
 }
