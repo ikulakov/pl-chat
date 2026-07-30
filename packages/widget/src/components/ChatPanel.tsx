@@ -2,11 +2,18 @@ import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
 import { Spinner } from '../shared/ui/Spinner'
-import { selectOperator, selectOperatorName, selectStatus, selectUserId } from '../store/selectors'
+import {
+  selectOperator,
+  selectOperatorName,
+  selectStatus,
+  selectUserId,
+  selectViewport,
+} from '../store/selectors'
+import { AttachmentProvider } from './Attachment/AttachmentProvider'
 import chatStyles from './ChatPanel.module.css'
+import { Composer } from './Composer/Composer'
 import { DevOperatorTools } from './dev/DevOperatorTools'
 import { Header } from './Header'
-import { MessageInput } from './MessageInput'
 import { MessageList } from './MessageList/MessageList'
 import { StatusScreen } from './StatusScreen'
 import statusStyles from './StatusScreen.module.css'
@@ -16,6 +23,7 @@ export function ChatPanel() {
   const userId = useChatStore(selectUserId)
   const operator = useChatStore(selectOperator)
   const operatorName = useChatStore(selectOperatorName)
+  const viewport = useChatStore(selectViewport)
 
   const { reconnect } = useChatActions()
 
@@ -51,10 +59,10 @@ export function ChatPanel() {
       )}
 
       {(status === 'waiting' || status === 'active') && userId !== null && (
-        <>
+        <AttachmentProvider dropZoneEnabled={viewport !== 'fullscreen'}>
           <MessageList userId={userId} />
-          <MessageInput />
-        </>
+          <Composer />
+        </AttachmentProvider>
       )}
     </div>
   )

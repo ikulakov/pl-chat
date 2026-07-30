@@ -23,13 +23,28 @@ describe('MatrixTransport', () => {
     const transport = new MatrixTransport(BASE_URL, tokens)
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ ok: true }))
 
-    await transport.request('/_matrix/client/v3/send', { method: 'POST', body: '{}' })
+    await transport.request('/_matrix/client/v3/send', { method: 'POST', body: {} })
 
     expect(fetchSpy).toHaveBeenCalledWith(`${BASE_URL}/_matrix/client/v3/send`, expect.anything())
     const headers = fetchSpy.mock.calls[0]![1]!.headers as Headers
     expect(headers.get('Authorization')).toBe('Bearer access-token')
     expect(headers.get('Content-Type')).toBe('application/json')
     expect(headers.get('traceparent')).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+  })
+
+  it('serializes searchParams into the query string and encodes values', async () => {
+    const tokens = createFakeTokenStore('access-token')
+    const transport = new MatrixTransport(BASE_URL, tokens)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ ok: true }))
+
+    await transport.request('/_matrix/client/v3/sync', {
+      searchParams: { timeout: 0, since: 's 42/&x' },
+    })
+
+    // timeout=0 (число → строка), since url-энкодится, порядок = порядок ключей объекта.
+    expect(fetchSpy.mock.calls[0]![0]).toBe(
+      `${BASE_URL}/_matrix/client/v3/sync?timeout=0&since=s+42%2F%26x`,
+    )
   })
 
   it('refreshes on 401 and retries the original request with the new token', async () => {

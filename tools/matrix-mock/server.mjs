@@ -12,6 +12,9 @@
 // (работают date-разделители). Объём: MOCK_HISTORY_MESSAGES=1000 pnpm dev
 // Временно выключить: галочка «История» в dev-панели виджета (GET/POST /_dev/history-toggle).
 //
+// Отладка загрузки файла: MOCK_UPLOAD_DELAY_MS=5000 pnpm dev — ответ на upload
+// придёт через 5 сек, состояние загрузки видно на файле любого размера.
+//
 // Команды в поле ввода для тестирования сценариев:
 //   /card    — оператор шлёт Adaptive Card с полем ввода
 //   /notice  — системная плашка (m.notice)
@@ -162,6 +165,9 @@ function buildSync(n, tv, rv) {
 const HISTORY_DAYS = 10; // на сколько дней назад растянута переписка (date-разделители)
 const HISTORY_MESSAGES = Number(process.env.MOCK_HISTORY_MESSAGES ?? 480);
 const HISTORY_DELAY_MS = 600; // чтобы спиннер подгрузки был виден
+
+// Задержка ответа на media-upload; 0 — мгновенно, как было. Ставить при отладке UI загрузки.
+const UPLOAD_DELAY_MS = Number(process.env.MOCK_UPLOAD_DELAY_MS ?? 0);
 
 // Размер клиентской страницы (widget: HISTORY_PAGE_SIZE). Нужен, чтобы блок невидимых
 // событий лёг ровно в границы одной страницы — иначе сценарий «страница без сообщений»
@@ -343,7 +349,10 @@ const send = (res, status, body, type = "application/json") => {
   res.writeHead(status, {
     "Content-Type": type,
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "*",
+    // Authorization подстановочный знак не покрывает (Fetch spec) — заголовок нужен явно,
+    // иначе браузер режет preflight и запрос уходит без токена. Остальные — всё, что шлёт
+    // MatrixTransport сверх CORS-safelist: при добавлении нового заголовка дополнить список.
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, traceparent",
     "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
   });
   res.end(typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body));
@@ -476,7 +485,12 @@ const server = createServer(async (req, res) => {
 
   // Media upload
   if (path.endsWith("/media/v3/upload")) {
-    return send(res, 200, { content_uri: "mxc://bank.ru/mock" + Date.now() });
+    // MOCK_UPLOAD_DELAY_MS растягивает ответ, чтобы разглядеть состояние загрузки
+    // (прогресс-бар, «Отмена») на маленьком файле. Сам процент так не замедлить —
+    // на localhost тело уходит мгновенно, для плавного прогресса нужен throttling в DevTools.
+    return delay(UPLOAD_DELAY_MS, () =>
+      send(res, 200, { content_uri: "mxc://bank.ru/mock" + Date.now() }),
+    );
   }
   // Media download/thumbnail → SVG-заглушка
   const mediaMatch = path.match(/\/media\/(?:download|thumbnail)\/[^/]+\/([^/]+)/);

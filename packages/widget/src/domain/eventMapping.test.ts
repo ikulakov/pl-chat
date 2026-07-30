@@ -62,15 +62,71 @@ describe('timelineEventsToItems — варианты контента', () => {
     expect(human?.content.body).toContain('Оля')
   })
 
+  it('m.file без подписи (body === filename на wire) даёт пустой body в домене', () => {
+    const [item] = timelineEventsToItems([
+      roomMessageEvent({
+        content: {
+          msgtype: MsgType.File,
+          body: 'doc.pdf',
+          filename: 'doc.pdf',
+          url: 'mxc://bank.ru/abc',
+          info: { mimetype: 'application/pdf', size: 100 },
+        },
+      }),
+    ])
+
+    expect(item).toMatchObject({
+      kind: 'file',
+      content: { body: '', filename: 'doc.pdf' },
+    })
+  })
+
+  it('m.image с реальной подписью (body !== filename) сохраняет её в домене', () => {
+    const [item] = timelineEventsToItems([
+      roomMessageEvent({
+        content: {
+          msgtype: MsgType.Image,
+          body: 'отчёт за март',
+          filename: 'report.png',
+          url: 'mxc://bank.ru/abc',
+          info: { mimetype: 'image/png', size: 200 },
+        },
+      }),
+    ])
+
+    expect(item).toMatchObject({
+      kind: 'image',
+      content: { body: 'отчёт за март', filename: 'report.png' },
+    })
+  })
+
+  it('m.file без explicit filename (не обязателен по спеке) берёт его из body, caption пуст', () => {
+    const [item] = timelineEventsToItems([
+      roomMessageEvent({
+        content: {
+          msgtype: MsgType.File,
+          body: 'doc.pdf',
+          url: 'mxc://bank.ru/abc',
+          info: { mimetype: 'application/pdf', size: 100 },
+        },
+      }),
+    ])
+
+    expect(item).toMatchObject({
+      kind: 'file',
+      content: { body: '', filename: 'doc.pdf' },
+    })
+  })
+
   it('неподдерживаемый контент молча выпадает, не роняя соседнее валидное сообщение', () => {
-    // медиа-msgtype ещё не реализован, m.reaction виджет не рендерит — оба события должны
-    // отброситься, но НЕ сорвать маппинг текста между ними (иначе одна картинка гасит всю ленту)
+    // m.audio ещё не реализован (только text/image/file), m.reaction виджет не рендерит —
+    // оба события должны отброситься, но НЕ сорвать маппинг текста между ними
     const mediaMessage = {
       type: MatrixEventType.RoomMessage,
-      event_id: '$img',
+      event_id: '$audio',
       sender: OPERATOR_ID,
       origin_server_ts: 1,
-      content: { msgtype: 'm.image', body: 'картинка', url: 'mxc://bank.ru/x' },
+      content: { msgtype: 'm.audio', body: 'запись', url: 'mxc://bank.ru/x' },
     } as unknown as ClientEvent
     const reaction = {
       type: 'm.reaction',

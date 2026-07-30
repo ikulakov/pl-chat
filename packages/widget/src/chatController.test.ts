@@ -20,6 +20,8 @@ function makeMatrix(): MatrixService {
     connect: vi.fn().mockResolvedValue(undefined),
     disconnect: vi.fn(),
     sendMessage: vi.fn().mockResolvedValue(undefined),
+    sendFile: vi.fn().mockResolvedValue(undefined),
+    cancelUpload: vi.fn(),
     resendMessage: vi.fn().mockResolvedValue(undefined),
     markRead: vi.fn().mockResolvedValue(undefined),
     loadMoreHistory: vi.fn().mockResolvedValue(undefined),

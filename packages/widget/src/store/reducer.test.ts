@@ -226,6 +226,42 @@ describe('chatRuntimeReducer', () => {
     expect(failed.room.timeline[0]).toMatchObject({ sendStatus: 'failed' })
   })
 
+  it('message.uploaded подставляет mxc и снимает локальный upload — повтор пойдёт как обычная отправка', () => {
+    const draft = {
+      ...ownMessage({}),
+      kind: 'file' as const,
+      content: { body: 'doc.pdf', url: '', filename: 'doc.pdf', info: { mimetype: '', size: 1 } },
+      upload: { file: new File([], 'doc.pdf'), pct: 40 },
+    }
+    const withDraft = chatRuntimeReducer(
+      { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
+      { type: 'message.optimisticAdded', message: draft },
+    )
+
+    const uploaded = chatRuntimeReducer(withDraft, {
+      type: 'message.uploaded',
+      localId: 'l1',
+      url: 'mxc://bank.ru/abc',
+    })
+
+    expect(uploaded.room.timeline[0]).toMatchObject({ content: { url: 'mxc://bank.ru/abc' } })
+    expect(uploaded.room.timeline[0]).not.toHaveProperty('upload')
+  })
+
+  it('message.discarded убирает отменённый черновик из ленты', () => {
+    const withOptimistic = chatRuntimeReducer(
+      { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
+      { type: 'message.optimisticAdded', message: ownMessage({}) },
+    )
+
+    const discarded = chatRuntimeReducer(withOptimistic, {
+      type: 'message.discarded',
+      localId: 'l1',
+    })
+
+    expect(discarded.room.timeline).toHaveLength(0)
+  })
+
   it('does not mark a message failed after sync already resolved it', () => {
     const withOptimistic = chatRuntimeReducer(
       { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },

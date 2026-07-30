@@ -176,7 +176,7 @@ describe('MessageList', () => {
     expect(screen.getByRole('status')).toBeInTheDocument()
   })
 
-  it('a reply to a not-loaded original renders an unavailable quote that is not clickable', () => {
+  it('a reply to a not-loaded original renders an unavailable reply preview that is not clickable', () => {
     // родитель вне загруженной ленты → заглушка без цели скролла, кнопки-цитаты нет
     const ts = new Date('2026-07-01T10:00:00').getTime()
     const reply: TextTimelineItem = {

@@ -1,13 +1,33 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { t } from '../../i18n'
-import { textItem } from '../../shared/testUtils/matrixFixtures'
+import type { FileTimelineItem } from '../../../domain/timeline'
+import { t } from '../../../i18n'
+import { textItem } from '../../../shared/testUtils/matrixFixtures'
 import { MessageActions } from './MessageActions'
+
+function fileItem(overrides: Partial<FileTimelineItem['content']> = {}): FileTimelineItem {
+  return {
+    kind: 'file',
+    localId: 'm1',
+    eventId: '$m1',
+    sender: '@operator:bank',
+    ts: 0,
+    sendStatus: 'sent',
+    content: {
+      // без подписи body пуст (см. eventMapping.createMediaItem/sendFile) — filename не дублируем
+      body: '',
+      url: 'mxc://bank.ru/abc',
+      filename: 'doc.pdf',
+      info: { mimetype: 'application/pdf', size: 100 },
+      ...overrides,
+    },
+  }
+}
 
 const resendMessage = vi.fn()
 const replyTo = vi.fn()
 
-vi.mock('../../hooks/useChatActions', () => ({
+vi.mock('../../../hooks/useChatActions', () => ({
   useChatActions: () => ({ resendMessage, replyTo }),
 }))
 
@@ -120,6 +140,84 @@ describe('MessageActions', () => {
       sender: '@operator:bank',
       body: 'hello',
     })
+  })
+
+  it('прячет «Копировать» у файла без подписи — копировать нечего, body пуст', () => {
+    render(
+      <MessageActions
+        message={fileItem()}
+        isOwn={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+
+    expect(screen.queryByText(t('chat.action.copy'))).not.toBeInTheDocument()
+  })
+
+  it('показывает «Ответить» у файла даже без подписи — сам файл уже контент для цитаты', () => {
+    render(
+      <MessageActions
+        message={fileItem()}
+        isOwn={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+
+    expect(screen.getByText(t('chat.action.reply'))).toBeInTheDocument()
+  })
+
+  it('«Ответить» у файла без подписи кладёт в превью цитаты имя файла, а не пустую строку', () => {
+    render(
+      <MessageActions
+        message={fileItem()}
+        isOwn={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+    fireEvent.click(screen.getByText(t('chat.action.reply')))
+
+    expect(replyTo).toHaveBeenCalledExactlyOnceWith({
+      eventId: '$m1',
+      sender: '@operator:bank',
+      body: 'doc.pdf',
+    })
+  })
+
+  it('«Ответить» у файла с подписью кладёт в превью саму подпись, не имя файла', () => {
+    render(
+      <MessageActions
+        message={fileItem({ body: 'договор на подпись' })}
+        isOwn={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+    fireEvent.click(screen.getByText(t('chat.action.reply')))
+
+    expect(replyTo).toHaveBeenCalledExactlyOnceWith({
+      eventId: '$m1',
+      sender: '@operator:bank',
+      body: 'договор на подпись',
+    })
+  })
+
+  it('показывает «Копировать» у файла с реальной подписью (body отличается от filename)', async () => {
+    render(
+      <MessageActions
+        message={fileItem({ body: 'договор на подпись' })}
+        isOwn={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+    fireEvent.click(screen.getByText(t('chat.action.copy')))
+
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('договор на подпись'),
+    )
   })
 
   it('does not render "Повторить отправку" for a non-own or non-failed message', () => {
