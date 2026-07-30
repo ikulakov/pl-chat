@@ -40,9 +40,17 @@
   "chat.reply.unavailable": "Сообщение недоступно",
   "chat.reply.cancel": "Отменить ответ",
   "chat.reply.goToOriginal": "Перейти к исходному сообщению",
+  "chat.action.cancelUpload": "Отменить загрузку",
   "system.operatorJoinedHuman": "Вам поможет {name}",
   "system.operatorJoinedBot": "С вами работает чат-бот",
   "system.operatorLeftCompleted": "Оператор завершил чат",
   "system.operatorLeftTransferred": "Передача другому оператору",
-  "system.operatorLeftTimeout": "Сессия завершена по тайм-ауту"
+  "system.operatorLeftTimeout": "Сессия завершена по тайм-ауту",
+  "composer.attach.cancel": "Убрать вложение",
+  "composer.drop.title": "Поместите файл сюда",
+  "composer.drop.formats": "До {size} · {formats}",
+  "composer.upload.progress": "{percent}%",
+  "composer.upload.badType": "Формат файла не поддерживается",
+  "composer.upload.tooLarge": "Файл слишком большой",
+  "chat.upload.error": "Не удалось загрузить файл, попробуйте ещё раз"
 }

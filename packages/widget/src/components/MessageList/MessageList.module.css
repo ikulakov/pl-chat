@@ -33,7 +33,7 @@
 .dateSeparator {
   position: sticky;
   top: var(--date-separator-top, 12px);
-  z-index: 1;
+  z-index: var(--z-sticky);
   display: flex;
   justify-content: center;
   margin: 12px 0;
@@ -48,7 +48,7 @@
   color: var(--c-text-tertiary);
   background: var(--c-surface-tertiary);
   padding: 4px 12px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow-wrap: anywhere;
 }
 
@@ -56,13 +56,14 @@
   display: flex;
   flex-direction: column;
 
-  &:has(~ .dayGroup) > .messageRow:last-child {
-    margin-bottom: 0;
+  & > .dateSeparator:first-child + * {
+    margin-top: 0;
   }
 }
 
 .bottomSentinel {
   height: 1px;
+  margin-top: 12px;
 }
 
 .historySpinnerWrap {
@@ -75,39 +76,4 @@
   justify-content: center;
   padding: 6px 0;
   pointer-events: none;
-}
-
-.messageRow {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-
-  & [data-role='message-actions-trigger'] {
-    transition: opacity 0.15s;
-    order: 2;
-    flex-shrink: 0;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  &.own {
-    justify-content: flex-end;
-
-    & [data-role='message-actions-trigger'] {
-      order: 0;
-    }
-  }
-
-  &.groupEnd {
-    margin-bottom: 12px;
-  }
-
-  &:hover [data-role='message-actions-trigger'],
-  &:focus-within [data-role='message-actions-trigger'],
-  &:has([data-role='message-actions-trigger'][aria-expanded='true'])
-    [data-role='message-actions-trigger'] {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }

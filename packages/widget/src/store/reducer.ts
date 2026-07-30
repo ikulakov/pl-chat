@@ -2,7 +2,8 @@ import { timelineEventsToItems } from '../domain/eventMapping'
 import { mergeTimeline, prependTimeline } from '../domain/mergeTimeline'
 import { reduceOperator } from '../domain/operator'
 import { mergeReadReceipts } from '../domain/receipts'
-import { isSystem } from '../domain/timeline'
+import type { MessageTimelineItem, TimelineItem } from '../domain/timeline'
+import { isMedia, isSystem } from '../domain/timeline'
 import type { JoinedRoom } from '../matrix/types'
 import { assertNever } from '../shared/assertNever'
 import type { ChatRuntimeState, RoomState, RuntimeAction } from './state'
@@ -17,6 +18,16 @@ function updateTimeline(
   updater: (timeline: RoomState['timeline']) => RoomState['timeline'],
 ): ChatRuntimeState {
   return updateRoom(state, { timeline: updater(state.room.timeline) })
+}
+
+function updateMessage(
+  state: ChatRuntimeState,
+  localId: string,
+  updater: (message: MessageTimelineItem) => TimelineItem,
+): ChatRuntimeState {
+  return updateTimeline(state, (timeline) =>
+    timeline.map((m) => (!isSystem(m) && m.localId === localId ? updater(m) : m)),
+  )
 }
 
 function applySync(room: RoomState, joinedRoom: JoinedRoom): RoomState {
@@ -82,39 +93,55 @@ export function chatRuntimeReducer(
       }
     }
 
-    case 'sync.received':
+    case 'sync.received': {
+      const { cursor, joinedRoom } = action
+
       return {
         ...state,
-        cursor: action.cursor,
-        room: action.joinedRoom ? applySync(state.room, action.joinedRoom) : state.room,
+        cursor,
+        room: joinedRoom ? applySync(state.room, joinedRoom) : state.room,
       }
+    }
 
     case 'message.optimisticAdded':
       return updateTimeline(state, (timeline) => [...timeline, action.message])
 
     case 'message.sent':
-      return updateTimeline(state, (timeline) =>
-        timeline.map((m) =>
-          !isSystem(m) && m.localId === action.localId
-            ? { ...m, eventId: action.eventId, sendStatus: 'sent' }
-            : m,
-        ),
-      )
+      return updateMessage(state, action.localId, (m) => ({
+        ...m,
+        eventId: action.eventId,
+        sendStatus: 'sent',
+      }))
 
     case 'message.failed':
-      return updateTimeline(state, (timeline) =>
-        timeline.map((m) =>
-          !isSystem(m) && m.localId === action.localId && m.sendStatus === 'sending'
-            ? { ...m, sendStatus: 'failed' }
-            : m,
-        ),
-      )
+      return updateMessage(state, action.localId, (m) => {
+        if (m.sendStatus !== 'sending') return m
+
+        const failed: MessageTimelineItem = { ...m, sendStatus: 'failed' }
+        if (!isMedia(failed) || !failed.upload) return failed
+
+        return { ...failed, upload: { ...failed.upload, pct: null } }
+      })
 
     case 'message.retrying':
+      return updateMessage(state, action.localId, (m) => ({ ...m, sendStatus: 'sending' }))
+
+    case 'message.uploadProgress':
+      return updateMessage(state, action.localId, (m) =>
+        isMedia(m) && m.upload ? { ...m, upload: { ...m.upload, pct: action.pct } } : m,
+      )
+
+    case 'message.uploaded':
+      return updateMessage(state, action.localId, (m) => {
+        if (!isMedia(m)) return m
+
+        const { upload: _uploaded, ...rest } = m
+        return { ...rest, content: { ...m.content, url: action.url } }
+      })
+
+    case 'message.discarded':
       return updateTimeline(state, (timeline) =>
-        timeline.map((m) =>
-          !isSystem(m) && m.localId === action.localId ? { ...m, sendStatus: 'sending' } : m,
-        ),
+        timeline.filter((m) => m.localId !== action.localId),
       )
 
     case 'receipt.markedRead':

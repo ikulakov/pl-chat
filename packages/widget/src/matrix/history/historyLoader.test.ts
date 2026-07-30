@@ -58,7 +58,9 @@ function loaderHarness(
   const load = () =>
     loader.load({
       getContext: () =>
-        state.room.prevBatch === null ? null : { roomId: ROOM_ID, prevBatch: state.room.prevBatch },
+        state.room.prevBatch === null
+          ? undefined
+          : { roomId: ROOM_ID, prevBatch: state.room.prevBatch },
       isStale: options.isStale ?? (() => false),
     })
 

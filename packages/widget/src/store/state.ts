@@ -13,6 +13,9 @@ export type RuntimeAction =
   | { type: 'message.sent'; localId: string; eventId: string }
   | { type: 'message.failed'; localId: string }
   | { type: 'message.retrying'; localId: string }
+  | { type: 'message.uploadProgress'; localId: string; pct: number }
+  | { type: 'message.uploaded'; localId: string; url: string }
+  | { type: 'message.discarded'; localId: string }
   | { type: 'receipt.markedRead'; userId: string; eventId: string }
   | { type: 'receipt.sendFailed'; userId: string; eventId: string; rollbackTo: string | null }
   | { type: 'reply.targeted'; target: ReplyTarget }

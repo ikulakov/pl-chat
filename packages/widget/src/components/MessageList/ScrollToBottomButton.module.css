@@ -8,11 +8,10 @@
   position: absolute;
   top: -6px;
   right: -6px;
-  box-sizing: border-box;
   min-width: 16px;
   height: 16px;
   padding: 2.5px 6px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--c-orange);
   color: var(--c-text-invert);
   font-size: 10px;

@@ -1,12 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '../i18n'
-import { QuotedMessage } from './QuotedMessage'
+import { ReplyPreview } from './ReplyPreview'
 
-describe('QuotedMessage', () => {
+describe('ReplyPreview', () => {
   it('без onClick — статичный блок, не кнопка (оригинал недоступен)', () => {
     render(
-      <QuotedMessage
+      <ReplyPreview
         author="Оля"
         text="вопрос"
       />,
@@ -19,7 +19,7 @@ describe('QuotedMessage', () => {
   it('с onClick — кнопка, клик делегирует переход к оригиналу', () => {
     const onClick = vi.fn()
     render(
-      <QuotedMessage
+      <ReplyPreview
         author="Оля"
         text="вопрос"
         onClick={onClick}

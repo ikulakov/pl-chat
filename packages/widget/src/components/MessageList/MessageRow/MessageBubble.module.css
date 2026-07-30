@@ -1,0 +1,43 @@
+.bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 16px;
+  max-width: 380px;
+  min-width: 0;
+  word-break: break-word;
+
+  &.single {
+    border-radius: var(--radius-lg);
+  }
+  &.first {
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-sm);
+  }
+  &.middle {
+    border-radius: var(--radius-sm);
+  }
+  &.last {
+    border-radius: var(--radius-sm) var(--radius-sm) var(--radius-lg) var(--radius-lg);
+  }
+}
+
+.operator {
+  background: var(--c-surface-primary);
+  color: var(--c-text-primary);
+  border: 1px solid var(--c-border);
+
+  &.single,
+  &.last {
+    border-bottom-left-radius: 4px;
+  }
+}
+
+.user {
+  background: var(--c-surface-contrast);
+  color: var(--c-text-invert);
+
+  &.single,
+  &.last {
+    border-bottom-right-radius: 4px;
+  }
+}

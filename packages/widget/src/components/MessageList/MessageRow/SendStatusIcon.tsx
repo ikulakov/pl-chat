@@ -1,6 +1,6 @@
-import type { SendStatus } from '../../domain/timeline'
-import { Spinner } from '../../shared/ui/Spinner'
-import { ChecksIcon, FailedIcon } from '../../shared/ui/icons'
+import type { SendStatus } from '../../../domain/timeline'
+import { Spinner } from '../../../shared/ui/Spinner'
+import { ChecksIcon, FailedIcon } from '../../../shared/ui/icons'
 import styles from './SendStatusIcon.module.css'
 
 interface Props {

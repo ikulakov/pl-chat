@@ -1,12 +1,12 @@
-import { isOptimistic } from '../../domain/optimistic'
-import { hasBody } from '../../domain/timeline'
-import type { MessageTimelineItem } from '../../domain/timeline'
-import { useChatActions } from '../../hooks/useChatActions'
-import { t } from '../../i18n'
-import { copyText } from '../../shared/clipboard'
-import { Dropdown, DropdownItem } from '../../shared/ui/Dropdown'
-import { IconButton } from '../../shared/ui/IconButton'
-import { CopyIcon, MoreIcon, ReplyIcon, RetryIcon } from '../../shared/ui/icons'
+import { isOptimistic } from '../../../domain/optimistic'
+import { replyText } from '../../../domain/reply'
+import type { MessageTimelineItem } from '../../../domain/timeline'
+import { useChatActions } from '../../../hooks/useChatActions'
+import { t } from '../../../i18n'
+import { copyText } from '../../../shared/clipboard'
+import { Dropdown, DropdownItem } from '../../../shared/ui/Dropdown'
+import { IconButton } from '../../../shared/ui/IconButton'
+import { CopyIcon, MoreIcon, ReplyIcon, RetryIcon } from '../../../shared/ui/icons'
 
 interface Props {
   message: MessageTimelineItem
@@ -16,8 +16,13 @@ interface Props {
 export function MessageActions({ message, isOwn }: Props) {
   const { resendMessage, replyTo } = useChatActions()
 
+  const reply = replyText(message)
+
   const canRetry = isOwn && message.sendStatus === 'failed'
-  const canReply = !isOptimistic(message.eventId) && hasBody(message)
+  const canReply = !isOptimistic(message.eventId) && reply !== ''
+  const canCopy = message.content.body.trim() !== ''
+
+  const disabled = !(canRetry || canReply || canCopy)
 
   return (
     <Dropdown
@@ -28,6 +33,7 @@ export function MessageActions({ message, isOwn }: Props) {
           size="md"
           data-role="message-actions-trigger"
           aria-label={t('chat.action.menu')}
+          disabled={disabled}
         >
           <MoreIcon size={18} />
         </IconButton>
@@ -49,7 +55,7 @@ export function MessageActions({ message, isOwn }: Props) {
             replyTo({
               eventId: message.eventId,
               sender: message.sender,
-              body: message.content.body,
+              body: reply,
             })
           }
         >
@@ -57,12 +63,14 @@ export function MessageActions({ message, isOwn }: Props) {
         </DropdownItem>
       )}
 
-      <DropdownItem
-        icon={<CopyIcon />}
-        onSelect={() => copyText(message.content.body)}
-      >
-        {t('chat.action.copy')}
-      </DropdownItem>
+      {canCopy && (
+        <DropdownItem
+          icon={<CopyIcon />}
+          onSelect={() => copyText(message.content.body)}
+        >
+          {t('chat.action.copy')}
+        </DropdownItem>
+      )}
     </Dropdown>
   )
 }

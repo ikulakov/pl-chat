@@ -1,4 +1,4 @@
-export type TimelineItemKind = 'text' | 'notice' | 'system'
+export type TimelineItemKind = 'text' | 'image' | 'file' | 'notice' | 'system'
 
 export type SendStatus = 'sending' | 'sent' | 'failed'
 
@@ -25,6 +25,44 @@ export interface TextTimelineItem extends BaseTimelineItem {
   content: { body: string }
 }
 
+export interface MediaInfo {
+  mimetype: string
+  size: number
+  w?: number
+  h?: number
+}
+
+export interface MediaContent {
+  body: string
+  // mxc://server/mediaId; у optimistic черновика пусто, пока файл не загрузился
+  url: string
+  filename: string
+  info: MediaInfo
+}
+
+/**
+ * Локальная обвязка исходящего медиа для optimistic черновиков — у событий с сервера её нет.
+ */
+export interface MediaUpload {
+  file: File
+  // проценты отдачи; null — загрузка не идёт (ошибка или уже загружено)
+  pct: number | null
+}
+
+export interface ImageTimelineItem extends BaseTimelineItem {
+  kind: 'image'
+  content: MediaContent
+  upload?: MediaUpload
+}
+
+export interface FileTimelineItem extends BaseTimelineItem {
+  kind: 'file'
+  content: MediaContent
+  upload?: MediaUpload
+}
+
+export type MediaTimelineItem = ImageTimelineItem | FileTimelineItem
+
 export interface SystemTimelineItem {
   kind: 'system' | 'notice'
   localId: string
@@ -33,11 +71,12 @@ export interface SystemTimelineItem {
   content: { body: string }
 }
 
-export type MessageTimelineItem = TextTimelineItem
+export type MessageTimelineItem = TextTimelineItem | MediaTimelineItem
 
 export type TimelineItem = MessageTimelineItem | SystemTimelineItem
 
 export const isSystem = (item: TimelineItem): item is SystemTimelineItem =>
   item.kind === 'system' || item.kind === 'notice'
 
-export const hasBody = (item: MessageTimelineItem): boolean => item.content.body.trim() !== ''
+export const isMedia = (item: TimelineItem): item is MediaTimelineItem =>
+  item.kind === 'image' || item.kind === 'file'

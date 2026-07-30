@@ -1,5 +1,5 @@
 import { MatrixEventType, OperatorStatus } from '../matrix/consts'
-import type { ClientEvent, OperatorCurrentEvent } from '../matrix/types'
+import type * as Matrix from '../matrix/types'
 
 export interface OperatorState {
   isActive: boolean
@@ -7,9 +7,12 @@ export interface OperatorState {
   displayName: string | null
 }
 
-export function reduceOperator(current: OperatorState, events: ClientEvent[]): OperatorState {
+export function reduceOperator(
+  current: OperatorState,
+  events: Matrix.ClientEvent[],
+): OperatorState {
   const operatorEvent = events.findLast(
-    (event): event is OperatorCurrentEvent =>
+    (event): event is Matrix.OperatorCurrentEvent =>
       event.type === MatrixEventType.OperatorCurrent && event.state_key === '',
   )
   if (!operatorEvent) return current

@@ -1,12 +1,14 @@
 import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
 import { createMatrixService } from './matrix/createMatrixService'
-import type { MatrixService } from './matrix/matrixController'
+import type { MatrixService, SendFileOptions } from './matrix/matrixController'
 import type { ReplyTarget } from './store/state'
 import { chatStore } from './store/store'
 
 export interface ChatActions {
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
+  sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   replyTo: (target: ReplyTarget) => void
   cancelReply: () => void
@@ -40,6 +42,8 @@ export class ChatController {
 
     this.actions = {
       sendMessage: this.sendMessage,
+      sendFile: this.sendFile,
+      cancelUpload: this.cancelUpload,
       resendMessage: this.resendMessage,
       replyTo: this.replyTo,
       cancelReply: this.cancelReply,
@@ -85,6 +89,11 @@ export class ChatController {
   cancelReply = (): void => {
     chatStore.getState().dispatch({ type: 'reply.cleared' })
   }
+
+  sendFile = (file: File, options?: SendFileOptions): Promise<void> =>
+    this.matrix.sendFile(file, options)
+
+  cancelUpload = (localId: string): void => this.matrix.cancelUpload(localId)
 
   resendMessage = (localId: string): Promise<void> => this.matrix.resendMessage(localId)
 
