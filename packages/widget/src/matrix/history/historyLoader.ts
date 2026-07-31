@@ -1,5 +1,5 @@
 import { timelineEventsToItems } from '../../domain/eventMapping'
-import { sleep } from '../../shared/sleep'
+import { sleep } from '../../shared/utils/sleep'
 import type { RuntimeAction } from '../../store/state'
 import type { MatrixApi } from '../matrixApi'
 

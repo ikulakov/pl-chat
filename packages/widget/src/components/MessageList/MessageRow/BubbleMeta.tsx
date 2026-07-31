@@ -1,6 +1,6 @@
 import type { SendStatus } from '../../../domain/timeline'
-import { cn } from '../../../shared/cn'
-import { formatTime } from '../../../shared/formatTime'
+import { cn } from '../../../shared/utils/cn'
+import { formatTime } from '../../../shared/utils/formatTime'
 import styles from './BubbleMeta.module.css'
 import { SendStatusIcon } from './SendStatusIcon'
 

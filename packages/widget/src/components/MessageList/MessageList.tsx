@@ -5,7 +5,7 @@ import { useChatScroll } from '../../hooks/useChatScroll'
 import { useChatStore } from '../../hooks/useChatStore'
 import { useLoadMoreHistory } from '../../hooks/useLoadMoreHistory'
 import { useSendReadReceipts } from '../../hooks/useSendReadReceipts'
-import { cn } from '../../shared/cn'
+import { cn } from '../../shared/utils/cn'
 import { Spinner } from '../../shared/ui/Spinner'
 import { selectIsOpen, selectReadReceipts, selectTimeline } from '../../store/selectors'
 import {

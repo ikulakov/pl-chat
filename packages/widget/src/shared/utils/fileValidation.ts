@@ -1,4 +1,4 @@
-import { t } from '../i18n'
+import { t } from '../../i18n'
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: 'image/jpeg',

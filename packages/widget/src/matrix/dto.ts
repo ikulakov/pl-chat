@@ -1,16 +1,17 @@
-import type { MediaContent } from '../domain/timeline'
 import type { MsgType } from './consts'
-import type { ClientEvent, JoinedRoom, RelatesTo } from './types'
+import type { ClientEvent, JoinedRoom, MediaInfo, WithRelation } from './types'
 
-export interface OutgoingTextContent {
+export interface OutgoingTextContent extends WithRelation {
   msgtype: typeof MsgType.Text
   body: string
-  'm.relates_to'?: RelatesTo
 }
 
-export type OutgoingMediaContent = MediaContent & {
+export interface OutgoingMediaContent extends WithRelation {
   msgtype: typeof MsgType.Image | typeof MsgType.File
-  'm.relates_to'?: RelatesTo
+  body: string
+  url: string
+  filename: string
+  info: MediaInfo
 }
 
 export type OutgoingContent = OutgoingTextContent | OutgoingMediaContent

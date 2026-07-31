@@ -5,7 +5,7 @@ import { mergeReadReceipts } from '../domain/receipts'
 import type { MessageTimelineItem, TimelineItem } from '../domain/timeline'
 import { isMedia, isSystem } from '../domain/timeline'
 import type { JoinedRoom } from '../matrix/types'
-import { assertNever } from '../shared/assertNever'
+import { assertNever } from '../shared/utils/assertNever'
 import type { ChatRuntimeState, RoomState, RuntimeAction } from './state'
 import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from './store'
 

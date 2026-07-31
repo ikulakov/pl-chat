@@ -17,10 +17,10 @@ import { CONNECTION_FAILED_ERROR, MatrixController } from './matrixController'
 import { MatrixSessionManager } from './session/sessionManager'
 import { MatrixError } from './transport/matrixError'
 
-vi.mock('../shared/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock('../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 // jsdom не грузит <img> → readImageDimensions зависла бы. Мокаем интринсик-размеры.
-vi.mock('../shared/imageDimensions', () => ({
+vi.mock('../shared/utils/imageDimensions', () => ({
   readImageDimensions: vi.fn().mockResolvedValue({ w: 100, h: 50 }),
 }))
 

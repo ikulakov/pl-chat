@@ -14,7 +14,7 @@ import { MatrixError } from '../transport/matrixError'
 import type { ClientEvent } from '../types'
 import { MatrixHistoryLoader } from './historyLoader'
 
-vi.mock('../../shared/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 const ROOM_ID = '!r:bank'
 

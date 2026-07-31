@@ -7,9 +7,9 @@ import {
   type MediaTimelineItem,
   type MessageTimelineItem,
 } from '../domain/timeline'
-import { isAbortError } from '../shared/abort'
-import { isPreviewableImage } from '../shared/fileValidation'
-import { readImageDimensions } from '../shared/imageDimensions'
+import { isAbortError } from '../shared/utils/abort'
+import { isPreviewableImage } from '../shared/utils/fileValidation'
+import { readImageDimensions } from '../shared/utils/imageDimensions'
 import type { ChatRuntimeState, RuntimeAction } from '../store/state'
 import type { SendEventResponse } from './dto'
 import { MatrixHistoryLoader } from './history/historyLoader'

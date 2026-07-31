@@ -10,6 +10,8 @@ interface Props {
   onEscape?: (() => void) | undefined
 }
 
+export const MAX_MESSAGE_LENGTH = 32_000
+
 /**
  * Поле ввода композера: изменяет размер при вводе текста, до 10 строк далее скролл,
  * Enter отправка, Shift+Enter перенос строки.
@@ -51,6 +53,7 @@ export function MessageTextarea({ value, placeholder, ref, onChange, onSubmit, o
       aria-label={placeholder}
       autoComplete="off"
       rows={1}
+      maxLength={MAX_MESSAGE_LENGTH}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={handleKeyDown}

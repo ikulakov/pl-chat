@@ -1,7 +1,7 @@
 import { replyAuthorLabel, replyEventIdOf, replyText } from '../../domain/reply'
 import { isSystem, type MessageTimelineItem, type TimelineItem } from '../../domain/timeline'
 import { t } from '../../i18n'
-import { formatDateLabel, startOfDay } from '../../shared/formatDate'
+import { formatDateLabel, startOfDay } from '../../shared/utils/formatDate'
 import type { BubblePosition } from './MessageRow/MessageBubble'
 
 interface DayGroup {
