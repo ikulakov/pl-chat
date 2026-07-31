@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { t } from '../../i18n'
-import { FILE_ACCEPT } from '../../shared/fileValidation'
+import { FILE_ACCEPT } from '../../shared/utils/fileValidation'
 import { IconButton } from '../../shared/ui/IconButton'
 import { AttachIcon } from '../../shared/ui/icons'
 

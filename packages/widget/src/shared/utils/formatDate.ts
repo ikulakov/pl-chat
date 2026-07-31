@@ -1,4 +1,4 @@
-import { t } from '../i18n'
+import { t } from '../../i18n'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 

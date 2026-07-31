@@ -3,7 +3,7 @@ export type TimelineItemKind = 'text' | 'image' | 'file' | 'notice' | 'system'
 export type SendStatus = 'sending' | 'sent' | 'failed'
 
 export interface TimelineRelation {
-  type: 'reply' | 'reference'
+  type: 'reply'
   eventId: string
 }
 

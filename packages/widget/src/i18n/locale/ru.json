@@ -52,5 +52,8 @@
   "composer.upload.progress": "{percent}%",
   "composer.upload.badType": "Формат файла не поддерживается",
   "composer.upload.tooLarge": "Файл слишком большой",
-  "chat.upload.error": "Не удалось загрузить файл, попробуйте ещё раз"
+  "chat.upload.error": "Не удалось загрузить файл, попробуйте ещё раз",
+  "size.b": "Б",
+  "size.kb": "КБ",
+  "size.mb": "МБ"
 }

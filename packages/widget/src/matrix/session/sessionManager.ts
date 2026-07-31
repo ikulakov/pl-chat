@@ -1,4 +1,4 @@
-import { sleep } from '../../shared/sleep'
+import { sleep } from '../../shared/utils/sleep'
 import type { JoinedRoom } from '../types'
 import type { SyncResponse } from '../dto'
 import type { MatrixApi } from '../matrixApi'

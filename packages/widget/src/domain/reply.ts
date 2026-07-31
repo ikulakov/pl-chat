@@ -6,7 +6,7 @@ export function replyAuthorLabel(sender: string, userId: string | null): string 
 }
 
 export const replyText = (item: MessageTimelineItem): string =>
-  item.content.body.trim() || (isMedia(item) ? item.content.body || item.content.filename : '')
+  item.content.body.trim() || (isMedia(item) ? item.content.filename : '')
 
 export const replyEventIdOf = (item: MessageTimelineItem): string | undefined =>
   item.relation?.type === 'reply' ? item.relation.eventId : undefined

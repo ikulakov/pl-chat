@@ -1,5 +1,6 @@
 import { t } from '../i18n'
 import { MatrixEventType, MsgType } from '../matrix/consts'
+import { getReplyEventId } from '../matrix/replyRelation'
 import type * as Matrix from '../matrix/types'
 import type { TimelineItem, TimelineRelation } from './timeline'
 
@@ -32,8 +33,10 @@ function operatorLeftText(reason: Matrix.OperatorLeftEvent['content']['reason'])
   }
 }
 
-function toRelation(content: { 'm.relates_to'?: Matrix.RelatesTo }): TimelineRelation | undefined {
-  const eventId = content['m.relates_to']?.['m.in_reply_to']?.event_id
+function toRelation(
+  content: Matrix.TextMessageContent | Matrix.MediaMessageContent,
+): TimelineRelation | undefined {
+  const eventId = getReplyEventId(content)
   return eventId ? { type: 'reply', eventId } : undefined
 }
 
@@ -82,6 +85,7 @@ function createMediaItem(
   content: Matrix.MediaMessageContent,
 ): TimelineItem {
   const { body, url, filename: rawFilename, info } = content
+  const relation = toRelation(content)
 
   const filename = rawFilename ?? body
   const caption = body !== filename ? body : ''
@@ -100,6 +104,7 @@ function createMediaItem(
         ...(info?.h ? { h: info.h } : {}),
       },
     },
+    ...(relation ? { relation } : {}),
   }
 }
 

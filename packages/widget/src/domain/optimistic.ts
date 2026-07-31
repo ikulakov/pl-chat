@@ -1,4 +1,4 @@
-import { isPreviewableImage, resolveMimeType } from '../shared/fileValidation'
+import { isPreviewableImage, resolveMimeType } from '../shared/utils/fileValidation'
 import type {
   MediaTimelineItem,
   MediaUpload,

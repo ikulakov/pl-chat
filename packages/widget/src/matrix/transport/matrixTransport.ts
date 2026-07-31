@@ -25,6 +25,8 @@ interface RawResponse {
   text: string
 }
 
+const UPLOAD_TIMEOUT_MS = 120_000
+
 export class MatrixTransport {
   private readonly baseUrl: string
   private readonly tokens: TokenSource
@@ -114,9 +116,12 @@ export class MatrixTransport {
         }
       }
 
+      xhr.timeout = UPLOAD_TIMEOUT_MS
+
       xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText })
       xhr.onerror = () => reject(new MatrixError(MatrixErrCode.Unknown, 'Network error'))
       xhr.onabort = () => reject(new DOMException('Upload aborted', 'AbortError'))
+      xhr.ontimeout = () => reject(new MatrixError(MatrixErrCode.Unknown, 'Upload timeout'))
 
       if (signal) {
         signal.addEventListener('abort', () => xhr.abort(), { once: true })

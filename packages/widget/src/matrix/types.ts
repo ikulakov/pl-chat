@@ -9,15 +9,15 @@ interface BaseClientEvent {
   unsigned?: { transaction_id?: string }
 }
 
-// Связь события с другим. Reply по Matrix-спеке — без rel_type, только вложенный m.in_reply_to
-export interface RelatesTo {
-  'm.in_reply_to'?: { event_id: string }
+export interface WithRelation {
+  'm.relates_to'?: {
+    'm.in_reply_to'?: { event_id: string }
+  }
 }
 
-export interface TextMessageContent {
+export interface TextMessageContent extends WithRelation {
   msgtype: typeof MsgType.Text
   body: string
-  'm.relates_to'?: RelatesTo
 }
 
 interface NoticeMessageContent {
@@ -25,11 +25,18 @@ interface NoticeMessageContent {
   body: string
 }
 
-export interface MediaMessageContent {
+export interface MediaInfo {
+  mimetype: string
+  size: number
+  w?: number
+  h?: number
+}
+
+export interface MediaMessageContent extends WithRelation {
   body: string
   url: string
   filename?: string
-  info?: { mimetype?: string; size?: number; w?: number; h?: number }
+  info?: Partial<MediaInfo>
 }
 
 interface ImageMessageContent extends MediaMessageContent {

@@ -1,16 +1,16 @@
-import type { MediaContent, MediaTimelineItem, TextTimelineItem } from '../domain/timeline'
 import { MsgType } from './consts'
 import type {
   MessagesResponse,
   OutgoingContent,
+  OutgoingMediaContent,
   RegisterResponse,
   SendEventResponse,
   SyncResponse,
   UploadResponse,
 } from './dto'
 import { Endpoints } from './endpoints'
+import { createReplyRelation } from './replyRelation'
 import type { MatrixTransport, UploadOptions } from './transport/matrixTransport'
-import type { RelatesTo } from './types'
 
 // Размер страницы истории (limit для GET /messages). Лимит на сервере считает все
 // события (m.room.member, m.reaction и т.п.), максимум сервера — 100.
@@ -19,23 +19,37 @@ const HISTORY_PAGE_SIZE = 50
 // Окно long-poll: сервер держит /sync до этого времени, потом отвечает пустым батчем.
 const SYNC_TIMEOUT_MS = 25_000
 
-function relatesTo(replyToEventId: string | undefined): { 'm.relates_to'?: RelatesTo } {
-  return replyToEventId ? { 'm.relates_to': { 'm.in_reply_to': { event_id: replyToEventId } } } : {}
-}
-
 interface SendMessageParams {
   roomId: string
   txnId: string
-  content: TextTimelineItem['content']
+  content: { body: string }
   replyToEventId?: string | undefined
 }
 
 interface SendMediaMessageParams {
   roomId: string
   txnId: string
-  kind: MediaTimelineItem['kind']
-  content: MediaContent
+  kind: 'image' | 'file'
+  content: Pick<OutgoingMediaContent, 'body' | 'url' | 'filename' | 'info'>
   replyToEventId?: string | undefined
+}
+
+function toMatrixMediaContent(
+  content: SendMediaMessageParams['content'],
+): Omit<OutgoingMediaContent, 'msgtype'> {
+  const { body, url, filename, info } = content
+
+  return {
+    body: body || filename,
+    url,
+    filename,
+    info: {
+      mimetype: info.mimetype,
+      size: info.size,
+      ...(info.w !== undefined ? { w: info.w } : {}),
+      ...(info.h !== undefined ? { h: info.h } : {}),
+    },
+  }
 }
 
 export function createMatrixApi(transport: MatrixTransport) {
@@ -98,7 +112,7 @@ export function createMatrixApi(transport: MatrixTransport) {
       return sendRoomMessage(roomId, txnId, {
         msgtype: MsgType.Text,
         body: content.body,
-        ...relatesTo(replyToEventId),
+        ...createReplyRelation(replyToEventId),
       })
     },
 
@@ -111,9 +125,8 @@ export function createMatrixApi(transport: MatrixTransport) {
     }: SendMediaMessageParams): Promise<SendEventResponse> {
       return sendRoomMessage(roomId, txnId, {
         msgtype: kind === 'image' ? MsgType.Image : MsgType.File,
-        ...content,
-        body: content.body || content.filename,
-        ...relatesTo(replyToEventId),
+        ...toMatrixMediaContent(content),
+        ...createReplyRelation(replyToEventId),
       })
     },
 

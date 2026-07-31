@@ -100,6 +100,26 @@ describe('timelineEventsToItems — варианты контента', () => {
     })
   })
 
+  it('медиа с цитатой сохраняет связь: иначе echo из sync стирает её у своего же черновика', () => {
+    const [item] = timelineEventsToItems([
+      roomMessageEvent({
+        content: {
+          msgtype: MsgType.Image,
+          body: 'отчёт',
+          filename: 'report.png',
+          url: 'mxc://bank.ru/abc',
+          info: { mimetype: 'image/png', size: 200 },
+          'm.relates_to': { 'm.in_reply_to': { event_id: '$parent' } },
+        },
+      }),
+    ])
+
+    expect(item).toMatchObject({
+      kind: 'image',
+      relation: { type: 'reply', eventId: '$parent' },
+    })
+  })
+
   it('m.file без explicit filename (не обязателен по спеке) берёт его из body, caption пуст', () => {
     const [item] = timelineEventsToItems([
       roomMessageEvent({

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { t } from '../i18n'
-import { cn } from '../shared/cn'
+import { cn } from '../shared/utils/cn'
 import styles from './ReplyPreview.module.css'
 
 interface Props {

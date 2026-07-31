@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useChatActions } from '../../hooks/useChatActions'
-import { isPreviewableImage, validateFile } from '../../shared/fileValidation'
+import { isPreviewableImage, validateFile } from '../../shared/utils/fileValidation'
 
 export interface PendingAttachment {
   file: File

@@ -1,8 +1,8 @@
 import { type DragEvent, type PropsWithChildren, useEffect, useRef, useState } from 'react'
 import { t } from '../../i18n'
-import { cn } from '../../shared/cn'
-import { ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES } from '../../shared/fileValidation'
-import { formatSize } from '../../shared/formatSize'
+import { cn } from '../../shared/utils/cn'
+import { ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES } from '../../shared/utils/fileValidation'
+import { formatSize } from '../../shared/utils/formatSize'
 import { useAttachment } from './AttachmentContext'
 import styles from './DropZone.module.css'
 

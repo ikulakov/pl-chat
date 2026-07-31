@@ -9,7 +9,7 @@ import type { MatrixApi } from '../matrixApi'
 import { MatrixSessionManager } from './sessionManager'
 import { MatrixError } from '../transport/matrixError'
 
-vi.mock('../../shared/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 function makeApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
   return makeMatrixApi({
