@@ -248,6 +248,56 @@ describe('chatRuntimeReducer', () => {
     expect(uploaded.room.timeline[0]).not.toHaveProperty('upload')
   })
 
+  it('повтор загрузки возвращает прогресс в 0 — отменить можно до первого progress-события', () => {
+    // message.failed гасит pct в null, и без возврата в 0 MediaContent считает загрузку
+    // неактивной: XHR уже идёт, а крестика отмены нет — вплоть до первого onprogress
+    // (которого при !lengthComputable может не быть вовсе).
+    const draft = {
+      ...ownMessage({ txnId: 'txn-1' }),
+      kind: 'file' as const,
+      content: { body: '', url: '', filename: 'doc.pdf', info: { mimetype: '', size: 1 } },
+      upload: { file: new File([], 'doc.pdf'), pct: 40 },
+    }
+    const failed = chatRuntimeReducer(
+      chatRuntimeReducer(
+        { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
+        { type: 'message.optimisticAdded', message: draft },
+      ),
+      { type: 'message.failed', localId: 'l1' },
+    )
+    expect(failed.room.timeline[0]).toMatchObject({ upload: { pct: null } })
+
+    const retrying = chatRuntimeReducer(failed, { type: 'message.retrying', localId: 'l1' })
+
+    expect(retrying.room.timeline[0]).toMatchObject({ sendStatus: 'sending', upload: { pct: 0 } })
+  })
+
+  it('повтор отправки уже загруженного файла не воскрешает upload-стейт', () => {
+    // mxc получен, upload снят в message.uploaded — повторяется только PUT /send,
+    // прогресс-полоске взяться неоткуда
+    const sent = {
+      ...ownMessage({ txnId: 'txn-1' }),
+      kind: 'file' as const,
+      content: {
+        body: '',
+        url: 'mxc://bank.ru/abc',
+        filename: 'doc.pdf',
+        info: { mimetype: '', size: 1 },
+      },
+    }
+    const failed = chatRuntimeReducer(
+      chatRuntimeReducer(
+        { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
+        { type: 'message.optimisticAdded', message: sent },
+      ),
+      { type: 'message.failed', localId: 'l1' },
+    )
+
+    const retrying = chatRuntimeReducer(failed, { type: 'message.retrying', localId: 'l1' })
+
+    expect(retrying.room.timeline[0]).not.toHaveProperty('upload')
+  })
+
   it('message.discarded убирает отменённый черновик из ленты', () => {
     const withOptimistic = chatRuntimeReducer(
       { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },

@@ -34,6 +34,24 @@ interface SendMediaMessageParams {
   replyToEventId?: string | undefined
 }
 
+function toMatrixMediaContent(
+  content: SendMediaMessageParams['content'],
+): Omit<OutgoingMediaContent, 'msgtype'> {
+  const { body, url, filename, info } = content
+
+  return {
+    body: body || filename,
+    url,
+    filename,
+    info: {
+      mimetype: info.mimetype,
+      size: info.size,
+      ...(info.w !== undefined ? { w: info.w } : {}),
+      ...(info.h !== undefined ? { h: info.h } : {}),
+    },
+  }
+}
+
 export function createMatrixApi(transport: MatrixTransport) {
   function sendRoomMessage(
     roomId: string,
@@ -107,8 +125,7 @@ export function createMatrixApi(transport: MatrixTransport) {
     }: SendMediaMessageParams): Promise<SendEventResponse> {
       return sendRoomMessage(roomId, txnId, {
         msgtype: kind === 'image' ? MsgType.Image : MsgType.File,
-        ...content,
-        body: content.body || content.filename,
+        ...toMatrixMediaContent(content),
         ...createReplyRelation(replyToEventId),
       })
     },

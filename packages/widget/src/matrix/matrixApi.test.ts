@@ -97,6 +97,34 @@ describe('createMatrixApi — форма запросов', () => {
     })
   })
 
+  it('sendMediaMessage: локальные поля domain-модели не утекают в Matrix payload', async () => {
+    // контроллер передаёт сюда domain-объект целиком; спред отправил бы на провод любое
+    // будущее локальное поле (превью, статус проверки) — wire-поля собираются поимённо
+    const { transport, request } = fakeTransport()
+
+    await createMatrixApi(transport).sendMediaMessage({
+      roomId: '!room:bank',
+      txnId: 'txn-1',
+      kind: 'file',
+      content: {
+        body: '',
+        url: 'mxc://bank.ru/abc',
+        filename: 'doc.pdf',
+        info: { mimetype: 'application/pdf', size: 10, w: 1, h: 2 },
+        localPreviewUrl: 'blob:...',
+      } as Parameters<ReturnType<typeof createMatrixApi>['sendMediaMessage']>[0]['content'],
+    })
+
+    const [, init] = request.mock.calls[0]!
+    expect((init as { body: unknown }).body).toEqual({
+      msgtype: 'm.file',
+      body: 'doc.pdf',
+      url: 'mxc://bank.ru/abc',
+      filename: 'doc.pdf',
+      info: { mimetype: 'application/pdf', size: 10, w: 1, h: 2 },
+    })
+  })
+
   it('longPollSync: since + timeout в searchParams, abort-signal пробрасывается', async () => {
     const { transport, request } = fakeTransport()
     const signal = new AbortController().signal

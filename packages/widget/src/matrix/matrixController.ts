@@ -97,8 +97,7 @@ export class MatrixController implements MatrixService {
 
   disconnect(): void {
     this.stopLoadingHistory()
-    this.uploads.forEach((controller) => controller.abort())
-    this.uploads.clear()
+    this.abortUploads()
     this.nextLifecycle()
     this.syncLoop.stop()
   }
@@ -151,6 +150,8 @@ export class MatrixController implements MatrixService {
     const { localId, content } = draft
 
     const lifecycleId = this.lifecycleId
+
+    this.uploads.get(localId)?.abort()
     const controller = new AbortController()
     this.uploads.set(localId, controller)
 
@@ -185,6 +186,14 @@ export class MatrixController implements MatrixService {
     this.uploads.delete(localId)
     controller.abort()
     this.dispatch({ type: 'message.discarded', localId })
+  }
+
+  private abortUploads(): void {
+    for (const [localId, controller] of this.uploads) {
+      controller.abort()
+      this.dispatch({ type: 'message.failed', localId })
+    }
+    this.uploads.clear()
   }
 
   async resendMessage(localId: string): Promise<void> {
@@ -372,6 +381,7 @@ export class MatrixController implements MatrixService {
   private recoverFromAuthError(err: unknown, context: AuthErrorContext): void {
     console.error(`[PLChat] ${context} auth error:`, err)
     this.stopLoadingHistory()
+    this.abortUploads()
     this.syncLoop.stop()
     this.startSessionRecovery(this.lifecycleId)
   }
@@ -395,6 +405,7 @@ export class MatrixController implements MatrixService {
 
   private failSession(): void {
     this.stopLoadingHistory()
+    this.abortUploads()
     this.nextLifecycle()
     this.syncLoop.stop()
     this.sessionManager.clearSession()

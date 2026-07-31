@@ -454,6 +454,67 @@ describe('MatrixController (orchestrator)', () => {
     expect(api.sendMediaMessage).not.toHaveBeenCalled()
   })
 
+  it('recovery по auth-ошибке обрывает загрузку в полёте — PUT в старую комнату не уходит', async () => {
+    // Ошибка прилетела из отправки текста, а не из загрузки. Recovery НЕ бампает lifecycle
+    // (см. тест про догрузку истории ниже), поэтому единственное, что снимает загрузку, —
+    // явный abort в recoverFromAuthError. Без него файл догрузится уже после пересоздания
+    // сессии и уедет PUT'ом в комнату, которой у нового гостя нет.
+    const upload = deferred<Awaited<ReturnType<MatrixApi['uploadMedia']>>>()
+    let signal: AbortSignal | undefined
+    const api = makeMatrixApi({
+      uploadMedia: vi.fn<MatrixApi['uploadMedia']>().mockImplementation((_file, options) => {
+        signal = options?.signal
+        return upload.promise
+      }),
+      sendMessage: vi
+        .fn<MatrixApi['sendMessage']>()
+        .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
+    })
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    const sending = controller.sendFile(makeFile('doc.pdf', 'application/pdf'))
+    await vi.waitFor(() => expect(signal).toBeDefined())
+
+    await controller.sendMessage('hi')
+
+    expect(signal!.aborted).toBe(true)
+
+    // даже если байты всё-таки дошли, отправлять уже нечего и некуда
+    upload.resolve({ content_uri: 'mxc://bank.ru/abc' })
+    await sending
+
+    expect(api.sendMediaMessage).not.toHaveBeenCalled()
+    controller.disconnect()
+  })
+
+  it('деактивация аккаунта обрывает загрузку в полёте — байты не льются в мёртвую сессию', async () => {
+    const upload = deferred<Awaited<ReturnType<MatrixApi['uploadMedia']>>>()
+    let signal: AbortSignal | undefined
+    const api = makeMatrixApi({
+      uploadMedia: vi.fn<MatrixApi['uploadMedia']>().mockImplementation((_file, options) => {
+        signal = options?.signal
+        return upload.promise
+      }),
+      sendMessage: vi
+        .fn<MatrixApi['sendMessage']>()
+        .mockRejectedValue(new MatrixError('M_USER_DEACTIVATED', 'disabled')),
+    })
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    const sending = controller.sendFile(makeFile('doc.pdf', 'application/pdf'))
+    await vi.waitFor(() => expect(signal).toBeDefined())
+
+    await controller.sendMessage('hi')
+
+    // смена lifecycle отбросила бы результат, но XHR продолжал бы качать файл целиком
+    expect(signal!.aborted).toBe(true)
+
+    upload.resolve({ content_uri: 'mxc://bank.ru/abc' })
+    await sending
+
+    expect(api.sendMediaMessage).not.toHaveBeenCalled()
+  })
+
   it('resendMessage re-uploads the file when the draft never got an mxc', async () => {
     const api = makeMatrixApi({
       uploadMedia: vi

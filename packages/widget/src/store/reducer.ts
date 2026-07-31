@@ -124,7 +124,13 @@ export function chatRuntimeReducer(
       })
 
     case 'message.retrying':
-      return updateMessage(state, action.localId, (m) => ({ ...m, sendStatus: 'sending' }))
+      return updateMessage(state, action.localId, (m) => {
+        const retrying: MessageTimelineItem = { ...m, sendStatus: 'sending' }
+
+        if (!isMedia(retrying) || !retrying.upload) return retrying
+
+        return { ...retrying, upload: { ...retrying.upload, pct: 0 } }
+      })
 
     case 'message.uploadProgress':
       return updateMessage(state, action.localId, (m) =>

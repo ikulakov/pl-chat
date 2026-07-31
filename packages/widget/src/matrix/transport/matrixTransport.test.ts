@@ -27,6 +27,8 @@ class FakeXhr {
   onload: (() => void) | null = null
   onerror: (() => void) | null = null
   onabort: (() => void) | null = null
+  ontimeout: (() => void) | null = null
+  timeout = 0
   status = 200
   responseText = '{}'
 
@@ -249,6 +251,26 @@ describe('MatrixTransport', () => {
     await uploadPromise
 
     expect(onProgress.mock.calls).toEqual([[10], [50]])
+  })
+
+  it('fails a timed out upload with an error distinct from user cancellation', async () => {
+    const tokens = createFakeTokenStore('access-token')
+    const transport = new MatrixTransport(BASE_URL, tokens)
+
+    vi.stubGlobal('XMLHttpRequest', FakeXhr as unknown as typeof XMLHttpRequest)
+
+    const uploadPromise = transport.upload('/_matrix/media/v3/upload', new File(['x'], 'a.png'))
+    const xhr = FakeXhr.instances[0]!
+
+    // Таймаут выставлен на сам XHR, а не сторожевым таймером: он покрывает и ожидание
+    // ответа сервера, где progress-событий уже нет.
+    expect(xhr.timeout).toBeGreaterThan(0)
+
+    // Падаем с MatrixError, а НЕ с AbortError: иначе вызывающий примет зависание
+    // за отмену пользователя и молча уберёт черновик из ленты.
+    xhr.ontimeout?.()
+
+    await expect(uploadPromise).rejects.toMatchObject({ name: 'MatrixError' })
   })
 
   it('throws the terminal MatrixError when refresh reports a deactivated user', async () => {
