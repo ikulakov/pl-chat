@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { t } from '../i18n'
 import { cn } from '../shared/cn'
-import styles from './QuotedMessage.module.css'
+import styles from './ReplyPreview.module.css'
 
 interface Props {
   author: string | undefined
@@ -10,7 +10,7 @@ interface Props {
   onClick?: (() => void) | undefined
 }
 
-export function QuotedMessage({ author, text, onClick }: Props) {
+export function ReplyPreview({ author, text, onClick }: Props) {
   const body: ReactNode = (
     <>
       {author && <span className={styles.author}>{author}</span>}
@@ -19,13 +19,13 @@ export function QuotedMessage({ author, text, onClick }: Props) {
   )
 
   if (!onClick) {
-    return <div className={styles.quote}>{body}</div>
+    return <div className={styles.reply}>{body}</div>
   }
 
   return (
     <button
       type="button"
-      className={cn(styles.quote, styles.clickable)}
+      className={cn(styles.reply, styles.clickable)}
       onClick={onClick}
       aria-label={t('chat.reply.goToOriginal')}
     >

@@ -1,28 +1,27 @@
 import { t } from '../i18n'
 import { MatrixEventType, MsgType } from '../matrix/consts'
-import type {
-  ClientEvent,
-  OperatorJoinedEvent,
-  OperatorLeftEvent,
-  RelatesTo,
-  RoomMessageEvent,
-  TextMessageContent,
-} from '../matrix/types'
+import type * as Matrix from '../matrix/types'
 import type { TimelineItem, TimelineRelation } from './timeline'
 
-function isRoomMessage(event: ClientEvent): event is RoomMessageEvent {
+function isRoomMessage(event: Matrix.ClientEvent): event is Matrix.RoomMessageEvent {
   return event.type === MatrixEventType.RoomMessage
 }
 
-function isOperatorJoined(event: ClientEvent): event is OperatorJoinedEvent {
+function isOperatorJoined(event: Matrix.ClientEvent): event is Matrix.OperatorJoinedEvent {
   return event.type === MatrixEventType.OperatorJoined
 }
 
-function isOperatorLeft(event: ClientEvent): event is OperatorLeftEvent {
+function isOperatorLeft(event: Matrix.ClientEvent): event is Matrix.OperatorLeftEvent {
   return event.type === MatrixEventType.OperatorLeft
 }
 
-function operatorLeftText(reason: OperatorLeftEvent['content']['reason']): string {
+function operatorJoinedText(content: Matrix.OperatorJoinedEvent['content']): string {
+  return content.role === 'bot'
+    ? t('system.operatorJoinedBot')
+    : t('system.operatorJoinedHuman', { name: content.displayname })
+}
+
+function operatorLeftText(reason: Matrix.OperatorLeftEvent['content']['reason']): string {
   switch (reason) {
     case 'completed':
       return t('system.operatorLeftCompleted')
@@ -33,14 +32,14 @@ function operatorLeftText(reason: OperatorLeftEvent['content']['reason']): strin
   }
 }
 
-function toRelation(content: { 'm.relates_to'?: RelatesTo }): TimelineRelation | undefined {
+function toRelation(content: { 'm.relates_to'?: Matrix.RelatesTo }): TimelineRelation | undefined {
   const eventId = content['m.relates_to']?.['m.in_reply_to']?.event_id
   return eventId ? { type: 'reply', eventId } : undefined
 }
 
 function createPlaqueItem(
   kind: 'system' | 'notice',
-  event: ClientEvent,
+  event: Matrix.ClientEvent,
   body: string,
 ): TimelineItem {
   return {
@@ -52,48 +51,92 @@ function createPlaqueItem(
   }
 }
 
-function textMessageToItem(event: RoomMessageEvent, content: TextMessageContent): TimelineItem {
-  const relation = toRelation(content)
-
+function messageBaseFields(event: Matrix.RoomMessageEvent) {
   return {
-    kind: 'text',
     localId: event.event_id,
     eventId: event.event_id,
     sender: event.sender,
     ts: event.origin_server_ts,
-    sendStatus: 'sent',
-    content: { body: content.body },
+    sendStatus: 'sent' as const,
     ...(event.unsigned?.transaction_id ? { txnId: event.unsigned.transaction_id } : {}),
+  }
+}
+
+function createTextItem(
+  event: Matrix.RoomMessageEvent,
+  content: Matrix.TextMessageContent,
+): TimelineItem {
+  const relation = toRelation(content)
+
+  return {
+    ...messageBaseFields(event),
+    kind: 'text',
+    content: { body: content.body },
     ...(relation ? { relation } : {}),
   }
 }
 
-function eventToItem(event: ClientEvent): TimelineItem | undefined {
-  if (isRoomMessage(event)) {
-    if (event.content.msgtype === MsgType.Notice) {
+function createMediaItem(
+  kind: 'image' | 'file',
+  event: Matrix.RoomMessageEvent,
+  content: Matrix.MediaMessageContent,
+): TimelineItem {
+  const { body, url, filename: rawFilename, info } = content
+
+  const filename = rawFilename ?? body
+  const caption = body !== filename ? body : ''
+
+  return {
+    ...messageBaseFields(event),
+    kind,
+    content: {
+      body: caption,
+      url,
+      filename,
+      info: {
+        mimetype: info?.mimetype ?? 'application/octet-stream',
+        size: info?.size ?? 0,
+        ...(info?.w ? { w: info.w } : {}),
+        ...(info?.h ? { h: info.h } : {}),
+      },
+    },
+  }
+}
+
+function roomMessageToItem(event: Matrix.RoomMessageEvent): TimelineItem | undefined {
+  switch (event.content.msgtype) {
+    case MsgType.Notice:
       return createPlaqueItem('notice', event, event.content.body)
-    }
-    if (event.content.msgtype === MsgType.Text) {
-      return textMessageToItem(event, event.content)
-    }
-    return undefined
+    case MsgType.Text:
+      return createTextItem(event, event.content)
+    case MsgType.Image:
+      return createMediaItem('image', event, event.content)
+    case MsgType.File:
+      return createMediaItem('file', event, event.content)
+    default:
+      return undefined
+  }
+}
+
+function eventToItem(event: Matrix.ClientEvent): TimelineItem | undefined {
+  if (isRoomMessage(event)) {
+    return roomMessageToItem(event)
   }
   if (isOperatorJoined(event)) {
-    const body =
-      event.content.role === 'bot'
-        ? t('system.operatorJoinedBot')
-        : t('system.operatorJoinedHuman', { name: event.content.displayname })
-
-    return createPlaqueItem('system', event, body)
+    return createPlaqueItem('system', event, operatorJoinedText(event.content))
   }
-
-  if (isOperatorLeft(event))
+  if (isOperatorLeft(event)) {
     return createPlaqueItem('system', event, operatorLeftText(event.content.reason))
+  }
 
   return undefined
 }
 
-export function timelineEventsToItems(events: ClientEvent[] = []): TimelineItem[] {
+/**
+ * Преобразует сырые события Matrix (timeline/state из sync) в доменные элементы ленты.
+ * События без соответствия (неизвестный тип или msgtype) отбрасываются.
+ */
+export function timelineEventsToItems(events: Matrix.ClientEvent[] = []): TimelineItem[] {
   const result: TimelineItem[] = []
 
   for (const event of events) {

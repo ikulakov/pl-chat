@@ -1,11 +1,19 @@
 @import '@fontsource-variable/onest';
 @import './variables.css';
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  font-family: var(--font);
+}
+
 /* Prevent scroll from leaking out of the iframe to the host page */
 html,
 body {
   height: 100%;
-  margin: 0;
   overscroll-behavior: none;
 }
 
@@ -13,8 +21,15 @@ body {
   height: 100%;
 }
 
-*,
-*::before,
-*::after {
-  font-family: var(--font);
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  background: none;
+  border: 0;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
 }

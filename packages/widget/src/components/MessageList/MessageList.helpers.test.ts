@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { TextTimelineItem } from '../../domain/timeline'
+import type { FileTimelineItem, TextTimelineItem } from '../../domain/timeline'
 import { t } from '../../i18n'
 import { noticeItem, systemItem, textItem } from '../../shared/testUtils/matrixFixtures'
-import { getPosition, getQuotePreview, indexMessagesByEventId } from './MessageList.helpers'
+import { getPosition, getReplyPreview, indexMessagesByEventId } from './MessageList.helpers'
 
 function message(sender: string): TextTimelineItem {
   return textItem({ localId: sender, eventId: sender, sender, body: 'x' })
@@ -43,7 +43,7 @@ describe('getPosition', () => {
   })
 })
 
-describe('getQuotePreview', () => {
+describe('getReplyPreview', () => {
   const USER = '@me:bank'
   const OPERATOR = '@op:bank'
 
@@ -58,7 +58,7 @@ describe('getQuotePreview', () => {
     const plain = textItem({ eventId: '$plain', sender: USER })
 
     expect(
-      getQuotePreview({
+      getReplyPreview({
         index: indexMessagesByEventId([plain]),
         message: plain,
         userId: USER,
@@ -70,13 +70,13 @@ describe('getQuotePreview', () => {
     // догрузить оригинал нечем — виджет не ходит в точечный GET /event/{id}
     const item = reply('$missing')
 
-    const quote = getQuotePreview({
+    const preview = getReplyPreview({
       index: indexMessagesByEventId([item]),
       message: item,
       userId: USER,
     })
 
-    expect(quote).toEqual({ text: t('chat.reply.unavailable') })
+    expect(preview).toEqual({ text: t('chat.reply.unavailable') })
   })
 
   it('отредактированный родитель (пустой body) — та же заглушка, что и ненайденный', () => {
@@ -84,13 +84,44 @@ describe('getQuotePreview', () => {
     const parent = textItem({ eventId: '$parent', sender: '@op:bank', body: '' })
     const item = reply('$parent')
 
-    const quote = getQuotePreview({
+    const preview = getReplyPreview({
       index: indexMessagesByEventId([parent, item]),
       message: item,
       userId: USER,
     })
 
-    expect(quote).toEqual({ text: t('chat.reply.unavailable') })
+    expect(preview).toEqual({ text: t('chat.reply.unavailable') })
+  })
+
+  it('цитата на файл без подписи показывает имя файла, а не заглушку «недоступно»', () => {
+    // у медиа body — только подпись (см. eventMapping.createMediaItem), и без неё он пуст;
+    // цитировать при этом есть что — сам файл загружен и лежит в ленте
+    const parent: FileTimelineItem = {
+      kind: 'file',
+      localId: 'p1',
+      eventId: '$parent',
+      sender: OPERATOR,
+      ts: 0,
+      sendStatus: 'sent',
+      content: {
+        body: '',
+        url: 'mxc://bank.ru/abc',
+        filename: 'doc.pdf',
+        info: { mimetype: 'application/pdf', size: 100 },
+      },
+    }
+
+    const preview = getReplyPreview({
+      index: indexMessagesByEventId([parent, reply('$parent')]),
+      message: reply('$parent'),
+      userId: USER,
+    })
+
+    expect(preview).toEqual({
+      author: t('chat.reply.operator'),
+      text: 'doc.pdf',
+      targetId: 'p1',
+    })
   })
 
   it('загруженный оригинал отдаёт localId как цель скролла', () => {
@@ -102,23 +133,23 @@ describe('getQuotePreview', () => {
       body: 'вопрос',
     })
 
-    const quote = getQuotePreview({
+    const preview = getReplyPreview({
       index: indexMessagesByEventId([parent, reply('$parent')]),
       message: reply('$parent'),
       userId: USER,
     })
 
-    expect(quote?.targetId).toBe('p1')
+    expect(preview?.targetId).toBe('p1')
   })
 
   it('недоступный оригинал не несёт цель скролла — цитата будет некликабельной', () => {
-    const quote = getQuotePreview({
+    const preview = getReplyPreview({
       index: indexMessagesByEventId([reply('$missing')]),
       message: reply('$missing'),
       userId: USER,
     })
 
-    expect(quote?.targetId).toBeUndefined()
+    expect(preview?.targetId).toBeUndefined()
   })
 
   it('автор цитаты — «Вы» для своего сообщения и «Оператор» для чужого', () => {
@@ -127,14 +158,14 @@ describe('getQuotePreview', () => {
     const index = indexMessagesByEventId([own, foreign])
 
     expect(
-      getQuotePreview({
+      getReplyPreview({
         index,
         message: reply('$own'),
         userId: USER,
       })?.author,
     ).toBe(t('chat.reply.you'))
     expect(
-      getQuotePreview({
+      getReplyPreview({
         index,
         message: reply('$foreign'),
         userId: USER,
@@ -151,7 +182,7 @@ describe('getQuotePreview', () => {
     const index = indexMessagesByEventId([oldOperatorMessage])
 
     expect(
-      getQuotePreview({
+      getReplyPreview({
         index,
         message: reply('$old'),
         userId: USER,

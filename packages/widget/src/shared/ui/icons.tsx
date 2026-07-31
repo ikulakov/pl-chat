@@ -43,11 +43,14 @@ export function SearchIcon(props: IconProps) {
 
 export function CloseIcon(props: IconProps) {
   return (
-    <Icon {...props}>
+    <Icon
+      {...props}
+      viewBox="0 0 16 16"
+    >
       <path
-        d="M6 6L18 18M18 6L6 18"
+        d="M3.33301 3.3335L7.99967 8.00016M7.99967 8.00016L12.6663 12.6668M7.99967 8.00016L12.6663 3.3335M7.99967 8.00016L3.33301 12.6668"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.2"
         strokeLinecap="round"
       />
     </Icon>
@@ -255,6 +258,54 @@ export function CopyIcon(props: IconProps) {
         stroke="currentColor"
         strokeWidth="1.2"
         strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Icon>
+  )
+}
+
+export function FileDocIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path
+        d="M6 3h7l5 5v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13 3v5h5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </Icon>
+  )
+}
+
+export function ImageIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect
+        x="3.5"
+        y="4.5"
+        width="17"
+        height="15"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <circle
+        cx="9"
+        cy="9.5"
+        r="1.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M4 17l4.5-4 3.5 3 3-2.5L20 17"
+        stroke="currentColor"
+        strokeWidth="1.5"
         strokeLinejoin="round"
       />
     </Icon>

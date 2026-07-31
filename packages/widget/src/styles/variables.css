@@ -6,6 +6,7 @@
   --c-text-placeholder: #909090;
   --c-text-invert: #fff;
   --c-text-invert-dim: rgba(255, 255, 255, 0.6);
+  --c-error: #c51e37;
 
   /* Surfaces */
   --c-surface-primary: #fff;
@@ -17,7 +18,11 @@
 
   /* Borders */
   --c-border: #f3f4f6;
+  --c-dashed-border: #dedfe1;
   --c-scrollbar: #e2e4e6;
+
+  /* Оттенок подложки иконки (адаптируется к currentColor) */
+  --c-icon-tint: color-mix(in srgb, currentColor 12%, transparent);
 
   /* Accent */
   --c-orange: #ff7f32;
@@ -27,6 +32,19 @@
   /* Typography */
   --font: 'Onest Variable', system-ui, sans-serif;
 
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Shadows */
+  --shadow-popover: 0px 16px 56px 0px rgba(0, 0, 0, 0.2);
+
   /* Sizes */
   --header-h: 64px;
+
+  /* Z-index */
+  --z-sticky: 1;
+  --z-overlay: 10;
+  --z-dropdown: 100;
 }

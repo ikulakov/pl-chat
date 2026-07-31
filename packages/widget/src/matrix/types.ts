@@ -25,9 +25,24 @@ interface NoticeMessageContent {
   body: string
 }
 
+export interface MediaMessageContent {
+  body: string
+  url: string
+  filename?: string
+  info?: { mimetype?: string; size?: number; w?: number; h?: number }
+}
+
+interface ImageMessageContent extends MediaMessageContent {
+  msgtype: typeof MsgType.Image
+}
+
+interface FileMessageContent extends MediaMessageContent {
+  msgtype: typeof MsgType.File
+}
+
 export interface RoomMessageEvent extends BaseClientEvent {
   type: typeof MatrixEventType.RoomMessage
-  content: TextMessageContent | NoticeMessageContent
+  content: TextMessageContent | NoticeMessageContent | ImageMessageContent | FileMessageContent
 }
 
 export interface OperatorCurrentEvent extends BaseClientEvent {

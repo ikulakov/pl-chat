@@ -30,7 +30,7 @@
   font-size: 13px;
   padding: 4px 8px;
   border: 1px solid var(--c-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--c-surface-primary);
   color: var(--c-text-primary);
   outline: none;
@@ -40,9 +40,7 @@
   flex-shrink: 0;
   font-size: 13px;
   padding: 4px 10px;
-  border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--c-border);
   color: var(--c-text-primary);
-  cursor: pointer;
 }
