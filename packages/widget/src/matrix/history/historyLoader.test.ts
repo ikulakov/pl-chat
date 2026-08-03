@@ -14,7 +14,7 @@ import { MatrixError } from '../transport/matrixError'
 import type { ClientEvent } from '../types'
 import { MatrixHistoryLoader } from './historyLoader'
 
-vi.mock('../../shared/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 const ROOM_ID = '!r:bank'
 
@@ -58,7 +58,9 @@ function loaderHarness(
   const load = () =>
     loader.load({
       getContext: () =>
-        state.room.prevBatch === null ? null : { roomId: ROOM_ID, prevBatch: state.room.prevBatch },
+        state.room.prevBatch === null
+          ? undefined
+          : { roomId: ROOM_ID, prevBatch: state.room.prevBatch },
       isStale: options.isStale ?? (() => false),
     })
 

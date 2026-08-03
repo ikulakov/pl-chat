@@ -12,11 +12,11 @@
 
 .illustrationWrap {
   width: 100%;
-  flex: 1 0 0;
   max-height: 260px;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: 16px;
 }
 
 .illustrationImg {
@@ -66,18 +66,16 @@
   height: 48px;
   background: var(--c-surface-contrast);
   color: var(--c-text-invert);
-  border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: 16px;
   font-weight: 500;
   letter-spacing: -0.1px;
-  cursor: pointer;
 
   &:hover {
-    background: #333;
+    background: color-mix(in srgb, var(--c-surface-contrast) 80%, #fff);
   }
 
   &:active {
-    background: #111;
+    background: color-mix(in srgb, var(--c-surface-contrast) 80%, #000);
   }
 }

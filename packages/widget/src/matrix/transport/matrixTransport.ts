@@ -1,6 +1,31 @@
-import { MATRIX_API_PREFIX } from '../consts'
+import type { RefreshResponse } from '../dto'
+import { Endpoints } from '../endpoints'
 import type { TokenSource } from '../session/types'
-import { isMatrixAuthError, MatrixErrCode, MatrixError } from './matrixError'
+import { makeMatrixError, MatrixErrCode, MatrixError } from './matrixError'
+
+export interface UploadOptions {
+  contentType?: string
+  searchParams?: Record<string, string | number>
+  signal?: AbortSignal | undefined
+  onProgress?: (percent: number) => void
+}
+
+export interface RequestOptions {
+  method?: string
+  // JSON-сериализуемое тело: транспорт сам делает JSON.stringify + Content-Type.
+  // request() обслуживает только JSON; бинарная загрузка идёт через upload().
+  body?: unknown
+  searchParams?: Record<string, string | number>
+  signal?: AbortSignal | undefined
+}
+
+// Нормализованный ответ любого транспорта (fetch/XHR)
+interface RawResponse {
+  status: number
+  text: string
+}
+
+const UPLOAD_TIMEOUT_MS = 120_000
 
 export class MatrixTransport {
   private readonly baseUrl: string
@@ -12,36 +37,109 @@ export class MatrixTransport {
     this.tokens = tokens
   }
 
-  async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const res = await this.fetchWithAuth(path, init)
-
-    if (res.status === 401) {
-      return this.retryAfterRefresh<T>(path, init)
-    }
-    return this.parseResponse<T>(res)
+  async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    return this.withRefresh<T>(() => this.fetchRaw(path, options))
   }
 
-  private async retryAfterRefresh<T>(path: string, init: RequestInit): Promise<T> {
-    const refreshed = await this.silentRefresh()
-    if (!refreshed) {
-      throw new MatrixError(MatrixErrCode.UnknownToken, 'Session expired')
-    }
-    return this.parseResponse<T>(await this.fetchWithAuth(path, init))
+  async upload<T>(path: string, file: File, options: UploadOptions = {}): Promise<T> {
+    return this.withRefresh<T>(() => this.xhrUpload(path, file, options))
   }
 
-  private fetchWithAuth(path: string, init: RequestInit): Promise<Response> {
-    const headers = new Headers(init.headers)
+  private async withRefresh<T>(call: () => Promise<RawResponse>): Promise<T> {
+    let response = await call()
+
+    // 401 → тихий refresh и один повтор, дальше уйдёт наверх как M_UNKNOWN_TOKEN.
+    if (response.status === 401) {
+      const refreshed = await this.silentRefresh()
+      if (!refreshed) {
+        throw new MatrixError(MatrixErrCode.UnknownToken, 'Session expired')
+      }
+      response = await call()
+    }
+
+    return MatrixTransport.unwrapResponse<T>(response)
+  }
+
+  private async fetchRaw(path: string, options: RequestOptions): Promise<RawResponse> {
+    const { method = 'GET', searchParams, signal = null } = options
+
+    const headers = new Headers()
+    const body = options.body === undefined ? null : JSON.stringify(options.body)
 
     const accessToken = this.tokens.getAccessToken()
     if (accessToken) {
       headers.set('Authorization', `Bearer ${accessToken}`)
     }
-    headers.set('traceparent', MatrixTransport.makeTraceparent())
-
-    if (init.body !== undefined && !headers.has('Content-Type')) {
+    if (body) {
       headers.set('Content-Type', 'application/json')
     }
-    return fetch(`${this.baseUrl}${path}`, { ...init, headers })
+    headers.set('traceparent', MatrixTransport.makeTraceparent())
+
+    const res = await fetch(this.buildUrl(path, searchParams), { method, headers, body, signal })
+
+    return { status: res.status, text: await res.text() }
+  }
+
+  private xhrUpload(path: string, file: File, options: UploadOptions): Promise<RawResponse> {
+    return new Promise<RawResponse>((resolve, reject) => {
+      const signal = options.signal
+      if (signal?.aborted) {
+        reject(new DOMException('Upload aborted', 'AbortError'))
+        return
+      }
+
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', this.buildUrl(path, options.searchParams))
+
+      const accessToken = this.tokens.getAccessToken()
+      if (accessToken) {
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+      }
+      xhr.setRequestHeader(
+        'Content-Type',
+        options.contentType || file.type || 'application/octet-stream',
+      )
+      xhr.setRequestHeader('traceparent', MatrixTransport.makeTraceparent())
+
+      const onProgress = options.onProgress
+      if (onProgress) {
+        let lastPercent = -1
+
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable || e.total <= 0) return
+
+          const percent = Math.round((e.loaded / e.total) * 100)
+          if (percent === lastPercent) return
+
+          lastPercent = percent
+          onProgress(percent)
+        }
+      }
+
+      xhr.timeout = UPLOAD_TIMEOUT_MS
+
+      xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText })
+      xhr.onerror = () => reject(new MatrixError(MatrixErrCode.Unknown, 'Network error'))
+      xhr.onabort = () => reject(new DOMException('Upload aborted', 'AbortError'))
+      xhr.ontimeout = () => reject(new MatrixError(MatrixErrCode.Unknown, 'Upload timeout'))
+
+      if (signal) {
+        signal.addEventListener('abort', () => xhr.abort(), { once: true })
+      }
+      xhr.send(file)
+    })
+  }
+
+  private buildUrl(path: string, searchParams?: Record<string, string | number>): string {
+    const url = `${this.baseUrl}${path}`
+
+    if (!searchParams) return url
+
+    const query = new URLSearchParams(
+      Object.entries(searchParams).map(([key, value]) => [key, String(value)]),
+    ).toString()
+
+    return query ? `${url}?${query}` : url
   }
 
   private silentRefresh(): Promise<boolean> {
@@ -50,7 +148,7 @@ export class MatrixTransport {
     const refreshToken = this.tokens.getRefreshToken()
     if (!refreshToken) return Promise.resolve(false)
 
-    this.refreshing = fetch(`${this.baseUrl}${MATRIX_API_PREFIX}/refresh`, {
+    this.refreshing = fetch(`${this.baseUrl}${Endpoints.REFRESH}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,16 +158,10 @@ export class MatrixTransport {
     })
       .then(async (res) => {
         if (!res.ok) {
-          const error = await this.parseError(res)
-          if (res.status === 401 || isMatrixAuthError(error)) {
-            return false
-          }
-          throw error
+          if (res.status === 401) return false
+          throw makeMatrixError(res.status, await res.text())
         }
-        const data = (await res.json()) as {
-          access_token: string
-          refresh_token?: string
-        }
+        const data = (await res.json()) as RefreshResponse
         // Другая вкладка уже переписала сессию, пока летел наш /refresh — не затираем её.
         if (this.tokens.getRefreshToken() !== refreshToken) {
           // null — сессию снесли (logout), иначе она просто свежее нашей
@@ -93,21 +185,10 @@ export class MatrixTransport {
     return `00-${hex(16)}-${hex(8)}-01`
   }
 
-  private async parseResponse<T>(res: Response): Promise<T> {
-    if (!res.ok) throw await this.parseError(res)
-    if (res.status === 204) return {} as T
-    return res.json() as Promise<T>
-  }
-
-  private async parseError(res: Response): Promise<MatrixError> {
-    try {
-      const body = (await res.json()) as { errcode?: string; error?: string }
-      return new MatrixError(
-        body.errcode ?? MatrixErrCode.Unknown,
-        body.error ?? `HTTP ${res.status}`,
-      )
-    } catch {
-      return new MatrixError(MatrixErrCode.Unknown, `HTTP ${res.status}`)
+  private static unwrapResponse<T>(res: RawResponse): T {
+    if (res.status >= 200 && res.status < 300) {
+      return (res.text ? JSON.parse(res.text) : {}) as T
     }
+    throw makeMatrixError(res.status, res.text)
   }
 }

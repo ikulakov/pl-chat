@@ -12,10 +12,44 @@ function jsonResponse(body: unknown, status = 200): Response {
   })
 }
 
+interface FakeProgressEvent {
+  lengthComputable: boolean
+  loaded: number
+  total: number
+}
+
+// Минимальный двойник XMLHttpRequest: реальный upload-прогресс недоступен через fetch,
+// поэтому MatrixTransport.upload() ходит на XHR напрямую — тестируем именно его.
+class FakeXhr {
+  static instances: FakeXhr[] = []
+
+  upload: { onprogress: ((e: FakeProgressEvent) => void) | null } = { onprogress: null }
+  onload: (() => void) | null = null
+  onerror: (() => void) | null = null
+  onabort: (() => void) | null = null
+  ontimeout: (() => void) | null = null
+  timeout = 0
+  status = 200
+  responseText = '{}'
+
+  constructor() {
+    FakeXhr.instances.push(this)
+  }
+
+  open(): void {}
+  setRequestHeader(): void {}
+  send(): void {}
+  abort(): void {
+    this.onabort?.()
+  }
+}
+
 describe('MatrixTransport', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
     localStorage.clear()
+    FakeXhr.instances.length = 0
   })
 
   it('adds auth, traceparent and default JSON content-type headers', async () => {
@@ -23,13 +57,28 @@ describe('MatrixTransport', () => {
     const transport = new MatrixTransport(BASE_URL, tokens)
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ ok: true }))
 
-    await transport.request('/_matrix/client/v3/send', { method: 'POST', body: '{}' })
+    await transport.request('/_matrix/client/v3/send', { method: 'POST', body: {} })
 
     expect(fetchSpy).toHaveBeenCalledWith(`${BASE_URL}/_matrix/client/v3/send`, expect.anything())
     const headers = fetchSpy.mock.calls[0]![1]!.headers as Headers
     expect(headers.get('Authorization')).toBe('Bearer access-token')
     expect(headers.get('Content-Type')).toBe('application/json')
     expect(headers.get('traceparent')).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+  })
+
+  it('serializes searchParams into the query string and encodes values', async () => {
+    const tokens = createFakeTokenStore('access-token')
+    const transport = new MatrixTransport(BASE_URL, tokens)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ ok: true }))
+
+    await transport.request('/_matrix/client/v3/sync', {
+      searchParams: { timeout: 0, since: 's 42/&x' },
+    })
+
+    // timeout=0 (число → строка), since url-энкодится, порядок = порядок ключей объекта.
+    expect(fetchSpy.mock.calls[0]![0]).toBe(
+      `${BASE_URL}/_matrix/client/v3/sync?timeout=0&since=s+42%2F%26x`,
+    )
   })
 
   it('refreshes on 401 and retries the original request with the new token', async () => {
@@ -179,6 +228,49 @@ describe('MatrixTransport', () => {
       name: 'MatrixError',
       errcode: 'M_UNKNOWN_TOKEN',
     })
+  })
+
+  it('rounds upload progress to a whole percent and reports it only when it changes', async () => {
+    const tokens = createFakeTokenStore('access-token')
+    const transport = new MatrixTransport(BASE_URL, tokens)
+    const onProgress = vi.fn()
+
+    vi.stubGlobal('XMLHttpRequest', FakeXhr as unknown as typeof XMLHttpRequest)
+
+    const uploadPromise = transport.upload('/_matrix/media/v3/upload', new File(['x'], 'a.png'), {
+      onProgress,
+    })
+
+    const xhr = FakeXhr.instances[0]!
+    // 10% и 10.4% округляются в один и тот же процент — второе событие дедуплицируется
+    xhr.upload.onprogress?.({ lengthComputable: true, loaded: 1, total: 10 })
+    xhr.upload.onprogress?.({ lengthComputable: true, loaded: 1.04, total: 10 })
+    xhr.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 })
+    xhr.onload?.()
+
+    await uploadPromise
+
+    expect(onProgress.mock.calls).toEqual([[10], [50]])
+  })
+
+  it('fails a timed out upload with an error distinct from user cancellation', async () => {
+    const tokens = createFakeTokenStore('access-token')
+    const transport = new MatrixTransport(BASE_URL, tokens)
+
+    vi.stubGlobal('XMLHttpRequest', FakeXhr as unknown as typeof XMLHttpRequest)
+
+    const uploadPromise = transport.upload('/_matrix/media/v3/upload', new File(['x'], 'a.png'))
+    const xhr = FakeXhr.instances[0]!
+
+    // Таймаут выставлен на сам XHR, а не сторожевым таймером: он покрывает и ожидание
+    // ответа сервера, где progress-событий уже нет.
+    expect(xhr.timeout).toBeGreaterThan(0)
+
+    // Падаем с MatrixError, а НЕ с AbortError: иначе вызывающий примет зависание
+    // за отмену пользователя и молча уберёт черновик из ленты.
+    xhr.ontimeout?.()
+
+    await expect(uploadPromise).rejects.toMatchObject({ name: 'MatrixError' })
   })
 
   it('throws the terminal MatrixError when refresh reports a deactivated user', async () => {

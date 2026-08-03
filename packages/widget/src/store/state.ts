@@ -1,18 +1,22 @@
 import type { OperatorState } from '../domain/operator'
 import type { ReadReceipt } from '../domain/receipts'
+import type { RoomSyncPatch } from '../domain/roomSync'
 import type { TimelineItem } from '../domain/timeline'
-import type { JoinedRoom } from '../matrix/types'
 
 export type RuntimeAction =
   | { type: 'connection.connecting' }
-  | { type: 'session.started'; identity: Identity; cursor: string; joinedRoom: JoinedRoom }
+  | { type: 'session.started'; identity: Identity; cursor: string; room: RoomSyncPatch }
   | { type: 'connection.failed'; error: string }
   | { type: 'session.recovering' }
-  | { type: 'sync.received'; cursor: string; joinedRoom?: JoinedRoom }
+  | { type: 'session.closed' }
+  | { type: 'sync.received'; cursor: string; room?: RoomSyncPatch }
   | { type: 'message.optimisticAdded'; message: TimelineItem }
   | { type: 'message.sent'; localId: string; eventId: string }
   | { type: 'message.failed'; localId: string }
   | { type: 'message.retrying'; localId: string }
+  | { type: 'message.uploadProgress'; localId: string; pct: number }
+  | { type: 'message.uploaded'; localId: string; url: string }
+  | { type: 'message.discarded'; localId: string }
   | { type: 'receipt.markedRead'; userId: string; eventId: string }
   | { type: 'receipt.sendFailed'; userId: string; eventId: string; rollbackTo: string | null }
   | { type: 'reply.targeted'; target: ReplyTarget }

@@ -21,7 +21,7 @@ interface UseLoadMoreHistoryParams {
 
 interface Anchor {
   id: string
-  top: number
+  viewportTop: number
 }
 
 function calcPosition(list: HTMLElement): {
@@ -47,7 +47,7 @@ function pickAnchor(list: HTMLElement): Anchor | null {
   for (const row of rows) {
     if (row.offsetTop + row.offsetHeight > list.scrollTop) {
       const id = row.dataset.itemId
-      if (id) return { id, top: row.offsetTop }
+      if (id) return { id, viewportTop: row.offsetTop - list.scrollTop }
     }
   }
   return null
@@ -61,7 +61,7 @@ function restorePrependedPosition(list: HTMLElement, anchor: Anchor, wasAtBottom
   const el = list.querySelector<HTMLElement>(`[${ITEM_ID_ATTR}="${CSS.escape(anchor.id)}"]`)
   if (!el) return
 
-  list.scrollTop += el.offsetTop - anchor.top
+  list.scrollTop = el.offsetTop - anchor.viewportTop
 }
 
 /**

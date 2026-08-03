@@ -1,4 +1,20 @@
-import type { ClientEvent, JoinedRoom } from './types'
+import type { MsgType } from './consts'
+import type { ClientEvent, JoinedRoom, MediaInfo, WithRelation } from './types'
+
+export interface OutgoingTextContent extends WithRelation {
+  msgtype: typeof MsgType.Text
+  body: string
+}
+
+export interface OutgoingMediaContent extends WithRelation {
+  msgtype: typeof MsgType.Image | typeof MsgType.File
+  body: string
+  url: string
+  filename: string
+  info: MediaInfo
+}
+
+export type OutgoingContent = OutgoingTextContent | OutgoingMediaContent
 
 export interface RegisterResponse {
   user_id: string
@@ -8,9 +24,22 @@ export interface RegisterResponse {
   expires_in_ms?: number
 }
 
+export interface RefreshResponse {
+  access_token: string
+  refresh_token?: string
+}
+
 export interface SyncResponse {
   next_batch: string
   rooms?: { join?: Record<string, JoinedRoom> }
+}
+
+export interface UploadResponse {
+  content_uri: string
+}
+
+export interface SendEventResponse {
+  event_id: string
 }
 
 /**

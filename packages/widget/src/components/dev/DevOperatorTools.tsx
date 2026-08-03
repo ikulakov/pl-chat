@@ -48,7 +48,13 @@ export function DevOperatorTools() {
       const id = crypto.randomUUID()
       chatStore.getState().dispatch({
         type: 'message.optimisticAdded',
-        message: { kind: 'notice', localId: id, eventId: id, ts: Date.now(), content: { body } },
+        message: {
+          kind: 'notice',
+          localId: id,
+          eventId: id,
+          ts: Date.now(),
+          label: { source: 'literal', body },
+        },
       })
       setText('')
       return
@@ -82,6 +88,7 @@ export function DevOperatorTools() {
     <div className={styles.wrap}>
       <label className={styles.noticeToggle}>
         <input
+          name="devNotice"
           type="checkbox"
           checked={isNotice}
           onChange={(e) => setIsNotice(e.target.checked)}
@@ -93,6 +100,7 @@ export function DevOperatorTools() {
         title={t('dev.historyToggleHint')}
       >
         <input
+          name="devHistory"
           type="checkbox"
           checked={isHistoryEnabled}
           onChange={(e) => toggleHistory(e.target.checked)}
@@ -100,9 +108,11 @@ export function DevOperatorTools() {
         {t('dev.historyToggle')}
       </label>
       <input
+        name="devOperatorMessage"
         className={styles.input}
         value={text}
         placeholder={t('dev.operatorMessagePlaceholder')}
+        autoComplete="off"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') send()

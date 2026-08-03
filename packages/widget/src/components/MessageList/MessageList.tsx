@@ -5,17 +5,17 @@ import { useChatScroll } from '../../hooks/useChatScroll'
 import { useChatStore } from '../../hooks/useChatStore'
 import { useLoadMoreHistory } from '../../hooks/useLoadMoreHistory'
 import { useSendReadReceipts } from '../../hooks/useSendReadReceipts'
-import { cn } from '../../shared/cn'
+import { cn } from '../../shared/utils/cn'
 import { Spinner } from '../../shared/ui/Spinner'
 import { selectIsOpen, selectReadReceipts, selectTimeline } from '../../store/selectors'
 import {
   getPosition,
-  getQuotePreview,
+  getReplyPreview,
   groupTimelineByDate,
   indexMessagesByEventId,
 } from './MessageList.helpers'
 import styles from './MessageList.module.css'
-import { MessageRow } from './MessageRow'
+import { MessageRow } from './MessageRow/MessageRow'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { SystemMessage } from './SystemMessage'
 
@@ -78,13 +78,12 @@ export function MessageList({ userId }: Props) {
                   <SystemMessage
                     key={item.localId}
                     itemId={item.localId}
-                  >
-                    {item.content.body}
-                  </SystemMessage>
+                    label={item.label}
+                  />
                 )
               }
               const position = getPosition(arr[index - 1], item, arr[index + 1])
-              const quote = getQuotePreview({
+              const reply = getReplyPreview({
                 index: messagesByEventId,
                 message: item,
                 userId,
@@ -96,10 +95,10 @@ export function MessageList({ userId }: Props) {
                   message={item}
                   position={position}
                   readByOperator={readByOperatorIds.has(item.eventId)}
-                  quotedAuthor={quote?.author}
-                  quotedText={quote?.text}
-                  quotedTargetId={quote?.targetId}
-                  onQuoteClick={scrollToItem}
+                  replyAuthor={reply?.author}
+                  replyText={reply?.text}
+                  replyTargetId={reply?.targetId}
+                  onReplyClick={scrollToItem}
                 />
               )
             })}

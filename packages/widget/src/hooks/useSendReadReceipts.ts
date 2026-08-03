@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent } from 'react'
 import type { TimelineItem } from '../domain/timeline'
-import { trailingThrottle } from '../shared/trailingThrottle'
+import { trailingThrottle } from '../shared/utils/trailingThrottle'
 import { useChatActions } from './useChatActions'
 
 export const SCAN_THROTTLE_MS = 500

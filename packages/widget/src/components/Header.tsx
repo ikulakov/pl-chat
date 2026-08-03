@@ -22,12 +22,6 @@ export function Header({ name, subtitle }: Props) {
         <span className={styles.status}>{subtitle}</span>
       </div>
       <div className={styles.actions}>
-        {/* <IconButton variant="surface" size="md" aria-label={t('chat.menu')}>
-          <SearchIcon />
-        </IconButton>
-        <IconButton variant="surface" size="md" aria-label={t('chat.menu')}>
-          <MoreIcon />
-        </IconButton> */}
         {viewport === 'fullscreen' && (
           <IconButton
             variant="surface"
@@ -35,7 +29,7 @@ export function Header({ name, subtitle }: Props) {
             aria-label={t('chat.close')}
             onClick={close}
           >
-            <CloseIcon />
+            <CloseIcon size={18} />
           </IconButton>
         )}
       </div>

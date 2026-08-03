@@ -2,6 +2,7 @@ import en from './locale/en.json'
 import ru from './locale/ru.json'
 
 export type MessageKey = keyof typeof ru
+export type SystemMessageKey = Extract<MessageKey, `system.${string}`>
 
 // явная аннотация: TypeScript проверит, что en содержит все ключи из ru
 const DICTS: Record<string, Record<MessageKey, string>> = { ru, en }

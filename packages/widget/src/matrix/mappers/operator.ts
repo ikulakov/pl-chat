@@ -1,0 +1,17 @@
+import type { OperatorState } from '../../domain/operator'
+import { OperatorStatus } from '../consts'
+import { isOperatorCurrent } from '../eventGuards'
+import type * as Matrix from '../types'
+
+export function toOperatorState(events: Matrix.ClientEvent[]): OperatorState | undefined {
+  const operatorEvent = events.findLast(isOperatorCurrent)
+  if (!operatorEvent) return undefined
+
+  const isActive = operatorEvent.content.status === OperatorStatus.Active
+
+  return {
+    isActive,
+    id: isActive ? (operatorEvent.content.operator_id ?? operatorEvent.sender) : null,
+    displayName: isActive ? (operatorEvent.content.displayname ?? null) : null,
+  }
+}

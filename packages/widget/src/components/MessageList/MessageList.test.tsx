@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TextTimelineItem } from '../../domain/timeline'
 import { systemItem, textItem } from '../../shared/testUtils/matrixFixtures'
-import { INITIAL_ROOM_STATE, chatStore } from '../../store/store'
+import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE, chatStore } from '../../store/store'
 import { MessageList } from './MessageList'
 
 const ME = '@me:bank'
@@ -32,8 +32,9 @@ function message(
 describe('MessageList', () => {
   beforeEach(() => {
     // сброс стора до рендера: в afterEach setState перерисовал бы ещё
-    // смонтированный компонент вне act() (cleanup RTL идёт позже) → warning
-    chatStore.setState({ room: INITIAL_ROOM_STATE })
+    // смонтированный компонент вне act() (cleanup RTL идёт позже) → warning.
+    // Полный сброс, не только room, — стор синглтон между тестами.
+    chatStore.setState({ ...INITIAL_RUNTIME_STATE, room: INITIAL_ROOM_STATE })
     loadMoreHistory.mockClear()
     vi.useFakeTimers()
     // "сейчас" далеко впереди дат сообщений — чтобы формат не съехал в "Сегодня"/"Вчера"
@@ -176,7 +177,7 @@ describe('MessageList', () => {
     expect(screen.getByRole('status')).toBeInTheDocument()
   })
 
-  it('a reply to a not-loaded original renders an unavailable quote that is not clickable', () => {
+  it('a reply to a not-loaded original renders an unavailable reply preview that is not clickable', () => {
     // родитель вне загруженной ленты → заглушка без цели скролла, кнопки-цитаты нет
     const ts = new Date('2026-07-01T10:00:00').getTime()
     const reply: TextTimelineItem = {

@@ -1,13 +1,8 @@
-import { quoteAuthorLabel } from '../../domain/quote'
-import {
-  hasBody,
-  isSystem,
-  type MessageTimelineItem,
-  type TimelineItem,
-} from '../../domain/timeline'
+import { replyAuthorLabel, replyEventIdOf, replyText } from '../../domain/reply'
+import { isSystem, type MessageTimelineItem, type TimelineItem } from '../../domain/timeline'
 import { t } from '../../i18n'
-import { formatDateLabel, startOfDay } from '../../shared/formatDate'
-import type { BubblePosition } from './MessageBubble'
+import { formatDateLabel, startOfDay } from '../../shared/utils/formatDate'
+import type { BubblePosition } from './MessageRow/MessageBubble'
 
 interface DayGroup {
   key: string
@@ -60,36 +55,38 @@ export function indexMessagesByEventId(timeline: TimelineItem[]): Map<string, Me
   return index
 }
 
-export interface QuotedPreview {
+export interface ReplyPreviewData {
   author?: string
   text: string
   targetId?: string
 }
 
-interface GetQuotePreviewParams {
+interface GetReplyPreviewParams {
   index: Map<string, MessageTimelineItem>
   message: MessageTimelineItem
   userId: string
 }
 
-export function getQuotePreview({
+export function getReplyPreview({
   index,
   message,
   userId,
-}: GetQuotePreviewParams): QuotedPreview | undefined {
-  if (message.relation?.type !== 'reply') return
+}: GetReplyPreviewParams): ReplyPreviewData | undefined {
+  const parentId = replyEventIdOf(message)
+  if (!parentId) return
 
   // цитата резолвится только из загруженной ленты
-  const parent = index.get(message.relation.eventId)
+  const parent = index.get(parentId)
+  const text = parent ? replyText(parent) : ''
 
-  // пустой body (отредактированное/вычищенное сообщение) недоступно так же, как не загруженное
-  if (!parent || !hasBody(parent)) {
+  // нечего показать (отредактированное/вычищенное сообщение) — то же, что не загруженное
+  if (!parent || text === '') {
     return { text: t('chat.reply.unavailable') }
   }
 
   return {
-    author: quoteAuthorLabel(parent.sender, userId),
-    text: parent.content.body,
+    author: replyAuthorLabel(parent.sender, userId),
+    text,
     targetId: parent.localId,
   }
 }

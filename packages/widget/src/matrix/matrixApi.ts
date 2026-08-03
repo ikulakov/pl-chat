@@ -1,77 +1,86 @@
-import { HISTORY_PAGE_SIZE, MATRIX_API_PREFIX, MsgType, ReceiptType } from './consts'
-import type { MessagesResponse, RegisterResponse, SyncResponse } from './dto'
-import type { MatrixTransport } from './transport/matrixTransport'
+import type {
+  MessagesResponse,
+  OutgoingContent,
+  RegisterResponse,
+  SendEventResponse,
+  SyncResponse,
+  UploadResponse,
+} from './dto'
+import { Endpoints } from './endpoints'
+import type { MatrixTransport, UploadOptions } from './transport/matrixTransport'
+
+// Размер страницы истории (limit для GET /messages). Лимит на сервере считает все
+// события (m.room.member, m.reaction и т.п.), максимум сервера — 100.
+const HISTORY_PAGE_SIZE = 50
+
+// Окно long-poll: сервер держит /sync до этого времени, потом отвечает пустым батчем.
+const SYNC_TIMEOUT_MS = 25_000
+
+interface SendMessageParams {
+  roomId: string
+  txnId: string
+  content: OutgoingContent
+}
 
 export function createMatrixApi(transport: MatrixTransport) {
   return {
     registerGuest(): Promise<RegisterResponse> {
-      return transport.request<RegisterResponse>(`${MATRIX_API_PREFIX}/register?kind=guest`, {
+      return transport.request(Endpoints.REGISTER, {
         method: 'POST',
-        body: JSON.stringify({}),
+        body: {},
+        searchParams: { kind: 'guest' },
       })
     },
 
     initialSync(): Promise<SyncResponse> {
-      return transport.request<SyncResponse>(`${MATRIX_API_PREFIX}/sync?timeout=0`)
+      return transport.request(Endpoints.SYNC, {
+        searchParams: { timeout: 0 },
+      })
     },
 
     longPollSync(
       since: string,
-      options?: { signal?: AbortSignal | null; timeoutMs?: number },
+      options?: { signal?: AbortSignal | undefined; timeoutMs?: number },
     ): Promise<SyncResponse> {
-      const params = new URLSearchParams({
-        timeout: String(options?.timeoutMs ?? 25_000),
-        since,
-      })
-      return transport.request<SyncResponse>(`${MATRIX_API_PREFIX}/sync?${params}`, {
-        signal: options?.signal ?? null,
+      return transport.request(Endpoints.SYNC, {
+        searchParams: {
+          timeout: options?.timeoutMs ?? SYNC_TIMEOUT_MS,
+          since,
+        },
+        signal: options?.signal,
       })
     },
 
     getRoomHistory(roomId: string, from: string, signal?: AbortSignal): Promise<MessagesResponse> {
-      const params = new URLSearchParams({
-        dir: 'b',
-        from,
-        limit: String(HISTORY_PAGE_SIZE),
+      return transport.request(Endpoints.LOAD_HISTORY({ roomId }), {
+        searchParams: {
+          dir: 'b',
+          from,
+          limit: HISTORY_PAGE_SIZE,
+        },
+        signal,
       })
-      return transport.request<MessagesResponse>(
-        `${MATRIX_API_PREFIX}/rooms/${encodeURIComponent(roomId)}/messages?${params}`,
-        { signal: signal ?? null },
-      )
     },
 
-    sendMessage(params: {
-      txnId: string
-      roomId: string
-      body: string
-      replyToEventId?: string
-    }): Promise<{ event_id: string }> {
-      const { roomId, txnId, body, replyToEventId } = params
+    sendMessage({ roomId, txnId, content }: SendMessageParams): Promise<SendEventResponse> {
+      return transport.request(Endpoints.SEND_MESSAGE({ roomId, txnId }), {
+        method: 'PUT',
+        body: content,
+      })
+    },
 
-      return transport.request<{ event_id: string }>(
-        `${MATRIX_API_PREFIX}/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({
-            msgtype: MsgType.Text,
-            body,
-            // reply по спеке — только m.relates_to; rich-reply фоллбек в body не пишем
-            ...(replyToEventId
-              ? { 'm.relates_to': { 'm.in_reply_to': { event_id: replyToEventId } } }
-              : {}),
-          }),
-        },
-      )
+    uploadMedia(file: File, options?: UploadOptions): Promise<UploadResponse> {
+      return transport.upload(Endpoints.UPLOAD_MEDIA, file, {
+        ...options,
+        searchParams: { filename: file.name },
+      })
     },
 
     sendReadReceipt(roomId: string, eventId: string): Promise<Record<string, never>> {
-      return transport.request<Record<string, never>>(
-        `${MATRIX_API_PREFIX}/rooms/${encodeURIComponent(roomId)}/receipt/${ReceiptType.Read}/${encodeURIComponent(eventId)}`,
-        {
-          method: 'POST',
-          body: JSON.stringify({}),
-        },
-      )
+      return transport.request(Endpoints.MARK_READ({ roomId, eventId }), {
+        method: 'POST',
+        body: {},
+      })
     },
   }
 }

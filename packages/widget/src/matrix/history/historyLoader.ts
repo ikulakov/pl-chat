@@ -1,8 +1,17 @@
-import { timelineEventsToItems } from '../../domain/eventMapping'
-import { sleep } from '../../shared/sleep'
+import { timelineEventsToItems } from '../mappers/timeline'
+import { sleep } from '../../shared/utils/sleep'
 import type { RuntimeAction } from '../../store/state'
-import { HISTORY_RETRY_BASE_MS, HISTORY_RETRY_MAX_MS, MAX_HISTORY_PAGES_PER_CALL } from '../consts'
 import type { MatrixApi } from '../matrixApi'
+
+// Максимальное кол-во страниц для просмотра на случай если все события страницы будут не целевыми
+const MAX_HISTORY_PAGES_PER_CALL = 5
+
+// Базовая пауза перед ретраем догрузки истории; растёт вдвое каждую попытку (backoff).
+// Количество попыток не ограничено — ретраим, пока вызывающий разрешает (пользователь у верха).
+const HISTORY_RETRY_BASE_MS = 1_000
+
+// Потолок backoff-паузы: пользователь стоит у верха и ждёт — паузы длиннее бессмысленны.
+const HISTORY_RETRY_MAX_MS = 10_000
 
 export interface HistoryContext {
   roomId: string
@@ -10,7 +19,7 @@ export interface HistoryContext {
 }
 
 export interface HistoryLoadRequest {
-  getContext: () => HistoryContext | null
+  getContext: () => HistoryContext | undefined
   /** Сессионная ось отмены (поколение сессии владельца). Опрашивается на await-границах —
    *  в отличие от `stop()`, запрос в полёте не рвёт. */
   isStale: () => boolean

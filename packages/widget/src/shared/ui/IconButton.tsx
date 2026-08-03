@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
-import { cn } from '../cn'
+import { cn } from '../utils/cn'
 import styles from './IconButton.module.css'
 
 type Variant = 'surface' | 'floating' | 'ghost' | 'accent' | 'contrast'

@@ -1,50 +1,27 @@
-import { MatrixEventType, ReceiptType } from '../matrix/consts'
-import type { EphemeralEvent, ReceiptEvent } from '../matrix/types'
 import { isOptimistic } from './optimistic'
 import { isSystem, type TimelineItem } from './timeline'
 
+/** Закладка участника: до какого события он дочитал. */
 export interface ReadReceipt {
   eventId: string
 }
 
-function isReceiptEvent(event: EphemeralEvent): event is ReceiptEvent {
-  return event.type === MatrixEventType.Receipt
+/** Сырая пара из m.receipt — ещё не прошедшая гард монотонности. */
+export interface ReadMarker {
+  userId: string
+  eventId: string
 }
 
-// Группировка m.read по пользователям userId → eventId на основе ephemeral-событий
-function ephemeralEventsToMarkers(
-  events: EphemeralEvent[],
-): Array<[userId: string, eventId: string]> {
-  const markers: Array<[string, string]> = []
-
-  for (const event of events) {
-    if (!isReceiptEvent(event)) continue
-
-    for (const [eventId, byType] of Object.entries(event.content)) {
-      const readers = byType[ReceiptType.Read]
-      if (!readers) continue
-
-      for (const userId of Object.keys(readers)) {
-        markers.push([userId, eventId])
-      }
-    }
-  }
-
-  return markers
-}
-
-// Обновляет readReceipts участников данными из sync m.receipt.
+// Применяет маркеры прочтения из sync к закладкам участников.
 // canMoveMarker не даёт откатить свою закладку назад: markRead двигает её сразу, а эхо из sync приходит с опозданием.
 // Ничего не сдвинулось — возвращаем existing как есть
-export function mergeReadReceipts(
+export function applyReadMarkers(
   existing: Record<string, ReadReceipt>,
-  events: EphemeralEvent[] = [],
+  markers: ReadMarker[],
   timeline: TimelineItem[],
 ): Record<string, ReadReceipt> {
-  const incomingMarkers = ephemeralEventsToMarkers(events)
-
   let result = existing
-  for (const [userId, eventId] of incomingMarkers) {
+  for (const { userId, eventId } of markers) {
     if (!canMoveMarker(timeline, result[userId]?.eventId ?? null, eventId)) continue
 
     if (result === existing) result = { ...existing }

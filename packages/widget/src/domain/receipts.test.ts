@@ -1,23 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { systemItem, textItem } from '../shared/testUtils/matrixFixtures'
-import type { EphemeralEvent } from '../matrix/types'
 import type { TimelineItem } from './timeline'
 import {
+  applyReadMarkers,
   canMoveMarker,
   countUnread,
-  mergeReadReceipts,
   readOwnEventIds,
+  type ReadMarker,
   type ReadReceipt,
 } from './receipts'
 
 const OWN = '@guest:bank'
 const OPERATOR = '@operator:bank'
-
-function readReceiptEvent(
-  content: Record<string, { 'm.read'?: Record<string, { ts?: number }> }>,
-): EphemeralEvent {
-  return { type: 'm.receipt', content }
-}
 
 function ownMsg(eventId: string, ts: number): TimelineItem {
   return textItem({ localId: eventId, eventId, sender: OWN, body: 'x', ts })
@@ -27,27 +21,20 @@ function opMsg(eventId: string, ts: number): TimelineItem {
   return textItem({ localId: eventId, eventId, sender: OPERATOR, body: 'x', ts })
 }
 
-describe('mergeReadReceipts', () => {
+describe('applyReadMarkers', () => {
   const timeline = [ownMsg('$m1', 1), ownMsg('$m2', 2)]
+  const marker = (eventId: string): ReadMarker => ({ userId: OPERATOR, eventId })
 
-  it('сворачивает m.read в карту userId → {eventId}', () => {
-    const result = mergeReadReceipts(
-      {},
-      [readReceiptEvent({ $m1: { 'm.read': { [OPERATOR]: { ts: 10 } } } })],
-      timeline,
-    )
+  it('сворачивает маркеры в карту userId → {eventId}', () => {
+    const result = applyReadMarkers({}, [marker('$m1')], timeline)
 
     expect(result).toEqual({ [OPERATOR]: { eventId: '$m1' } })
   })
 
-  it('более поздний по ленте receipt юзера перетирает предыдущий', () => {
+  it('более поздний по ленте маркер юзера перетирает предыдущий', () => {
     const base: Record<string, ReadReceipt> = { [OPERATOR]: { eventId: '$m1' } }
 
-    const result = mergeReadReceipts(
-      base,
-      [readReceiptEvent({ $m2: { 'm.read': { [OPERATOR]: { ts: 20 } } } })],
-      timeline,
-    )
+    const result = applyReadMarkers(base, [marker('$m2')], timeline)
 
     expect(result[OPERATOR]).toEqual({ eventId: '$m2' })
   })
@@ -57,50 +44,25 @@ describe('mergeReadReceipts', () => {
     // без гарда откат вызвал бы повторный POST и мигание производного unreadCount
     const base: Record<string, ReadReceipt> = { [OPERATOR]: { eventId: '$m2' } }
 
-    const result = mergeReadReceipts(
-      base,
-      [readReceiptEvent({ $m1: { 'm.read': { [OPERATOR]: { ts: 30 } } } })],
-      timeline,
-    )
+    const result = applyReadMarkers(base, [marker('$m1')], timeline)
 
     expect(result).toBe(base)
   })
 
-  it('принимает receipt на событие вне ленты, пока маркера нет (регидратация после F5)', () => {
+  it('принимает маркер на событие вне ленты, пока своего маркера нет (регидратация после F5)', () => {
     // initial sync после перезагрузки: маркер пуст, receipt может указывать старше окна истории
-    const result = mergeReadReceipts(
-      {},
-      [readReceiptEvent({ $old: { 'm.read': { [OPERATOR]: { ts: 5 } } } })],
-      timeline,
-    )
+    const result = applyReadMarkers({}, [marker('$old')], timeline)
 
     expect(result[OPERATOR]).toEqual({ eventId: '$old' })
   })
 
-  it('игнорирует не-receipt ephemeral-события (m.typing и пр.)', () => {
-    const typing: EphemeralEvent = {
-      type: 'm.typing',
-      content: { user_ids: [OPERATOR] },
-    }
-
-    expect(mergeReadReceipts({}, [typing], timeline)).toEqual({})
-  })
-
-  it('игнорирует receipt без m.read', () => {
-    expect(mergeReadReceipts({}, [readReceiptEvent({ $m1: {} })], timeline)).toEqual({})
-  })
-
-  it('принимает forward-receipt на событие вне ленты, даже когда маркер уже стоит', () => {
+  it('принимает forward-маркер на событие вне ленты, даже когда маркер уже стоит', () => {
     // оператор дочитал наше сообщение, которого в текущем окне ещё нет (пришло раньше события).
     // раньше такой receipt терялся (canMoveMarker блокировал), а m.receipt не переприсылается —
     // и «прочитано» так и не доезжало. Теперь маркер сохраняется и применится, когда событие догрузится.
     const base: Record<string, ReadReceipt> = { [OPERATOR]: { eventId: '$m1' } }
 
-    const result = mergeReadReceipts(
-      base,
-      [readReceiptEvent({ $notYetInTimeline: { 'm.read': { [OPERATOR]: { ts: 40 } } } })],
-      timeline,
-    )
+    const result = applyReadMarkers(base, [marker('$notYetInTimeline')], timeline)
 
     expect(result[OPERATOR]).toEqual({ eventId: '$notYetInTimeline' })
   })
