@@ -78,9 +78,8 @@ export function MessageList({ userId }: Props) {
                   <SystemMessage
                     key={item.localId}
                     itemId={item.localId}
-                  >
-                    {item.content.body}
-                  </SystemMessage>
+                    label={item.label}
+                  />
                 )
               }
               const position = getPosition(arr[index - 1], item, arr[index + 1])

@@ -1,4 +1,4 @@
-export type TimelineItemKind = 'text' | 'image' | 'file' | 'notice' | 'system'
+import type { SystemMessageKey } from '../i18n'
 
 export type SendStatus = 'sending' | 'sent' | 'failed'
 
@@ -63,12 +63,16 @@ export interface FileTimelineItem extends BaseTimelineItem {
 
 export type MediaTimelineItem = ImageTimelineItem | FileTimelineItem
 
+export type SystemLabel =
+  | { source: 'literal'; body: string }
+  | { source: 'i18n'; key: SystemMessageKey; params?: Record<string, string> }
+
 export interface SystemTimelineItem {
   kind: 'system' | 'notice'
   localId: string
   eventId: string
   ts: number
-  content: { body: string }
+  label: SystemLabel
 }
 
 export type MessageTimelineItem = TextTimelineItem | MediaTimelineItem

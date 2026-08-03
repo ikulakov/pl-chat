@@ -1,23 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import {
-  emptyJoinedRoom,
-  OPERATOR_ID,
-  operatorCurrentEvent,
-  roomMessageEvent,
-  textItem,
-} from '../shared/testUtils/matrixFixtures'
+import { OPERATOR_ID, textItem } from '../shared/testUtils/matrixFixtures'
+import type { RoomSyncPatch } from '../domain/roomSync'
 import type { TextTimelineItem } from '../domain/timeline'
-import type { EphemeralEvent, JoinedRoom } from '../matrix/types'
 import { chatRuntimeReducer } from './reducer'
 import type { ChatRuntimeState, Identity } from './state'
 import { INITIAL_RUNTIME_STATE } from './store'
 
 const IDENTITY: Identity = { userId: '@user:bank', roomId: '!room:bank' }
 const OPERATOR = '@operator:bank'
-
-function readReceipt(eventId: string, reader: string): EphemeralEvent {
-  return { type: 'm.receipt', content: { [eventId]: { 'm.read': { [reader]: { ts: 1 } } } } }
-}
 
 // connected-состояние с одним своим доставленным ('sent') сообщением $real в таймлайне
 function connectedWithSentMessage(): ChatRuntimeState {
@@ -42,10 +32,16 @@ function connectedWithSentMessage(): ChatRuntimeState {
   }
 }
 
-function joinedRoom(): JoinedRoom {
-  return emptyJoinedRoom({
-    state: { events: [operatorCurrentEvent()] },
-    timeline: { limited: true, prev_batch: 'p1', events: [roomMessageEvent()] },
+function roomPatch(overrides: Partial<RoomSyncPatch> = {}): RoomSyncPatch {
+  return { timeline: [], readMarkers: [], prevBatch: null, ...overrides }
+}
+
+// снимок «как при старте комнаты»: одно сообщение, активный оператор, курсор истории
+function initialPatch(): RoomSyncPatch {
+  return roomPatch({
+    timeline: [textItem({ localId: '$m1', eventId: '$m1' })],
+    operator: { isActive: true, id: OPERATOR_ID, displayName: 'Support' },
+    prevBatch: 'p1',
   })
 }
 
@@ -69,7 +65,7 @@ describe('chatRuntimeReducer', () => {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's1',
-      joinedRoom: joinedRoom(),
+      room: initialPatch(),
     })
 
     expect(next.phase).toBe('connected')
@@ -84,7 +80,7 @@ describe('chatRuntimeReducer', () => {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's1',
-      joinedRoom: joinedRoom(),
+      room: initialPatch(),
     })
     const withDraft = chatRuntimeReducer(connected, {
       type: 'message.optimisticAdded',
@@ -95,22 +91,14 @@ describe('chatRuntimeReducer', () => {
       type: 'session.started',
       identity: { userId: '@new:bank', roomId: '!new:bank' },
       cursor: 's2',
-      joinedRoom: emptyJoinedRoom({
-        timeline: {
-          events: [
-            roomMessageEvent({
-              event_id: '$new',
-              content: { body: 'new session message' },
-              origin_server_ts: 3,
-            }),
-          ],
-        },
+      room: roomPatch({
+        timeline: [
+          textItem({ localId: '$new', eventId: '$new', body: 'new session message', ts: 3 }),
+        ],
       }),
     })
 
-    expect(next.room.timeline.map((message) => message.content.body)).toEqual([
-      'new session message',
-    ])
+    expect(next.room.timeline).toMatchObject([{ content: { body: 'new session message' } }])
   })
 
   it('цель ответа переживает re-auth в ту же комнату и сбрасывается при новой', () => {
@@ -119,7 +107,7 @@ describe('chatRuntimeReducer', () => {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's1',
-      joinedRoom: joinedRoom(),
+      room: initialPatch(),
     })
     const withTarget = chatRuntimeReducer(connected, {
       type: 'reply.targeted',
@@ -130,13 +118,13 @@ describe('chatRuntimeReducer', () => {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's2',
-      joinedRoom: emptyJoinedRoom(),
+      room: roomPatch(),
     })
     const newRoom = chatRuntimeReducer(withTarget, {
       type: 'session.started',
       identity: { userId: '@new:bank', roomId: '!new:bank' },
       cursor: 's2',
-      joinedRoom: emptyJoinedRoom(),
+      room: roomPatch(),
     })
 
     expect(sameRoom.room.replyTarget).toEqual({
@@ -152,7 +140,7 @@ describe('chatRuntimeReducer', () => {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's1',
-      joinedRoom: joinedRoom(),
+      room: initialPatch(),
     })
 
     const synced = chatRuntimeReducer(connected, { type: 'sync.received', cursor: 's2' })
@@ -166,7 +154,7 @@ describe('chatRuntimeReducer', () => {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's1',
-      joinedRoom: joinedRoom(),
+      room: initialPatch(),
     })
 
     const failed = chatRuntimeReducer(connected, { type: 'connection.failed', error: 'network' })
@@ -178,12 +166,25 @@ describe('chatRuntimeReducer', () => {
     expect(failed.room.timeline).toHaveLength(0)
   })
 
+  it('session.closed возвращает рантайм в исходное состояние', () => {
+    const connected = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'session.started',
+      identity: IDENTITY,
+      cursor: 's1',
+      room: initialPatch(),
+    })
+
+    const closed = chatRuntimeReducer(connected, { type: 'session.closed' })
+
+    expect(closed).toEqual(INITIAL_RUNTIME_STATE)
+  })
+
   it('session.recovering keeps the current runtime data while recovery is in flight', () => {
     const connected = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's1',
-      joinedRoom: joinedRoom(),
+      room: initialPatch(),
     })
     const withError = { ...connected, error: 'expired' }
 
@@ -320,18 +321,17 @@ describe('chatRuntimeReducer', () => {
     const resolvedBySync = chatRuntimeReducer(withOptimistic, {
       type: 'sync.received',
       cursor: 's1',
-      joinedRoom: emptyJoinedRoom({
+      room: roomPatch({
         // txnId совпадает с оптимистичным — иначе mergeTimeline не свяжет черновик с реальным событием
-        timeline: {
-          events: [
-            roomMessageEvent({
-              event_id: '$real',
-              sender: IDENTITY.userId,
-              content: { body: 'hi' },
-              unsigned: { transaction_id: 'txn-1' },
-            }),
-          ],
-        },
+        timeline: [
+          textItem({
+            localId: '$real',
+            eventId: '$real',
+            sender: IDENTITY.userId,
+            body: 'hi',
+            txnId: 'txn-1',
+          }),
+        ],
       }),
     })
 
@@ -342,11 +342,11 @@ describe('chatRuntimeReducer', () => {
     expect(failedLate.room.timeline[0]).toMatchObject({ sendStatus: 'sent' })
   })
 
-  it('folds operator read receipt from ephemeral into readReceipts (индикатор — при рендере)', () => {
+  it('folds operator read marker into readReceipts (индикатор — при рендере)', () => {
     const next = chatRuntimeReducer(connectedWithSentMessage(), {
       type: 'sync.received',
       cursor: 's2',
-      joinedRoom: emptyJoinedRoom({ ephemeral: { events: [readReceipt('$real', OPERATOR)] } }),
+      room: roomPatch({ readMarkers: [{ userId: OPERATOR, eventId: '$real' }] }),
     })
 
     // sendStatus не мутируется — «прочитано» вычисляется в рендере из readReceipts
@@ -354,26 +354,20 @@ describe('chatRuntimeReducer', () => {
     expect(next.room.timeline[0]).toMatchObject({ sendStatus: 'sent' })
   })
 
-  it('keeps prior read receipts across a later sync without ephemeral', () => {
+  it('keeps prior read receipts across a later sync without markers', () => {
     const withReceipt = chatRuntimeReducer(connectedWithSentMessage(), {
       type: 'sync.received',
       cursor: 's2',
-      joinedRoom: emptyJoinedRoom({ ephemeral: { events: [readReceipt('$real', OPERATOR)] } }),
+      room: roomPatch({ readMarkers: [{ userId: OPERATOR, eventId: '$real' }] }),
     })
 
     const resynced = chatRuntimeReducer(withReceipt, {
       type: 'sync.received',
       cursor: 's3',
-      joinedRoom: emptyJoinedRoom({
-        timeline: {
-          events: [
-            roomMessageEvent({
-              event_id: '$real',
-              sender: IDENTITY.userId,
-              content: { body: 'hi' },
-            }),
-          ],
-        },
+      room: roomPatch({
+        timeline: [
+          textItem({ localId: '$real', eventId: '$real', sender: IDENTITY.userId, body: 'hi' }),
+        ],
       }),
     })
 
@@ -423,8 +417,8 @@ describe('chatRuntimeReducer', () => {
     const withNext = chatRuntimeReducer(base, {
       type: 'sync.received',
       cursor: 's2',
-      joinedRoom: emptyJoinedRoom({
-        timeline: { events: [roomMessageEvent({ event_id: '$next' })] },
+      room: roomPatch({
+        timeline: [textItem({ localId: '$next', eventId: '$next', ts: 2 })],
       }),
     })
     const marked = chatRuntimeReducer(withNext, {
@@ -436,9 +430,7 @@ describe('chatRuntimeReducer', () => {
     const echoed = chatRuntimeReducer(marked, {
       type: 'sync.received',
       cursor: 's3',
-      joinedRoom: emptyJoinedRoom({
-        ephemeral: { events: [readReceipt('$real', IDENTITY.userId)] },
-      }),
+      room: roomPatch({ readMarkers: [{ userId: IDENTITY.userId, eventId: '$real' }] }),
     })
 
     expect(echoed.room.readReceipts[IDENTITY.userId]).toEqual({ eventId: '$next' })
@@ -477,7 +469,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's1',
-      joinedRoom: joinedRoom(),
+      room: initialPatch(),
     })
   }
 
@@ -490,7 +482,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's1',
-      joinedRoom: emptyJoinedRoom({ timeline: { events: [roomMessageEvent()] } }),
+      room: roomPatch({ timeline: [textItem()] }),
     })
 
     expect(next.room.prevBatch).toBeNull()
@@ -507,9 +499,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
     const synced = chatRuntimeReducer(paginated, {
       type: 'sync.received',
       cursor: 's2',
-      joinedRoom: emptyJoinedRoom({
-        timeline: { events: [roomMessageEvent({ event_id: '$m2' })] },
-      }),
+      room: roomPatch({ timeline: [textItem({ localId: '$m2', eventId: '$m2' })] }),
     })
 
     expect(synced.room.prevBatch).toBe('p2')
@@ -528,7 +518,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's9',
-      joinedRoom: joinedRoom(),
+      room: initialPatch(),
     })
 
     expect(resumed.room.prevBatch).toBe('p2')
@@ -539,7 +529,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
       type: 'session.started',
       identity: { userId: '@user2:bank', roomId: '!other:bank' },
       cursor: 's9',
-      joinedRoom: joinedRoom(),
+      room: initialPatch(),
     })
 
     expect(resumed.room.prevBatch).toBe('p1')
@@ -553,7 +543,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
       type: 'session.started',
       identity: IDENTITY,
       cursor: 's9',
-      joinedRoom: joinedRoom(),
+      room: initialPatch(),
     })
 
     expect(loading.room.isLoadingHistory).toBe(true)

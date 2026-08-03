@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { FileTimelineItem, TextTimelineItem } from '../../domain/timeline'
+import type { TextTimelineItem } from '../../domain/timeline'
 import { t } from '../../i18n'
-import { noticeItem, systemItem, textItem } from '../../shared/testUtils/matrixFixtures'
+import { fileItem, noticeItem, systemItem, textItem } from '../../shared/testUtils/matrixFixtures'
 import { getPosition, getReplyPreview, indexMessagesByEventId } from './MessageList.helpers'
 
 function message(sender: string): TextTimelineItem {
@@ -96,20 +96,7 @@ describe('getReplyPreview', () => {
   it('цитата на файл без подписи показывает имя файла, а не заглушку «недоступно»', () => {
     // у медиа body — только подпись (см. eventMapping.createMediaItem), и без неё он пуст;
     // цитировать при этом есть что — сам файл загружен и лежит в ленте
-    const parent: FileTimelineItem = {
-      kind: 'file',
-      localId: 'p1',
-      eventId: '$parent',
-      sender: OPERATOR,
-      ts: 0,
-      sendStatus: 'sent',
-      content: {
-        body: '',
-        url: 'mxc://bank.ru/abc',
-        filename: 'doc.pdf',
-        info: { mimetype: 'application/pdf', size: 100 },
-      },
-    }
+    const parent = fileItem({ localId: 'p1', eventId: '$parent', sender: OPERATOR, ts: 0 })
 
     const preview = getReplyPreview({
       index: indexMessagesByEventId([parent, reply('$parent')]),

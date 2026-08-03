@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { makeFile as file } from '../testUtils/matrixFixtures'
 import { isPreviewableImage, resolveMimeType, validateFile } from './fileValidation'
-
-function file(name: string, size: number, type = ''): File {
-  const blob = new Blob([new Uint8Array(Math.min(size, 1024))], { type })
-  // jsdom File: переопределяем size, т.к. реальные байты не создаём.
-  return Object.defineProperty(new File([blob], name, { type }), 'size', { value: size })
-}
 
 describe('validateFile', () => {
   it('accepts whitelisted extensions within the size limit', () => {

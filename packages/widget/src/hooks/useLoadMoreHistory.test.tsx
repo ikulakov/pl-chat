@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TimelineItem } from '../domain/timeline'
 import { textItem } from '../shared/testUtils/matrixFixtures'
-import { chatStore, INITIAL_ROOM_STATE } from '../store/store'
+import { chatStore, INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '../store/store'
 import { ITEM_ID_ATTR, useLoadMoreHistory } from './useLoadMoreHistory'
 
 // Экшены дёргают ChatController → MatrixService, которые в этом тесте не поднимаются
@@ -79,7 +79,8 @@ function scrollTo(container: HTMLElement, top: number): void {
 
 describe('useLoadMoreHistory', () => {
   beforeEach(() => {
-    chatStore.setState({ room: INITIAL_ROOM_STATE })
+    // Полный сброс, не только room, — стор синглтон между тестами.
+    chatStore.setState({ ...INITIAL_RUNTIME_STATE, room: INITIAL_ROOM_STATE })
   })
 
   afterEach(() => {

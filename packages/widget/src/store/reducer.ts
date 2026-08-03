@@ -1,10 +1,8 @@
-import { timelineEventsToItems } from '../domain/eventMapping'
 import { mergeTimeline, prependTimeline } from '../domain/mergeTimeline'
-import { reduceOperator } from '../domain/operator'
-import { mergeReadReceipts } from '../domain/receipts'
+import { applyReadMarkers } from '../domain/receipts'
+import type { RoomSyncPatch } from '../domain/roomSync'
 import type { MessageTimelineItem, TimelineItem } from '../domain/timeline'
 import { isMedia, isSystem } from '../domain/timeline'
-import type { JoinedRoom } from '../matrix/types'
 import { assertNever } from '../shared/utils/assertNever'
 import type { ChatRuntimeState, RoomState, RuntimeAction } from './state'
 import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from './store'
@@ -30,31 +28,27 @@ function updateMessage(
   )
 }
 
-function applySync(room: RoomState, joinedRoom: JoinedRoom): RoomState {
-  const stateEvents = joinedRoom.state.events
-  const timelineEvents = joinedRoom.timeline.events
-  const ephemeralEvents = joinedRoom.ephemeral?.events
-
-  const timeline = mergeTimeline(room.timeline, timelineEventsToItems(timelineEvents))
+function applySync(room: RoomState, patch: RoomSyncPatch): RoomState {
+  const timeline = mergeTimeline(room.timeline, patch.timeline)
 
   return {
     ...room,
     timeline,
-    operator: reduceOperator(room.operator, [...stateEvents, ...timelineEvents]),
-    readReceipts: mergeReadReceipts(room.readReceipts, ephemeralEvents, timeline),
+    operator: patch.operator ?? room.operator,
+    readReceipts: applyReadMarkers(room.readReceipts, patch.readMarkers, timeline),
   }
 }
 
-function startRoom(joinedRoom: JoinedRoom): RoomState {
+function startRoom(patch: RoomSyncPatch): RoomState {
   return {
-    ...applySync(INITIAL_ROOM_STATE, joinedRoom),
-    prevBatch: joinedRoom.timeline.prev_batch ?? null,
+    ...applySync(INITIAL_ROOM_STATE, patch),
+    prevBatch: patch.prevBatch,
   }
 }
 
-function continueRoom(room: RoomState, joinedRoom: JoinedRoom): RoomState {
+function continueRoom(room: RoomState, patch: RoomSyncPatch): RoomState {
   return {
-    ...applySync(room, joinedRoom),
+    ...applySync(room, patch),
     // курсор истории держим свой — из снимка он откатит подгрузку к низу ленты
     prevBatch: room.prevBatch,
     isLoadingHistory: false,
@@ -75,8 +69,11 @@ export function chatRuntimeReducer(
     case 'connection.failed':
       return { ...INITIAL_RUNTIME_STATE, phase: 'error', error: action.error }
 
+    case 'session.closed':
+      return INITIAL_RUNTIME_STATE
+
     case 'session.started': {
-      const { identity, cursor, joinedRoom } = action
+      const { identity, cursor, room } = action
 
       // isSameRoom достижим только в авторизованной зоне:
       // при протухшем токене re-auth авторизованному пользователю вернёт ту же комнату при живой ленте;
@@ -89,17 +86,17 @@ export function chatRuntimeReducer(
         error: null,
         identity,
         cursor,
-        room: isSameRoom ? continueRoom(state.room, joinedRoom) : startRoom(joinedRoom),
+        room: isSameRoom ? continueRoom(state.room, room) : startRoom(room),
       }
     }
 
     case 'sync.received': {
-      const { cursor, joinedRoom } = action
+      const { cursor, room } = action
 
       return {
         ...state,
         cursor,
-        room: joinedRoom ? applySync(state.room, joinedRoom) : state.room,
+        room: room ? applySync(state.room, room) : state.room,
       }
     }
 

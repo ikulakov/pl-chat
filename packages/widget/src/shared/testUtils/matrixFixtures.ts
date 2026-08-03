@@ -1,11 +1,18 @@
 import { vi } from 'vitest'
-import type { SystemTimelineItem, TextTimelineItem } from '../../domain/timeline'
+import type {
+  FileTimelineItem,
+  ImageTimelineItem,
+  MediaContent,
+  SystemTimelineItem,
+  TextTimelineItem,
+} from '../../domain/timeline'
 import { MatrixEventType, MsgType, OperatorStatus } from '../../matrix/consts'
 import type { MessagesResponse, SyncResponse } from '../../matrix/dto'
 import type { MatrixApi } from '../../matrix/matrixApi'
 import type { SessionInit } from '../../matrix/session/types'
 import type {
   ClientEvent,
+  EphemeralEvent,
   JoinedRoom,
   OperatorCurrentEvent,
   OperatorJoinedEvent,
@@ -40,7 +47,7 @@ export function systemItem(
     localId: overrides.localId ?? 'sys1',
     eventId: overrides.eventId ?? 'sys1',
     ts: overrides.ts ?? 0,
-    content: { body: overrides.body ?? 'system' },
+    label: { source: 'literal', body: overrides.body ?? 'system' },
   }
 }
 
@@ -52,8 +59,74 @@ export function noticeItem(
     localId: overrides.localId ?? 'notice1',
     eventId: overrides.eventId ?? 'notice1',
     ts: overrides.ts ?? 0,
-    content: { body: overrides.body ?? 'notice' },
+    label: { source: 'literal', body: overrides.body ?? 'notice' },
   }
+}
+
+export function fileItem(
+  overrides: Partial<Omit<FileTimelineItem, 'kind' | 'content'>> & {
+    body?: string
+    content?: Partial<MediaContent>
+  } = {},
+): FileTimelineItem {
+  const { body, content, ...rest } = overrides
+  return {
+    kind: 'file',
+    localId: 'm1',
+    eventId: '$m1',
+    sender: OPERATOR_ID,
+    ts: 0,
+    sendStatus: 'sent',
+    ...rest,
+    content: {
+      body: body ?? '',
+      url: 'mxc://bank.ru/abc',
+      filename: 'doc.pdf',
+      info: { mimetype: 'application/pdf', size: 100 },
+      ...content,
+    },
+  }
+}
+
+export function imageItem(
+  overrides: Partial<Omit<ImageTimelineItem, 'kind' | 'content'>> & {
+    body?: string
+    content?: Partial<MediaContent>
+  } = {},
+): ImageTimelineItem {
+  const { body, content, ...rest } = overrides
+  return {
+    kind: 'image',
+    localId: 'm1',
+    eventId: '$m1',
+    sender: OPERATOR_ID,
+    ts: 0,
+    sendStatus: 'sent',
+    ...rest,
+    content: {
+      body: body ?? '',
+      url: 'mxc://bank.ru/abc',
+      filename: 'p.png',
+      info: { mimetype: 'image/png', size: 100 },
+      ...content,
+    },
+  }
+}
+
+export function makeFile(name: string, size = 1, type = ''): File {
+  // jsdom File: реальные байты не создаём — переопределяем size напрямую.
+  const blob = new Blob([new Uint8Array(Math.min(size, 1024))], { type })
+  return Object.defineProperty(new File([blob], name, { type }), 'size', { value: size })
+}
+
+export function receiptEvent(
+  content: Record<string, { 'm.read'?: Record<string, { ts?: number }> }>,
+): EphemeralEvent {
+  return { type: 'm.receipt', content }
+}
+
+export function readReceipt(eventId: string, reader: string, ts = 1): EphemeralEvent {
+  return receiptEvent({ [eventId]: { 'm.read': { [reader]: { ts } } } })
 }
 
 export function emptyJoinedRoom(overrides: Partial<JoinedRoom> = {}): JoinedRoom {
@@ -155,9 +228,6 @@ export function makeMatrixApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
     longPollSync: vi.fn<MatrixApi['longPollSync']>().mockReturnValue(new Promise<never>(() => {})),
     getRoomHistory: vi.fn<MatrixApi['getRoomHistory']>().mockResolvedValue(messagesResponse()),
     sendMessage: vi.fn<MatrixApi['sendMessage']>().mockResolvedValue({ event_id: '$real' }),
-    sendMediaMessage: vi
-      .fn<MatrixApi['sendMediaMessage']>()
-      .mockResolvedValue({ event_id: '$real' }),
     uploadMedia: vi
       .fn<MatrixApi['uploadMedia']>()
       .mockResolvedValue({ content_uri: 'mxc://bank.ru/abc' }),

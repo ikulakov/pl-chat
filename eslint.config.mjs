@@ -37,6 +37,26 @@ export default tseslint.config(
     },
   },
 
+  // Граница ACL: wire-форма Matrix живёт только в matrix/. Перевод протокола в доменные
+  // типы делают matrix/mappers/*, поэтому domain и store о нём знать не должны.
+  {
+    files: ['packages/widget/src/{domain,store}/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/matrix/**'],
+              message:
+                'domain и store не знают wire-протокол Matrix: переводи его в matrix/mappers/* и передавай доменный тип (например RoomSyncPatch).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // widget only
   {
     files: ['packages/widget/src/**/*.{ts,tsx}'],

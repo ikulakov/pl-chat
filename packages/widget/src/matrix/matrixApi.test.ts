@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { MsgType } from './consts'
 import { createMatrixApi } from './matrixApi'
 import type { MatrixTransport } from './transport/matrixTransport'
 
@@ -11,118 +12,21 @@ function fakeTransport() {
 }
 
 describe('createMatrixApi — форма запросов', () => {
-  it('sendMessage: PUT на send/m.room.message/{txnId}, roomId url-энкодится, тело m.text', async () => {
+  it('sendMessage: PUT на send/m.room.message/{txnId}, roomId url-энкодится, тело уходит как есть', async () => {
     const { transport, request } = fakeTransport()
 
     await createMatrixApi(transport).sendMessage({
       roomId: '!room:bank',
       txnId: 'txn-1',
-      content: { body: 'привет' },
+      content: { msgtype: MsgType.Text, body: 'привет' },
     })
 
     const [path, init] = request.mock.calls[0]!
     // roomId содержит : — без encodeURIComponent (%3A) двоеточие распадётся на лишний сегмент пути
     expect(path).toBe('/_matrix/client/v3/rooms/!room%3Abank/send/m.room.message/txn-1')
     expect(init).toMatchObject({ method: 'PUT' })
-    expect((init as { body: unknown }).body).toEqual({
-      msgtype: 'm.text',
-      body: 'привет',
-    })
-  })
-
-  it('sendMessage: reply кладёт m.relates_to.m.in_reply_to.event_id и не пишет fallback в body', async () => {
-    const { transport, request } = fakeTransport()
-
-    await createMatrixApi(transport).sendMessage({
-      roomId: '!room:bank',
-      txnId: 'txn-1',
-      content: { body: 'ок' },
-      replyToEventId: '$parent:bank',
-    })
-
-    const [, init] = request.mock.calls[0]!
-    expect((init as { body: unknown }).body).toEqual({
-      msgtype: 'm.text',
-      body: 'ок',
-      'm.relates_to': { 'm.in_reply_to': { event_id: '$parent:bank' } },
-    })
-  })
-
-  it('sendMediaMessage: без подписи body на wire падает на filename (MSC2530), kind → msgtype', async () => {
-    // домен держит подпись и имя файла раздельно (body пуст без подписи), но на проводе
-    // body не бывает пустым — иначе клиенты без media-рендерера покажут пустое сообщение
-    const { transport, request } = fakeTransport()
-
-    await createMatrixApi(transport).sendMediaMessage({
-      roomId: '!room:bank',
-      txnId: 'txn-1',
-      kind: 'image',
-      content: {
-        body: '',
-        url: 'mxc://bank.ru/abc',
-        filename: 'p.png',
-        info: { mimetype: 'image/png', size: 10 },
-      },
-    })
-
-    const [, init] = request.mock.calls[0]!
-    expect((init as { body: unknown }).body).toMatchObject({
-      msgtype: 'm.image',
-      body: 'p.png',
-      filename: 'p.png',
-    })
-  })
-
-  it('sendMediaMessage: подпись переживает отправку, reply едет тем же m.relates_to', async () => {
-    const { transport, request } = fakeTransport()
-
-    await createMatrixApi(transport).sendMediaMessage({
-      roomId: '!room:bank',
-      txnId: 'txn-1',
-      kind: 'file',
-      content: {
-        body: 'смотри договор',
-        url: 'mxc://bank.ru/abc',
-        filename: 'doc.pdf',
-        info: { mimetype: 'application/pdf', size: 10 },
-      },
-      replyToEventId: '$parent:bank',
-    })
-
-    const [, init] = request.mock.calls[0]!
-    expect((init as { body: unknown }).body).toMatchObject({
-      msgtype: 'm.file',
-      body: 'смотри договор',
-      'm.relates_to': { 'm.in_reply_to': { event_id: '$parent:bank' } },
-    })
-  })
-
-  it('sendMediaMessage: локальные поля domain-модели не утекают в Matrix payload', async () => {
-    // контроллер передаёт сюда domain-объект целиком; спред отправил бы на провод любое
-    // будущее локальное поле (превью, статус проверки) — wire-поля собираются поимённо
-    const { transport, request } = fakeTransport()
-
-    await createMatrixApi(transport).sendMediaMessage({
-      roomId: '!room:bank',
-      txnId: 'txn-1',
-      kind: 'file',
-      content: {
-        body: '',
-        url: 'mxc://bank.ru/abc',
-        filename: 'doc.pdf',
-        info: { mimetype: 'application/pdf', size: 10, w: 1, h: 2 },
-        localPreviewUrl: 'blob:...',
-      } as Parameters<ReturnType<typeof createMatrixApi>['sendMediaMessage']>[0]['content'],
-    })
-
-    const [, init] = request.mock.calls[0]!
-    expect((init as { body: unknown }).body).toEqual({
-      msgtype: 'm.file',
-      body: 'doc.pdf',
-      url: 'mxc://bank.ru/abc',
-      filename: 'doc.pdf',
-      info: { mimetype: 'application/pdf', size: 10, w: 1, h: 2 },
-    })
+    // сборка тела живёт в matrix/mappers/outgoing — здесь проверяем только транспортную часть
+    expect((init as { body: unknown }).body).toEqual({ msgtype: 'm.text', body: 'привет' })
   })
 
   it('longPollSync: since + timeout в searchParams, abort-signal пробрасывается', async () => {

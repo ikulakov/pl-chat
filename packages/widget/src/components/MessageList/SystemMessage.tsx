@@ -1,12 +1,18 @@
+import type { SystemLabel } from '../../domain/timeline'
 import { ITEM_ID_ATTR } from '../../hooks/useLoadMoreHistory'
+import { t } from '../../i18n'
 import styles from './SystemMessage.module.css'
 
 interface Props {
   itemId: string
-  children: React.ReactNode
+  label: SystemLabel
 }
 
-export function SystemMessage({ itemId, children }: Props) {
+function resolveLabel(label: SystemLabel): string {
+  return label.source === 'literal' ? label.body : t(label.key, label.params)
+}
+
+export function SystemMessage({ itemId, label }: Props) {
   return (
     <div
       className={styles.systemRow}
@@ -17,7 +23,7 @@ export function SystemMessage({ itemId, children }: Props) {
         className={styles.text}
         data-role="system-message"
       >
-        {children}
+        {resolveLabel(label)}
       </span>
     </div>
   )

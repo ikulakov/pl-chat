@@ -44,6 +44,12 @@ if (typeof globalThis.IntersectionObserver === 'undefined') {
     FakeIntersectionObserver as unknown as typeof IntersectionObserver
 }
 
+// jsdom не реализует object-URL — на них живут превью вложений (картинка в композере).
+if (typeof URL.createObjectURL !== 'function') {
+  URL.createObjectURL = () => 'blob:test'
+  URL.revokeObjectURL = () => {}
+}
+
 // jsdom не реализует ResizeObserver — нужен useAutoScroll для прилипания к низу
 // при изменении высоты контейнера (рост композера, мобильная клавиатура).
 class FakeResizeObserver implements ResizeObserver {

@@ -1,56 +1,43 @@
-import { t } from '../i18n'
-import { MatrixEventType, MsgType } from '../matrix/consts'
-import { getReplyEventId } from '../matrix/replyRelation'
-import type * as Matrix from '../matrix/types'
-import type { TimelineItem, TimelineRelation } from './timeline'
+import type { SystemLabel, TimelineItem, TimelineRelation } from '../../domain/timeline'
+import { MsgType } from '../consts'
+import { isOperatorJoined, isOperatorLeft, isRoomMessage } from '../eventGuards'
+import type * as Matrix from '../types'
 
-function isRoomMessage(event: Matrix.ClientEvent): event is Matrix.RoomMessageEvent {
-  return event.type === MatrixEventType.RoomMessage
-}
-
-function isOperatorJoined(event: Matrix.ClientEvent): event is Matrix.OperatorJoinedEvent {
-  return event.type === MatrixEventType.OperatorJoined
-}
-
-function isOperatorLeft(event: Matrix.ClientEvent): event is Matrix.OperatorLeftEvent {
-  return event.type === MatrixEventType.OperatorLeft
-}
-
-function operatorJoinedText(content: Matrix.OperatorJoinedEvent['content']): string {
+function operatorJoinedLabel(content: Matrix.OperatorJoinedEvent['content']): SystemLabel {
   return content.role === 'bot'
-    ? t('system.operatorJoinedBot')
-    : t('system.operatorJoinedHuman', { name: content.displayname })
+    ? { source: 'i18n', key: 'system.operatorJoinedBot' }
+    : { source: 'i18n', key: 'system.operatorJoinedHuman', params: { name: content.displayname } }
 }
 
-function operatorLeftText(reason: Matrix.OperatorLeftEvent['content']['reason']): string {
+function operatorLeftLabel(reason: Matrix.OperatorLeftEvent['content']['reason']): SystemLabel {
   switch (reason) {
     case 'completed':
-      return t('system.operatorLeftCompleted')
+      return { source: 'i18n', key: 'system.operatorLeftCompleted' }
     case 'transferred':
-      return t('system.operatorLeftTransferred')
+      return { source: 'i18n', key: 'system.operatorLeftTransferred' }
     case 'timeout':
-      return t('system.operatorLeftTimeout')
+      return { source: 'i18n', key: 'system.operatorLeftTimeout' }
   }
 }
 
 function toRelation(
   content: Matrix.TextMessageContent | Matrix.MediaMessageContent,
 ): TimelineRelation | undefined {
-  const eventId = getReplyEventId(content)
+  const eventId = content['m.relates_to']?.['m.in_reply_to']?.event_id
   return eventId ? { type: 'reply', eventId } : undefined
 }
 
 function createPlaqueItem(
   kind: 'system' | 'notice',
   event: Matrix.ClientEvent,
-  body: string,
+  label: SystemLabel,
 ): TimelineItem {
   return {
     kind,
     localId: event.event_id,
     eventId: event.event_id,
     ts: event.origin_server_ts,
-    content: { body },
+    label,
   }
 }
 
@@ -111,7 +98,7 @@ function createMediaItem(
 function roomMessageToItem(event: Matrix.RoomMessageEvent): TimelineItem | undefined {
   switch (event.content.msgtype) {
     case MsgType.Notice:
-      return createPlaqueItem('notice', event, event.content.body)
+      return createPlaqueItem('notice', event, { source: 'literal', body: event.content.body })
     case MsgType.Text:
       return createTextItem(event, event.content)
     case MsgType.Image:
@@ -128,10 +115,10 @@ function eventToItem(event: Matrix.ClientEvent): TimelineItem | undefined {
     return roomMessageToItem(event)
   }
   if (isOperatorJoined(event)) {
-    return createPlaqueItem('system', event, operatorJoinedText(event.content))
+    return createPlaqueItem('system', event, operatorJoinedLabel(event.content))
   }
   if (isOperatorLeft(event)) {
-    return createPlaqueItem('system', event, operatorLeftText(event.content.reason))
+    return createPlaqueItem('system', event, operatorLeftLabel(event.content.reason))
   }
 
   return undefined

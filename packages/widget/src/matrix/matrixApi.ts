@@ -1,15 +1,12 @@
-import { MsgType } from './consts'
 import type {
   MessagesResponse,
   OutgoingContent,
-  OutgoingMediaContent,
   RegisterResponse,
   SendEventResponse,
   SyncResponse,
   UploadResponse,
 } from './dto'
 import { Endpoints } from './endpoints'
-import { createReplyRelation } from './replyRelation'
 import type { MatrixTransport, UploadOptions } from './transport/matrixTransport'
 
 // Размер страницы истории (limit для GET /messages). Лимит на сервере считает все
@@ -22,48 +19,10 @@ const SYNC_TIMEOUT_MS = 25_000
 interface SendMessageParams {
   roomId: string
   txnId: string
-  content: { body: string }
-  replyToEventId?: string | undefined
-}
-
-interface SendMediaMessageParams {
-  roomId: string
-  txnId: string
-  kind: 'image' | 'file'
-  content: Pick<OutgoingMediaContent, 'body' | 'url' | 'filename' | 'info'>
-  replyToEventId?: string | undefined
-}
-
-function toMatrixMediaContent(
-  content: SendMediaMessageParams['content'],
-): Omit<OutgoingMediaContent, 'msgtype'> {
-  const { body, url, filename, info } = content
-
-  return {
-    body: body || filename,
-    url,
-    filename,
-    info: {
-      mimetype: info.mimetype,
-      size: info.size,
-      ...(info.w !== undefined ? { w: info.w } : {}),
-      ...(info.h !== undefined ? { h: info.h } : {}),
-    },
-  }
+  content: OutgoingContent
 }
 
 export function createMatrixApi(transport: MatrixTransport) {
-  function sendRoomMessage(
-    roomId: string,
-    txnId: string,
-    content: OutgoingContent,
-  ): Promise<SendEventResponse> {
-    return transport.request(Endpoints.SEND_MESSAGE({ roomId, txnId }), {
-      method: 'PUT',
-      body: content,
-    })
-  }
-
   return {
     registerGuest(): Promise<RegisterResponse> {
       return transport.request(Endpoints.REGISTER, {
@@ -103,30 +62,10 @@ export function createMatrixApi(transport: MatrixTransport) {
       })
     },
 
-    sendMessage({
-      roomId,
-      txnId,
-      content,
-      replyToEventId,
-    }: SendMessageParams): Promise<SendEventResponse> {
-      return sendRoomMessage(roomId, txnId, {
-        msgtype: MsgType.Text,
-        body: content.body,
-        ...createReplyRelation(replyToEventId),
-      })
-    },
-
-    sendMediaMessage({
-      kind,
-      roomId,
-      txnId,
-      content,
-      replyToEventId,
-    }: SendMediaMessageParams): Promise<SendEventResponse> {
-      return sendRoomMessage(roomId, txnId, {
-        msgtype: kind === 'image' ? MsgType.Image : MsgType.File,
-        ...toMatrixMediaContent(content),
-        ...createReplyRelation(replyToEventId),
+    sendMessage({ roomId, txnId, content }: SendMessageParams): Promise<SendEventResponse> {
+      return transport.request(Endpoints.SEND_MESSAGE({ roomId, txnId }), {
+        method: 'PUT',
+        body: content,
       })
     },
 
