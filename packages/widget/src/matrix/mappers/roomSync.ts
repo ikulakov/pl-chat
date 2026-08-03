@@ -1,5 +1,5 @@
 import type { RoomSyncPatch } from '../../domain/roomSync'
-import type * as Matrix from '../types'
+import type * as Matrix from '../wire/types'
 import { toOperatorState } from './operator'
 import { toReadMarkers } from './receipts'
 import { timelineEventsToItems } from './timeline'

@@ -1,7 +1,7 @@
 import type { ReadMarker } from '../../domain/receipts'
-import { ReceiptType } from '../consts'
-import { isReceiptEvent } from '../eventGuards'
-import type * as Matrix from '../types'
+import { ReceiptType } from '../wire/consts'
+import { isReceiptEvent } from '../wire/guards'
+import type * as Matrix from '../wire/types'
 
 /**
  * Разворачивает m.receipt в плоский список маркеров userId → eventId.

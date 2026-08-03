@@ -1,7 +1,7 @@
 import type { SystemLabel, TimelineItem, TimelineRelation } from '../../domain/timeline'
-import { MsgType } from '../consts'
-import { isOperatorJoined, isOperatorLeft, isRoomMessage } from '../eventGuards'
-import type * as Matrix from '../types'
+import { MsgType } from '../wire/consts'
+import { isOperatorJoined, isOperatorLeft, isRoomMessage } from '../wire/guards'
+import type * as Matrix from '../wire/types'
 
 function operatorJoinedLabel(content: Matrix.OperatorJoinedEvent['content']): SystemLabel {
   return content.role === 'bot'

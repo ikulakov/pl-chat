@@ -1,9 +1,9 @@
 import type { ChatRuntimeState, RuntimeAction } from '../store/state'
-import { createMatrixApi } from './matrixApi'
+import { createMatrixApi } from './api/matrixApi'
+import { MatrixTransport } from './api/matrixTransport'
 import { MatrixController, type MatrixService } from './matrixController'
 import { LocalStorageSessionStore } from './session/localStorageSessionStore'
 import { MatrixSessionManager } from './session/sessionManager'
-import { MatrixTransport } from './transport/matrixTransport'
 
 interface CreateMatrixServiceDeps {
   dispatch: (action: RuntimeAction) => void

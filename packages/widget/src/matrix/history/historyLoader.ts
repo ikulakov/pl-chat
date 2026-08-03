@@ -1,7 +1,7 @@
-import { timelineEventsToItems } from '../mappers/timeline'
 import { sleep } from '../../shared/utils/sleep'
 import type { RuntimeAction } from '../../store/state'
-import type { MatrixApi } from '../matrixApi'
+import type { MatrixApi } from '../api/matrixApi'
+import { timelineEventsToItems } from '../mappers/timeline'
 
 // Максимальное кол-во страниц для просмотра на случай если все события страницы будут не целевыми
 const MAX_HISTORY_PAGES_PER_CALL = 5

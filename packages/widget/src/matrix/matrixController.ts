@@ -9,17 +9,13 @@ import {
 import { isAbortError } from '../shared/utils/abort'
 import type { ImageDimensions } from '../shared/utils/imageDimensions'
 import type { ChatRuntimeState, RuntimeAction } from '../store/state'
+import { type MatrixApi } from './api/matrixApi'
+import { isMatrixAuthError, isUserDeactivatedError, type AuthErrorContext } from './api/matrixError'
 import { MatrixHistoryLoader } from './history/historyLoader'
 import { toOutgoingContent } from './mappers/outgoing'
 import { toRoomSyncPatch } from './mappers/roomSync'
-import { type MatrixApi } from './matrixApi'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
-import {
-  isMatrixAuthError,
-  isUserDeactivatedError,
-  type AuthErrorContext,
-} from './transport/matrixError'
 
 export const CONNECTION_FAILED_ERROR = 'Не удалось подключиться'
 

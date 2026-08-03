@@ -9,9 +9,9 @@ import {
 import { chatRuntimeReducer } from '../../store/reducer'
 import type { ChatRuntimeState, RuntimeAction } from '../../store/state'
 import { INITIAL_RUNTIME_STATE } from '../../store/store'
-import type { MatrixApi } from '../matrixApi'
-import { MatrixError } from '../transport/matrixError'
-import type { ClientEvent } from '../types'
+import type { MatrixApi } from '../api/matrixApi'
+import { MatrixError } from '../api/matrixError'
+import type { ClientEvent } from '../wire/types'
 import { MatrixHistoryLoader } from './historyLoader'
 
 vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
