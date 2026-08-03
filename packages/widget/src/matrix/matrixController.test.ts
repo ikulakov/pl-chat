@@ -3,6 +3,7 @@ import { isSystem, type TextTimelineItem } from '../domain/timeline'
 import {
   createFakeTokenStore,
   deferred,
+  makeFile,
   makeMatrixApi,
   messagesResponse,
   roomMessageEvent,
@@ -19,16 +20,7 @@ import { MatrixError } from './transport/matrixError'
 
 vi.mock('../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 
-// jsdom не грузит <img> → readImageDimensions зависла бы. Мокаем интринсик-размеры.
-vi.mock('../shared/utils/imageDimensions', () => ({
-  readImageDimensions: vi.fn().mockResolvedValue({ w: 100, h: 50 }),
-}))
-
 const IDENTITY: Identity = { userId: '@u:bank', roomId: '!r:bank' }
-
-function makeFile(name: string, type: string): File {
-  return new File([new Uint8Array([1, 2, 3])], name, { type })
-}
 
 // Стор с реальным редьюсером + спай на apply: проверяем, какие доменные действия контроллер
 // диспетчит, а состояние эволюционирует по-настоящему — контроллер читает из getState()
@@ -43,12 +35,8 @@ function harness(initial: Partial<ChatRuntimeState> = {}, api: MatrixApi = makeM
   })
   const sessionManager = new MatrixSessionManager(api, tokens)
   const controller = new MatrixController({ dispatch, getState: () => state, api, sessionManager })
-  // setState — рубильник для сценариев, которых нет в action-модели (например, teardown стора
-  // при destroy виджета): подменяет состояние напрямую, мимо applied.
-  const setState = (partial: Partial<ChatRuntimeState>) => {
-    state = { ...state, ...partial }
-  }
-  return { controller, dispatch, applied, tokens, getState: () => state, setState }
+
+  return { controller, dispatch, applied, tokens, getState: () => state }
 }
 
 // Общая форма "неудачно отправленного" сообщения для resendMessage-тестов ниже
@@ -128,6 +116,23 @@ describe('MatrixController (orchestrator)', () => {
 
     expect(applied[0]).toEqual({ type: 'connection.connecting' })
     expect(applied.some((action) => action.type === 'session.started')).toBe(true)
+  })
+
+  it('disconnect сбрасывает рантайм, поэтому повторный connect поднимает сессию заново', async () => {
+    // До сброса стора disconnect оставлял phase 'connected', и гард в connect() навсегда
+    // запирал переподключение — виджет уже не поднимался.
+    const { controller, getState } = harness()
+
+    await controller.connect()
+    controller.disconnect()
+
+    expect(getState()).toEqual(INITIAL_RUNTIME_STATE)
+
+    await controller.connect()
+
+    expect(getState().phase).toBe('connected')
+    expect(getState().identity).not.toBeNull()
+    controller.disconnect()
   })
 
   it('does not start a session when disconnected during initial connect', async () => {
@@ -238,15 +243,12 @@ describe('MatrixController (orchestrator)', () => {
       }
       return new Promise<never>(() => {})
     })
-    const { controller, applied, setState } = harness({}, api)
+    const { controller, applied } = harness({}, api)
 
     await controller.connect()
     await vi.waitFor(() => expect(api.initialSync).toHaveBeenCalledTimes(2))
 
     controller.disconnect()
-    // disconnect — lifecycle-рубильник, стор он не трогает (фаза осталась 'recovering');
-    // в реальном приложении destroy пересоздаёт стор — имитируем свежий старт
-    setState({ phase: 'idle' })
     await controller.connect()
 
     staleRecoverySync.resolve(syncResponse('stale'))
@@ -318,7 +320,7 @@ describe('MatrixController (orchestrator)', () => {
     })
     const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
 
-    const sending = controller.sendFile(makeFile('doc.pdf', 'application/pdf'))
+    const sending = controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'))
     await vi.waitFor(() =>
       expect(applied.some((a) => a.type === 'message.optimisticAdded')).toBe(true),
     )
@@ -327,17 +329,16 @@ describe('MatrixController (orchestrator)', () => {
     expect(applied.find((a) => a.type === 'message.optimisticAdded')).toMatchObject({
       message: { kind: 'file', content: { url: '', filename: 'doc.pdf' }, upload: { pct: 0 } },
     })
-    expect(api.sendMediaMessage).not.toHaveBeenCalled()
+    expect(api.sendMessage).not.toHaveBeenCalled()
 
     upload.resolve({ content_uri: 'mxc://bank.ru/abc' })
     await sending
 
     await vi.waitFor(() => expect(applied.some((a) => a.type === 'message.sent')).toBe(true))
-    expect(api.sendMediaMessage).toHaveBeenCalledWith(
+    expect(api.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         roomId: IDENTITY.roomId,
-        kind: 'file',
-        content: expect.objectContaining({ url: 'mxc://bank.ru/abc' }),
+        content: expect.objectContaining({ msgtype: 'm.file', url: 'mxc://bank.ru/abc' }),
       }),
     )
   })
@@ -346,26 +347,33 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi()
     const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
 
-    await controller.sendFile(makeFile('doc.pdf', 'application/pdf'), {
+    await controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'), {
       replyToEventId: '$parent:bank',
     })
 
-    expect(api.sendMediaMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ replyToEventId: '$parent:bank' }),
+    expect(api.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({
+          'm.relates_to': { 'm.in_reply_to': { event_id: '$parent:bank' } },
+        }),
+      }),
     )
     expect(applied).toContainEqual({ type: 'reply.cleared' })
   })
 
-  it('sendFile puts intrinsic w/h into image info', async () => {
+  it('размеры, прочитанные при выборе файла, доезжают до черновика и до события', async () => {
+    // черновик знает пропорции сразу — место под превью в ленте не прыгает после загрузки
     const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
 
-    await controller.sendFile(makeFile('p.png', 'image/png'))
+    await controller.sendFile(makeFile('p.png', 1, 'image/png'), { dims: { w: 800, h: 600 } })
 
-    expect(api.sendMediaMessage).toHaveBeenCalledWith(
+    expect(applied.find((a) => a.type === 'message.optimisticAdded')).toMatchObject({
+      message: { content: { info: { w: 800, h: 600 } } },
+    })
+    expect(api.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
-        kind: 'image',
-        content: expect.objectContaining({ info: expect.objectContaining({ w: 100, h: 50 }) }),
+        content: expect.objectContaining({ info: expect.objectContaining({ w: 800, h: 600 }) }),
       }),
     )
   })
@@ -376,14 +384,14 @@ describe('MatrixController (orchestrator)', () => {
 
     // браузер часто отдаёт для .docx пустой type — заявленный тип должен браться из расширения,
     // иначе сервер отвергнет приём (заголовок сверяется с содержимым)
-    await controller.sendFile(makeFile('выписка.docx', ''))
+    await controller.sendFile(makeFile('выписка.docx', 1, ''))
 
     const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     expect(api.uploadMedia).toHaveBeenCalledWith(
       expect.any(File),
       expect.objectContaining({ contentType: docxMime }),
     )
-    expect(api.sendMediaMessage).toHaveBeenCalledWith(
+    expect(api.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         content: expect.objectContaining({ info: expect.objectContaining({ mimetype: docxMime }) }),
       }),
@@ -400,24 +408,24 @@ describe('MatrixController (orchestrator)', () => {
     })
     const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
 
-    await controller.sendFile(makeFile('big.pdf', 'application/pdf'))
+    await controller.sendFile(makeFile('big.pdf', 1, 'application/pdf'))
 
     // ошибка загрузки видна на сообщении, а не в композере — сообщение уже в ленте;
     // текст рисует MediaContent по уцелевшему upload, в действии причины нет
     expect(applied.some((a) => a.type === 'message.optimisticAdded')).toBe(true)
     expect(applied).toContainEqual({ type: 'message.failed', localId: expect.any(String) })
-    expect(api.sendMediaMessage).not.toHaveBeenCalled()
+    expect(api.sendMessage).not.toHaveBeenCalled()
   })
 
   it('sendFile marks the draft failed when the send fails', async () => {
     const api = makeMatrixApi({
-      sendMediaMessage: vi
-        .fn<MatrixApi['sendMediaMessage']>()
+      sendMessage: vi
+        .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError('M_UNKNOWN', 'boom')),
     })
     const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
 
-    await controller.sendFile(makeFile('doc.pdf', 'application/pdf'))
+    await controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'))
 
     await vi.waitFor(() =>
       expect(applied).toContainEqual({ type: 'message.failed', localId: expect.any(String) }),
@@ -438,7 +446,7 @@ describe('MatrixController (orchestrator)', () => {
       api,
     )
 
-    const sending = controller.sendFile(makeFile('doc.pdf', 'application/pdf'))
+    const sending = controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'))
     await vi.waitFor(() => expect(signal).toBeDefined())
     const draft = getState().room.timeline.find((m) => !isSystem(m))!
 
@@ -451,14 +459,17 @@ describe('MatrixController (orchestrator)', () => {
     upload.reject(new DOMException('Upload aborted', 'AbortError'))
     await sending
     expect(applied.some((a) => a.type === 'message.failed')).toBe(false)
-    expect(api.sendMediaMessage).not.toHaveBeenCalled()
+    expect(api.sendMessage).not.toHaveBeenCalled()
   })
 
-  it('recovery по auth-ошибке обрывает загрузку в полёте — PUT в старую комнату не уходит', async () => {
-    // Ошибка прилетела из отправки текста, а не из загрузки. Recovery НЕ бампает lifecycle
-    // (см. тест про догрузку истории ниже), поэтому единственное, что снимает загрузку, —
-    // явный abort в recoverFromAuthError. Без него файл догрузится уже после пересоздания
-    // сессии и уедет PUT'ом в комнату, которой у нового гостя нет.
+  // Обе ветки handleAuthError обязаны снять загрузку, и ни одна не может положиться на смену
+  // lifecycle: recovery его вовсе не бампает (см. тест про догрузку истории ниже), а при
+  // деактивации бампает — но XHR без явного abort всё равно докачает файл в мёртвую сессию.
+  // Ошибка при этом прилетает из отправки текста, а не из самой загрузки.
+  it.each([
+    ['M_UNKNOWN_TOKEN', 'expired'],
+    ['M_USER_DEACTIVATED', 'disabled'],
+  ])('%s обрывает загрузку в полёте — PUT в мёртвую сессию не уходит', async (errcode, message) => {
     const upload = deferred<Awaited<ReturnType<MatrixApi['uploadMedia']>>>()
     let signal: AbortSignal | undefined
     const api = makeMatrixApi({
@@ -468,11 +479,11 @@ describe('MatrixController (orchestrator)', () => {
       }),
       sendMessage: vi
         .fn<MatrixApi['sendMessage']>()
-        .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
+        .mockRejectedValue(new MatrixError(errcode, message)),
     })
     const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
 
-    const sending = controller.sendFile(makeFile('doc.pdf', 'application/pdf'))
+    const sending = controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'))
     await vi.waitFor(() => expect(signal).toBeDefined())
 
     await controller.sendMessage('hi')
@@ -483,36 +494,34 @@ describe('MatrixController (orchestrator)', () => {
     upload.resolve({ content_uri: 'mxc://bank.ru/abc' })
     await sending
 
-    expect(api.sendMediaMessage).not.toHaveBeenCalled()
+    // текстовая отправка выше свой PUT сделала (им и уронили сессию) — важно, что медиа
+    // своего не сделала
+    const msgtypes = vi.mocked(api.sendMessage).mock.calls.map(([{ content }]) => content.msgtype)
+    expect(msgtypes).not.toContain('m.file')
     controller.disconnect()
   })
 
-  it('деактивация аккаунта обрывает загрузку в полёте — байты не льются в мёртвую сессию', async () => {
-    const upload = deferred<Awaited<ReturnType<MatrixApi['uploadMedia']>>>()
-    let signal: AbortSignal | undefined
+  it('повтор отправки картинки переиспользует размеры из черновика', async () => {
+    // повтор идёт сразу в загрузку, минуя sendFile: размеры взять неоткуда, кроме
+    // самого черновика — потому они и живут на нём, а не собираются по пути отправки
     const api = makeMatrixApi({
-      uploadMedia: vi.fn<MatrixApi['uploadMedia']>().mockImplementation((_file, options) => {
-        signal = options?.signal
-        return upload.promise
-      }),
-      sendMessage: vi
-        .fn<MatrixApi['sendMessage']>()
-        .mockRejectedValue(new MatrixError('M_USER_DEACTIVATED', 'disabled')),
+      uploadMedia: vi
+        .fn<MatrixApi['uploadMedia']>()
+        .mockRejectedValueOnce(new MatrixError('M_UNKNOWN', 'boom'))
+        .mockResolvedValueOnce({ content_uri: 'mxc://bank.ru/retry' }),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
 
-    const sending = controller.sendFile(makeFile('doc.pdf', 'application/pdf'))
-    await vi.waitFor(() => expect(signal).toBeDefined())
+    await controller.sendFile(makeFile('p.png', 1, 'image/png'), { dims: { w: 800, h: 600 } })
+    const draft = getState().room.timeline.find((m) => !isSystem(m))!
 
-    await controller.sendMessage('hi')
+    await controller.resendMessage(draft.localId)
 
-    // смена lifecycle отбросила бы результат, но XHR продолжал бы качать файл целиком
-    expect(signal!.aborted).toBe(true)
-
-    upload.resolve({ content_uri: 'mxc://bank.ru/abc' })
-    await sending
-
-    expect(api.sendMediaMessage).not.toHaveBeenCalled()
+    expect(api.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({ info: expect.objectContaining({ w: 800, h: 600 }) }),
+      }),
+    )
   })
 
   it('resendMessage re-uploads the file when the draft never got an mxc', async () => {
@@ -527,14 +536,14 @@ describe('MatrixController (orchestrator)', () => {
       api,
     )
 
-    await controller.sendFile(makeFile('doc.pdf', 'application/pdf'))
+    await controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'))
     const draft = getState().room.timeline.find((m) => !isSystem(m))!
 
     await controller.resendMessage(draft.localId)
 
     // повтор начинается с байт: PUT /send без mxc отправлять нечего
     expect(api.uploadMedia).toHaveBeenCalledTimes(2)
-    expect(api.sendMediaMessage).toHaveBeenCalledWith(
+    expect(api.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         content: expect.objectContaining({ url: 'mxc://bank.ru/retry' }),
       }),
@@ -682,8 +691,8 @@ describe('MatrixController (orchestrator)', () => {
 
     await controller.resendMessage('local-1')
 
-    const [{ replyToEventId }] = vi.mocked(api.sendMessage).mock.calls[0]!
-    expect(replyToEventId).toBe('$parent')
+    const [{ content }] = vi.mocked(api.sendMessage).mock.calls[0]!
+    expect(content['m.relates_to']).toEqual({ 'm.in_reply_to': { event_id: '$parent' } })
   })
 
   it('resendMessage does nothing when the failed message has no txnId', async () => {
@@ -881,7 +890,9 @@ describe('MatrixController — подгрузка истории вверх', ()
     await inFlight
 
     expect(getState().room.timeline).toHaveLength(0)
-    expect(getState().room.prevBatch).toBe('p1')
+    // disconnect сбросил рантайм, поэтому курсор null; важно, что прерванная страница
+    // не успела продвинуть его на свой 'p2'
+    expect(getState().room.prevBatch).not.toBe('p2')
   })
 
   it('recovery по auth-ошибке из другого вызова обрывает догрузку истории', async () => {

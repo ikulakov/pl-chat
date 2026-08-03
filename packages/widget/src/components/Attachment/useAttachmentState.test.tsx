@@ -1,5 +1,7 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { deferred, makeFile } from '../../shared/testUtils/matrixFixtures'
+import { readImageDimensions, type ImageDimensions } from '../../shared/utils/imageDimensions'
 import { useAttachmentState } from './useAttachmentState'
 
 const sendFile = vi.fn()
@@ -7,10 +9,10 @@ vi.mock('../../hooks/useChatActions', () => ({
   useChatActions: () => ({ sendFile }),
 }))
 
-function makeFile(name: string, size: number, type = ''): File {
-  const blob = new Blob([new Uint8Array(1)], { type })
-  return Object.defineProperty(new File([blob], name, { type }), 'size', { value: size })
-}
+// jsdom не грузит <img> → readImageDimensions зависла бы. Мокаем интринсик-размеры.
+vi.mock('../../shared/utils/imageDimensions', () => ({
+  readImageDimensions: vi.fn().mockResolvedValue({ w: 800, h: 600 }),
+}))
 
 describe('useAttachmentState', () => {
   afterEach(() => {
@@ -43,6 +45,31 @@ describe('useAttachmentState', () => {
     expect(result.current.pending?.error).toBeUndefined()
     // загрузка стартует только с отправкой — файл уезжает вместе с сообщением
     expect(sendFile).not.toHaveBeenCalled()
+  })
+
+  it('отправка ждёт размеры картинки, но композер освобождает сразу', async () => {
+    // w/h обязаны уехать с событием: у получателя байтов ещё нет, и без размеров его лента
+    // дёрнется, когда картинка догрузится. Декодирование начато при выборе, поэтому ожидание
+    // в норме нулевое — здесь оно растянуто, чтобы проверить сам порядок.
+    const decoding = deferred<ImageDimensions | null>()
+    vi.mocked(readImageDimensions).mockReturnValueOnce(decoding.promise)
+    sendFile.mockResolvedValue(undefined)
+    const { result } = renderHook(() => useAttachmentState())
+
+    act(() => result.current.pickFile(makeFile('p.png', 100, 'image/png')))
+    act(() => result.current.send())
+
+    expect(result.current.pending).toBeNull()
+    expect(sendFile).not.toHaveBeenCalled()
+
+    decoding.resolve({ w: 800, h: 600 })
+
+    await waitFor(() =>
+      expect(sendFile).toHaveBeenCalledExactlyOnceWith(
+        expect.any(File),
+        expect.objectContaining({ dims: { w: 800, h: 600 } }),
+      ),
+    )
   })
 
   it('cancel clears the pending attachment', () => {

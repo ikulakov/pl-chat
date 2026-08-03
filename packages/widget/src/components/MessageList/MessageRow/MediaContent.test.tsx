@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { FileTimelineItem } from '../../../domain/timeline'
 import { t } from '../../../i18n'
+import { fileItem } from '../../../shared/testUtils/matrixFixtures'
 import type { BubbleMetaData } from './BubbleMeta'
 import { MediaContent } from './MediaContent'
 
@@ -12,24 +12,6 @@ vi.mock('../../../hooks/useChatActions', () => ({
 }))
 
 const meta: BubbleMetaData = { ts: 0, own: true, sendStatus: 'sent', isRead: false }
-
-function fileItem(overrides: Partial<FileTimelineItem> = {}): FileTimelineItem {
-  return {
-    kind: 'file',
-    localId: 'm1',
-    eventId: '$m1',
-    sender: '@user:bank',
-    ts: 0,
-    sendStatus: 'sent',
-    content: {
-      body: '',
-      url: 'mxc://bank.ru/abc',
-      filename: 'doc.pdf',
-      info: { mimetype: 'application/pdf', size: 100 },
-    },
-    ...overrides,
-  }
-}
 
 describe('MediaContent', () => {
   afterEach(() => {

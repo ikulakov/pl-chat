@@ -1,28 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FileTimelineItem } from '../../../domain/timeline'
 import { t } from '../../../i18n'
-import { textItem } from '../../../shared/testUtils/matrixFixtures'
+import { fileItem, textItem } from '../../../shared/testUtils/matrixFixtures'
 import { MessageActions } from './MessageActions'
-
-function fileItem(overrides: Partial<FileTimelineItem['content']> = {}): FileTimelineItem {
-  return {
-    kind: 'file',
-    localId: 'm1',
-    eventId: '$m1',
-    sender: '@operator:bank',
-    ts: 0,
-    sendStatus: 'sent',
-    content: {
-      // без подписи body пуст (см. eventMapping.createMediaItem/sendFile) — filename не дублируем
-      body: '',
-      url: 'mxc://bank.ru/abc',
-      filename: 'doc.pdf',
-      info: { mimetype: 'application/pdf', size: 100 },
-      ...overrides,
-    },
-  }
-}
 
 const resendMessage = vi.fn()
 const replyTo = vi.fn()

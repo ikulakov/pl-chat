@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { MatrixEventType, MsgType } from '../matrix/consts'
-import type { ClientEvent } from '../matrix/types'
+import { isSystem, type TimelineItem } from '../../domain/timeline'
 import {
   OPERATOR_ID,
   operatorJoinedEvent,
   operatorLeftEvent,
   roomMessageEvent,
-} from '../shared/testUtils/matrixFixtures'
-import { timelineEventsToItems } from './eventMapping'
+} from '../../shared/testUtils/matrixFixtures'
+import { MatrixEventType, MsgType } from '../consts'
+import type { ClientEvent } from '../types'
+import { timelineEventsToItems } from './timeline'
 
 describe('timelineEventsToItems — варианты контента', () => {
   it('обычный m.text даёт kind: text', () => {
@@ -22,7 +23,8 @@ describe('timelineEventsToItems — варианты контента', () => {
     ])
 
     expect(item?.kind).toBe('notice')
-    expect(item?.content.body).toBe('Ищем оператора')
+    // серверный текст едет литералом, а не ключом — переводить его нельзя
+    expect(item).toMatchObject({ label: { source: 'literal', body: 'Ищем оператора' } })
   })
 
   it('m.relates_to → m.in_reply_to даёт relation reply, без него поля нет', () => {
@@ -42,24 +44,29 @@ describe('timelineEventsToItems — варианты контента', () => {
     expect(plain).not.toHaveProperty('relation')
   })
 
-  it('kc.operator.left с разными reason мапится на разный текст, kind system', () => {
+  it('kc.operator.left с разными reason мапится на разные ключи, kind system', () => {
     const [completed] = timelineEventsToItems([operatorLeftEvent({ reason: 'completed' })])
     const [transferred] = timelineEventsToItems([operatorLeftEvent({ reason: 'transferred' })])
     const [timeout] = timelineEventsToItems([operatorLeftEvent({ reason: 'timeout' })])
 
-    expect(completed?.content.body).not.toBe(transferred?.content.body)
-    expect(transferred?.content.body).not.toBe(timeout?.content.body)
+    const key = (item?: TimelineItem) =>
+      item && isSystem(item) && item.label.source === 'i18n' ? item.label.key : null
+
+    expect(key(completed)).not.toBe(key(transferred))
+    expect(key(transferred)).not.toBe(key(timeout))
     expect(completed?.kind).toBe('system')
   })
 
-  it('kc.operator.joined различает human и bot', () => {
+  it('kc.operator.joined различает human и bot, имя едет параметром', () => {
     const [human] = timelineEventsToItems([
       operatorJoinedEvent({ role: 'human', displayname: 'Оля' }),
     ])
     const [bot] = timelineEventsToItems([operatorJoinedEvent({ role: 'bot' })])
 
-    expect(human?.content.body).not.toBe(bot?.content.body)
-    expect(human?.content.body).toContain('Оля')
+    expect(human).toMatchObject({
+      label: { source: 'i18n', key: 'system.operatorJoinedHuman', params: { name: 'Оля' } },
+    })
+    expect(bot).toMatchObject({ label: { source: 'i18n', key: 'system.operatorJoinedBot' } })
   })
 
   it('m.file без подписи (body === filename на wire) даёт пустой body в домене', () => {

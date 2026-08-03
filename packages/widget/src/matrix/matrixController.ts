@@ -1,6 +1,5 @@
 import { createOptimisticMediaMessage, createOptimisticTextMessage } from '../domain/optimistic'
 import { canMoveMarker } from '../domain/receipts'
-import { replyEventIdOf } from '../domain/reply'
 import {
   isMedia,
   isSystem,
@@ -8,11 +7,11 @@ import {
   type MessageTimelineItem,
 } from '../domain/timeline'
 import { isAbortError } from '../shared/utils/abort'
-import { isPreviewableImage } from '../shared/utils/fileValidation'
-import { readImageDimensions } from '../shared/utils/imageDimensions'
+import type { ImageDimensions } from '../shared/utils/imageDimensions'
 import type { ChatRuntimeState, RuntimeAction } from '../store/state'
-import type { SendEventResponse } from './dto'
 import { MatrixHistoryLoader } from './history/historyLoader'
+import { toOutgoingContent } from './mappers/outgoing'
+import { toRoomSyncPatch } from './mappers/roomSync'
 import { type MatrixApi } from './matrixApi'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
@@ -27,6 +26,7 @@ export const CONNECTION_FAILED_ERROR = 'Не удалось подключить
 export interface SendFileOptions {
   caption?: string | undefined
   replyToEventId?: string | undefined
+  dims?: ImageDimensions | undefined
 }
 
 export interface MatrixService {
@@ -96,17 +96,16 @@ export class MatrixController implements MatrixService {
   }
 
   disconnect(): void {
-    this.stopLoadingHistory()
-    this.abortUploads()
+    this.stopSessionActivity()
     this.nextLifecycle()
-    this.syncLoop.stop()
+    this.dispatch({ type: 'session.closed' })
   }
 
   async sendMessage(text: string, replyToEventId?: string): Promise<void> {
     const connection = this.requireConnection()
     if (!connection) return
 
-    const { message } = createOptimisticTextMessage({
+    const message = createOptimisticTextMessage({
       sender: connection.identity.userId,
       text: text.trim(),
       replyToEventId,
@@ -121,13 +120,9 @@ export class MatrixController implements MatrixService {
     const connection = this.requireConnection()
     if (!connection) return
 
-    const { caption, replyToEventId } = options
-    const lifecycleId = this.lifecycleId
-    const dims = isPreviewableImage(file) ? await readImageDimensions(file) : null
+    const { caption, replyToEventId, dims } = options
 
-    if (!this.isCurrentLifecycle(lifecycleId)) return
-
-    const { message } = createOptimisticMediaMessage({
+    const message = createOptimisticMediaMessage({
       sender: connection.identity.userId,
       file,
       caption,
@@ -137,7 +132,7 @@ export class MatrixController implements MatrixService {
     this.dispatch({ type: 'message.optimisticAdded', message })
     this.dispatch({ type: 'reply.cleared' })
 
-    const uploaded = await this.uploadFile(message, file)
+    const uploaded = await this.uploadFile(message, file, 'sendFile')
     if (!uploaded) return
 
     await this.dispatchSend(connection.identity.roomId, uploaded, 'sendFile')
@@ -146,6 +141,7 @@ export class MatrixController implements MatrixService {
   private async uploadFile(
     draft: MediaTimelineItem,
     file: File,
+    context: AuthErrorContext,
   ): Promise<MediaTimelineItem | null> {
     const { localId, content } = draft
 
@@ -167,7 +163,7 @@ export class MatrixController implements MatrixService {
       if (isAbortError(err) || !this.isCurrentLifecycle(lifecycleId)) return null
 
       this.dispatch({ type: 'message.failed', localId })
-      this.handleAuthError(err, 'sendFile')
+      this.handleAuthError(err, context)
       return null
     } finally {
       if (this.uploads.get(localId) === controller) this.uploads.delete(localId)
@@ -188,12 +184,16 @@ export class MatrixController implements MatrixService {
     this.dispatch({ type: 'message.discarded', localId })
   }
 
-  private abortUploads(): void {
+  private stopSessionActivity(): void {
+    this.stopLoadingHistory()
+
     for (const [localId, controller] of this.uploads) {
       controller.abort()
       this.dispatch({ type: 'message.failed', localId })
     }
     this.uploads.clear()
+
+    this.syncLoop.stop()
   }
 
   async resendMessage(localId: string): Promise<void> {
@@ -211,7 +211,7 @@ export class MatrixController implements MatrixService {
 
     const sendable =
       isMedia(message) && message.upload
-        ? await this.uploadFile(message, message.upload.file)
+        ? await this.uploadFile(message, message.upload.file, 'resendMessage')
         : message
 
     if (!sendable) return
@@ -275,22 +275,6 @@ export class MatrixController implements MatrixService {
     this.historyLoader.stop()
   }
 
-  private sendEvent(roomId: string, message: MessageTimelineItem): Promise<SendEventResponse> {
-    const txnId = message.txnId!
-    const replyToEventId = replyEventIdOf(message)
-
-    if (isMedia(message)) {
-      return this.api.sendMediaMessage({
-        roomId,
-        txnId,
-        kind: message.kind,
-        content: message.content,
-        replyToEventId,
-      })
-    }
-    return this.api.sendMessage({ roomId, txnId, content: message.content, replyToEventId })
-  }
-
   private async dispatchSend(
     roomId: string,
     message: MessageTimelineItem,
@@ -300,7 +284,11 @@ export class MatrixController implements MatrixService {
     const lifecycleId = this.lifecycleId
 
     try {
-      const { event_id } = await this.sendEvent(roomId, message)
+      const { event_id } = await this.api.sendMessage({
+        roomId,
+        txnId: message.txnId!,
+        content: toOutgoingContent(message),
+      })
       if (!this.isCurrentLifecycle(lifecycleId)) return
 
       this.dispatch({ type: 'message.sent', localId, eventId: event_id })
@@ -331,7 +319,7 @@ export class MatrixController implements MatrixService {
         type: 'session.started',
         identity: { userId: session.userId, roomId: session.roomId },
         cursor: session.cursor,
-        joinedRoom: session.initialRoom,
+        room: toRoomSyncPatch(session.initialRoom),
       })
       this.syncLoop.start({
         cursor: session.cursor,
@@ -353,7 +341,7 @@ export class MatrixController implements MatrixService {
     this.dispatch({
       type: 'sync.received',
       cursor: tick.next,
-      ...(joinedRoom ? { joinedRoom } : {}),
+      ...(joinedRoom ? { room: toRoomSyncPatch(joinedRoom) } : {}),
     })
   }
 
@@ -380,9 +368,7 @@ export class MatrixController implements MatrixService {
 
   private recoverFromAuthError(err: unknown, context: AuthErrorContext): void {
     console.error(`[PLChat] ${context} auth error:`, err)
-    this.stopLoadingHistory()
-    this.abortUploads()
-    this.syncLoop.stop()
+    this.stopSessionActivity()
     this.startSessionRecovery(this.lifecycleId)
   }
 
@@ -404,10 +390,8 @@ export class MatrixController implements MatrixService {
   }
 
   private failSession(): void {
-    this.stopLoadingHistory()
-    this.abortUploads()
+    this.stopSessionActivity()
     this.nextLifecycle()
-    this.syncLoop.stop()
     this.sessionManager.clearSession()
     this.dispatch({ type: 'connection.failed', error: CONNECTION_FAILED_ERROR })
   }

@@ -1,15 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { makeFile } from '../../shared/testUtils/matrixFixtures'
 import { DropZone } from './DropZone'
 
 const pickFile = vi.fn()
 vi.mock('./AttachmentContext', () => ({
   useAttachment: () => ({ pickFile }),
 }))
-
-function makeFile(name = 'doc.pdf'): File {
-  return new File([new Uint8Array(1)], name, { type: 'application/pdf' })
-}
 
 // jsdom не строит настоящий DataTransfer — подкладываем минимум, который читает DropZone.
 function fileDrag(file?: File) {
@@ -45,7 +42,7 @@ describe('DropZone', () => {
 
   it('бросок в оверлей грузит файл', () => {
     const root = renderZone()
-    const file = makeFile()
+    const file = makeFile('doc.pdf', 1, 'application/pdf')
 
     fireEvent.dragEnter(root, fileDrag(file))
     fireEvent.drop(overlay(), fileDrag(file))
@@ -57,8 +54,8 @@ describe('DropZone', () => {
   it('бросок мимо оверлея (в ленту) отменяет — файл не берётся', () => {
     const root = renderZone()
 
-    fireEvent.dragEnter(root, fileDrag(makeFile()))
-    fireEvent.drop(root, fileDrag(makeFile()))
+    fireEvent.dragEnter(root, fileDrag(makeFile('doc.pdf', 1, 'application/pdf')))
+    fireEvent.drop(root, fileDrag(makeFile('doc.pdf', 1, 'application/pdf')))
 
     expect(pickFile).not.toHaveBeenCalled()
     expect(overlay()).toHaveAttribute('aria-hidden', 'true')

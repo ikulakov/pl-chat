@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '../../i18n'
+import { makeFile } from '../../shared/testUtils/matrixFixtures'
 import { chatStore, INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '../../store/store'
 import { AttachmentProvider } from '../Attachment/AttachmentProvider'
 import { Composer } from './Composer'
@@ -11,11 +12,6 @@ const cancelReply = vi.fn()
 vi.mock('../../hooks/useChatActions', () => ({
   useChatActions: () => ({ sendMessage, sendFile, cancelReply }),
 }))
-
-function makeFile(name: string, size: number, type = ''): File {
-  const blob = new Blob([new Uint8Array(1)], { type })
-  return Object.defineProperty(new File([blob], name, { type }), 'size', { value: size })
-}
 
 function pickFile(container: HTMLElement, file: File) {
   const input = container.querySelector('input[type=file]') as HTMLInputElement

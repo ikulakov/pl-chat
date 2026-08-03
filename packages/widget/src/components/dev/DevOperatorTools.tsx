@@ -48,7 +48,13 @@ export function DevOperatorTools() {
       const id = crypto.randomUUID()
       chatStore.getState().dispatch({
         type: 'message.optimisticAdded',
-        message: { kind: 'notice', localId: id, eventId: id, ts: Date.now(), content: { body } },
+        message: {
+          kind: 'notice',
+          localId: id,
+          eventId: id,
+          ts: Date.now(),
+          label: { source: 'literal', body },
+        },
       })
       setText('')
       return

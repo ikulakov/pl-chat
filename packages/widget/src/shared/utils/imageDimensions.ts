@@ -1,8 +1,13 @@
+export interface ImageDimensions {
+  w: number
+  h: number
+}
+
 /**
  * Читает intrinsic-размеры картинки через offscreen `Image`.
  * Необходимо для `info.w/h` в исходящем `m.image`.
  */
-export function readImageDimensions(file: File): Promise<{ w: number; h: number } | null> {
+export function readImageDimensions(file: File): Promise<ImageDimensions | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file)
     const img = new Image()

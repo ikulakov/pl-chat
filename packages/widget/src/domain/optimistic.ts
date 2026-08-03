@@ -1,4 +1,5 @@
 import { isPreviewableImage, resolveMimeType } from '../shared/utils/fileValidation'
+import type { ImageDimensions } from '../shared/utils/imageDimensions'
 import type {
   MediaTimelineItem,
   MediaUpload,
@@ -12,10 +13,7 @@ export function isOptimistic(eventId: string): boolean {
   return eventId.startsWith(OPTIMISTIC_PREFIX)
 }
 
-interface Outgoing<M extends MessageTimelineItem> {
-  message: M
-  txnId: string
-}
+type Outgoing<M extends MessageTimelineItem> = M & { txnId: string }
 
 interface CreateOptimisticParams<M extends MessageTimelineItem> {
   sender: string
@@ -32,18 +30,15 @@ function createOptimistic<M extends MessageTimelineItem>({
   const txnId = crypto.randomUUID()
 
   return {
-    message: {
-      localId,
-      eventId: `${OPTIMISTIC_PREFIX}${localId}`,
-      txnId,
-      ts: Date.now(),
-      sendStatus: 'sending',
-      sender,
-      ...fields,
-      ...(replyToEventId ? { relation: { type: 'reply', eventId: replyToEventId } } : {}),
-    } as M,
+    localId,
+    eventId: `${OPTIMISTIC_PREFIX}${localId}`,
     txnId,
-  }
+    ts: Date.now(),
+    sendStatus: 'sending',
+    sender,
+    ...fields,
+    ...(replyToEventId ? { relation: { type: 'reply', eventId: replyToEventId } } : {}),
+  } as Outgoing<M>
 }
 
 interface CreateOptimisticTextMessageParams {
@@ -68,7 +63,7 @@ interface CreateOptimisticMediaMessageParams {
   sender: string
   file: File
   caption?: string | undefined
-  dims?: { w: number; h: number } | null
+  dims?: ImageDimensions | undefined
   replyToEventId?: string | undefined
 }
 
@@ -76,7 +71,7 @@ export function createOptimisticMediaMessage({
   sender,
   file,
   caption,
-  dims = null,
+  dims,
   replyToEventId,
 }: CreateOptimisticMediaMessageParams): Outgoing<MediaTimelineItem> {
   const upload: MediaUpload = { file, pct: 0 }
