@@ -1,8 +1,8 @@
 import { sleep } from '../../shared/utils/sleep'
-import type { JoinedRoom } from '../types'
-import type { SyncResponse } from '../dto'
-import type { MatrixApi } from '../matrixApi'
-import { isMatrixAuthError, MatrixErrCode, MatrixError } from '../transport/matrixError'
+import type { MatrixApi } from '../api/matrixApi'
+import { isMatrixAuthError, MatrixErrCode, MatrixError } from '../api/matrixError'
+import type { SyncResponse } from '../wire/dto'
+import type { JoinedRoom } from '../wire/types'
 import type { MatrixSessionStore } from './types'
 
 const ROOM_VISIBILITY_RETRY_DELAYS_MS = [200, 500]

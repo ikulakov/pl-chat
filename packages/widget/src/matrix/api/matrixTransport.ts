@@ -1,6 +1,6 @@
-import type { RefreshResponse } from '../dto'
-import { Endpoints } from '../endpoints'
+import type { RefreshResponse } from '../wire/dto'
 import type { TokenSource } from '../session/types'
+import { Endpoints } from './endpoints'
 import { makeMatrixError, MatrixErrCode, MatrixError } from './matrixError'
 
 export interface UploadOptions {

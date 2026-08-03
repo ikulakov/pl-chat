@@ -1,6 +1,6 @@
 import { sleep } from '../../shared/utils/sleep'
-import type { SyncResponse } from '../dto'
-import type { MatrixApi } from '../matrixApi'
+import type { MatrixApi } from '../api/matrixApi'
+import type { SyncResponse } from '../wire/dto'
 
 export interface SyncTick {
   since: string

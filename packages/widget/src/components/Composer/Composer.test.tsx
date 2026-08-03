@@ -20,6 +20,9 @@ function pickFile(container: HTMLElement, file: File) {
 
 describe('Composer — семантика отправки', () => {
   beforeEach(() => {
+    // Сбрасываем singleton-store до рендера: изменение store в afterEach обновляло ещё
+    // смонтированный Composer и вызывало React warning про update вне act().
+    chatStore.setState({ ...INITIAL_RUNTIME_STATE, room: INITIAL_ROOM_STATE })
     sendFile.mockResolvedValue(undefined)
   })
 
@@ -27,9 +30,6 @@ describe('Composer — семантика отправки', () => {
     sendMessage.mockReset()
     sendFile.mockReset()
     cancelReply.mockReset()
-    // стор — синглтон: сбрасываем и цель ответа, и идентичность, чтобы состояние
-    // reply-тестов не протекало в тесты обычной отправки
-    chatStore.setState({ ...INITIAL_RUNTIME_STATE, room: INITIAL_ROOM_STATE })
   })
 
   function typeThenEnter(value: string, opts: { shiftKey?: boolean } = {}) {

@@ -5,9 +5,9 @@ import type {
   SendEventResponse,
   SyncResponse,
   UploadResponse,
-} from './dto'
+} from '../wire/dto'
 import { Endpoints } from './endpoints'
-import type { MatrixTransport, UploadOptions } from './transport/matrixTransport'
+import type { MatrixTransport, UploadOptions } from './matrixTransport'
 
 // Размер страницы истории (limit для GET /messages). Лимит на сервере считает все
 // события (m.room.member, m.reaction и т.п.), максимум сервера — 100.
