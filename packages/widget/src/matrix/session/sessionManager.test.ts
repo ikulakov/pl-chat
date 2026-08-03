@@ -5,9 +5,9 @@ import {
   ROOM_ID,
   syncResponse,
 } from '../../shared/testUtils/matrixFixtures'
-import type { MatrixApi } from '../matrixApi'
+import type { MatrixApi } from '../api/matrixApi'
+import { MatrixError } from '../api/matrixError'
 import { MatrixSessionManager } from './sessionManager'
-import { MatrixError } from '../transport/matrixError'
 
 vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 

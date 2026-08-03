@@ -6,10 +6,10 @@ import type {
   SystemTimelineItem,
   TextTimelineItem,
 } from '../../domain/timeline'
-import { MatrixEventType, MsgType, OperatorStatus } from '../../matrix/consts'
-import type { MessagesResponse, SyncResponse } from '../../matrix/dto'
-import type { MatrixApi } from '../../matrix/matrixApi'
+import type { MatrixApi } from '../../matrix/api/matrixApi'
 import type { SessionInit } from '../../matrix/session/types'
+import { MatrixEventType, MsgType, OperatorStatus } from '../../matrix/wire/consts'
+import type { MessagesResponse, SyncResponse } from '../../matrix/wire/dto'
 import type {
   ClientEvent,
   EphemeralEvent,
@@ -18,7 +18,7 @@ import type {
   OperatorJoinedEvent,
   OperatorLeftEvent,
   RoomMessageEvent,
-} from '../../matrix/types'
+} from '../../matrix/wire/types'
 
 export const ROOM_ID = '!room:bank'
 export const OPERATOR_ID = '@operator:bank'

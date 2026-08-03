@@ -1,7 +1,7 @@
 import { replyEventIdOf } from '../../domain/reply'
 import { isMedia, type MediaContent, type MessageTimelineItem } from '../../domain/timeline'
-import { MsgType } from '../consts'
-import type { OutgoingContent, OutgoingMediaContent } from '../dto'
+import { MsgType } from '../wire/consts'
+import type { OutgoingContent, OutgoingMediaContent } from '../wire/dto'
 
 function toMediaContent(content: MediaContent): Omit<OutgoingMediaContent, 'msgtype'> {
   const { body, url, filename, info } = content

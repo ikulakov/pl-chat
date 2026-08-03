@@ -13,10 +13,10 @@ import {
 import { chatRuntimeReducer } from '../store/reducer'
 import type { ChatRuntimeState, Identity, RoomState, RuntimeAction } from '../store/state'
 import { INITIAL_RUNTIME_STATE } from '../store/store'
-import type { MatrixApi } from './matrixApi'
+import type { MatrixApi } from './api/matrixApi'
+import { MatrixError } from './api/matrixError'
 import { CONNECTION_FAILED_ERROR, MatrixController } from './matrixController'
 import { MatrixSessionManager } from './session/sessionManager'
-import { MatrixError } from './transport/matrixError'
 
 vi.mock('../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 

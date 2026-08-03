@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deferred, ROOM_ID, syncResponse } from '../../shared/testUtils/matrixFixtures'
-import type { SyncResponse } from '../dto'
-import type { MatrixApi } from '../matrixApi'
+import type { MatrixApi } from '../api/matrixApi'
+import type { SyncResponse } from '../wire/dto'
 import { MatrixSyncLoop, type SyncTick } from './syncLoop'
 
 vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))

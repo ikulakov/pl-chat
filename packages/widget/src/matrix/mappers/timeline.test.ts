@@ -6,8 +6,8 @@ import {
   operatorLeftEvent,
   roomMessageEvent,
 } from '../../shared/testUtils/matrixFixtures'
-import { MatrixEventType, MsgType } from '../consts'
-import type { ClientEvent } from '../types'
+import { MatrixEventType, MsgType } from '../wire/consts'
+import type { ClientEvent } from '../wire/types'
 import { timelineEventsToItems } from './timeline'
 
 describe('timelineEventsToItems — варианты контента', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readReceipt, receiptEvent } from '../../shared/testUtils/matrixFixtures'
-import type { EphemeralEvent } from '../types'
+import type { EphemeralEvent } from '../wire/types'
 import { toReadMarkers } from './receipts'
 
 const OPERATOR = '@operator:bank'
