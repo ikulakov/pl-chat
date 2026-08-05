@@ -1,3 +1,4 @@
+import type { ParsedMxcUrl } from '../../shared/utils/mxc'
 import type {
   MessagesResponse,
   OutgoingContent,
@@ -15,6 +16,11 @@ const HISTORY_PAGE_SIZE = 50
 
 // Окно long-poll: сервер держит /sync до этого времени, потом отвечает пустым батчем.
 const SYNC_TIMEOUT_MS = 25_000
+
+export interface ThumbnailSize {
+  width: number
+  height: number
+}
 
 interface SendMessageParams {
   roomId: string
@@ -73,6 +79,19 @@ export function createMatrixApi(transport: MatrixTransport) {
       return transport.upload(Endpoints.UPLOAD_MEDIA, file, {
         ...options,
         searchParams: { filename: file.name },
+      })
+    },
+
+    downloadMedia({ mediaId, serverName }: ParsedMxcUrl): Promise<Blob> {
+      return transport.download(Endpoints.DOWNLOAD_MEDIA({ mediaId, serverName }))
+    },
+
+    getThumbnail(
+      { mediaId, serverName }: ParsedMxcUrl,
+      { width, height }: ThumbnailSize,
+    ): Promise<Blob> {
+      return transport.download(Endpoints.THUMBNAIL_MEDIA({ mediaId, serverName }), {
+        searchParams: { width, height, method: 'scale' },
       })
     },
 

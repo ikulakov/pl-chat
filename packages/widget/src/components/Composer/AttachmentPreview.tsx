@@ -1,9 +1,10 @@
 import { t } from '../../i18n'
-import type { PendingAttachment } from '../Attachment/useAttachmentState'
-import { cn } from '../../shared/utils/cn'
-import { formatSize } from '../../shared/utils/formatSize'
 import { IconButton } from '../../shared/ui/IconButton'
-import { CloseIcon, FailedIcon, FileDocIcon } from '../../shared/ui/icons'
+import { CloseIcon, FileDocIcon } from '../../shared/ui/icons'
+import { cn } from '../../shared/utils/cn'
+import { getFileExtension } from '../../shared/utils/fileValidation'
+import { formatSize } from '../../shared/utils/formatSize'
+import type { PendingAttachment } from '../Attachment/useAttachmentState'
 import styles from './AttachmentPreview.module.css'
 
 interface Props {
@@ -18,6 +19,9 @@ interface Props {
 export function AttachmentPreview({ pending, onCancel }: Props) {
   const { error } = pending
 
+  const extension = getFileExtension(pending.file.name).toUpperCase()
+  const fileHint = extension || formatSize(pending.file.size)
+
   return (
     <div className={styles.attachment}>
       {pending.previewUrl ? (
@@ -31,17 +35,14 @@ export function AttachmentPreview({ pending, onCancel }: Props) {
           className={cn(styles.icon, error && styles.iconError)}
           aria-hidden
         >
-          <FileDocIcon size={20} />
+          <FileDocIcon />
         </span>
       )}
       <div className={styles.info}>
         <div className={cn(styles.name)}>
           <span className={styles.fileName}>{pending.file.name}</span>
-          {error && <FailedIcon size={14} />}
         </div>
-        <div className={cn(styles.meta, error && styles.metaError)}>
-          {error ?? formatSize(pending.file.size)}
-        </div>
+        <div className={cn(styles.meta, error && styles.metaError)}>{error ?? fileHint}</div>
       </div>
       <IconButton
         variant="ghost"

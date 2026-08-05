@@ -1,0 +1,122 @@
+/* Размеры по макету; дублируют MEDIA_BOX в ./thumbnailSize.ts.
+   Бокс фиксирован — лента не дёргается, когда байты превью приезжают. */
+.frame {
+  position: relative;
+  width: 184px;
+  height: 172px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--c-icon-tint);
+}
+
+/* Сбой заливки: текста и статуса на картинке нет, поэтому сам кадр и говорит об ошибке.
+   Outline, а не border — рамка не влияет на раскладку фиксированного бокса; отрицательный
+   offset уводит её внутрь, иначе её срежет overflow: hidden у кадра. */
+.failed {
+  outline: 2px solid var(--c-error);
+  outline-offset: -2px;
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.dimmed {
+  opacity: 0.6;
+}
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  border: 0;
+  background: none;
+  color: var(--c-text-secondary);
+  text-align: center;
+}
+
+.skeleton {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.hint {
+  font-size: 12px;
+  line-height: 14px;
+}
+
+.cancel,
+.download,
+.action {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--c-text-invert);
+  background: rgb(0 0 0 / 45%);
+  transition:
+    background-color 0.15s,
+    opacity 0.15s;
+
+  &:not(:disabled):hover {
+    background: rgb(0 0 0 / 65%);
+  }
+}
+
+/* Отмена заливки и действие по её сбою занимают один и тот же слот в центре кадра:
+   состояния сменяют друг друга, пересечься не могут. */
+.cancel,
+.action {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Крупнее отмены: при сбое это единственное действие на картинке. */
+.action {
+  width: 32px;
+  height: 32px;
+}
+
+.download {
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Тот же приём, что у кнопки «Меню» в MessageRow: не display:none, иначе кнопка
+   выпадает из таб-порядка и её нельзя достать с клавиатуры. */
+.frame:hover .download,
+.frame:focus-within .download {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* На тач-экранах ховера нет, а другого способа скачать картинку не осталось. */
+@media (hover: none) {
+  .download {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}

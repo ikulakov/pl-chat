@@ -268,15 +268,10 @@ export function FileDocIcon(props: IconProps) {
   return (
     <Icon {...props}>
       <path
-        d="M6 3h7l5 5v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2z"
+        d="M8 17H15M8 13H11M12.75 3.01159V7.4C12.75 9.05685 14.0931 10.4 15.75 10.4H19.9918M19.9918 10.4C19.9397 9.69759 19.6417 9.03312 19.1463 8.52583L14.6328 3.90398C14.13 3.38911 13.4611 3.07427 12.75 3.01159C12.6627 3.00389 12.5748 3 12.4865 3H7C5.34315 3 4 4.34315 4 6V18C4 19.6569 5.34315 21 7 21H17C18.6569 21 20 19.6569 20 18V10.6219C20 10.5476 19.9972 10.4736 19.9918 10.4Z"
         stroke="currentColor"
         strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M13 3v5h5"
-        stroke="currentColor"
-        strokeWidth="1.5"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
     </Icon>
@@ -307,6 +302,19 @@ export function ImageIcon(props: IconProps) {
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinejoin="round"
+      />
+    </Icon>
+  )
+}
+
+export function DownloadIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path
+        d="M12 3V15M16 10.9432L12 15L8 10.9432M3 15V17C3 18.6569 4.34315 20 6 20H18C19.6569 20 21 18.6569 21 17V15"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
       />
     </Icon>
   )

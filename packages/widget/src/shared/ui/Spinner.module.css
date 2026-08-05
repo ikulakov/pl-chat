@@ -13,6 +13,15 @@
     vertical-align: middle;
   }
 
+  /* Для слотов рядом с иконками 20px: inline там теряется, block не влезает. */
+  &.icon {
+    width: 16px;
+    height: 16px;
+    border-width: 1.5px;
+    border-color: currentColor;
+    border-top-color: transparent;
+  }
+
   &.block {
     display: block;
     width: 36px;

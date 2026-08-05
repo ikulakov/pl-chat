@@ -1,0 +1,22 @@
+/* Центрируем по своим размерам, а не растягиваем по боксу: кольцо рисуется на `size`,
+   и бокс-владелец может быть крупнее (в чипе — квадрат 32×32 под общий вид иконок). */
+.ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  pointer-events: none;
+}
+
+.track {
+  fill: none;
+  stroke: currentColor;
+  opacity: 0.25;
+}
+
+.value {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 150ms linear;
+}

@@ -21,11 +21,13 @@ function makeMatrix(): MatrixService {
     disconnect: vi.fn(),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     sendFile: vi.fn().mockResolvedValue(undefined),
+    downloadFile: vi.fn().mockResolvedValue(new Blob()),
     cancelUpload: vi.fn(),
     resendMessage: vi.fn().mockResolvedValue(undefined),
     markRead: vi.fn().mockResolvedValue(undefined),
     loadMoreHistory: vi.fn().mockResolvedValue(undefined),
     stopLoadingHistory: vi.fn(),
+    loadPreview: vi.fn().mockResolvedValue(new Blob()),
   }
 }
 

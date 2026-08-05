@@ -1,0 +1,144 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Кликабельный чип: та же раскладка, что и .chip, но кнопка — клик скачивает файл. */
+.chipButton {
+  composes: chip;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  /* Во время скачивания кнопка отключена — курсор не должен обещать клик. */
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.iconBox {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  background: var(--c-icon-tint);
+}
+
+/* Обе иконки в одной ячейке грида — подмена не двигает раскладку чипа. */
+.restIcon,
+.hoverIcon {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  transition: opacity 0.15s;
+}
+
+.hoverIcon {
+  opacity: 0;
+}
+
+.chipButton:hover .restIcon,
+.chipButton:focus-visible .restIcon {
+  opacity: 0;
+}
+
+.chipButton:hover .hoverIcon,
+.chipButton:focus-visible .hoverIcon {
+  opacity: 1;
+}
+
+/* Тот же квадрат 32×32, что у иконки типа файла и кнопок ошибок, — в чипе все слоты слева
+   одного размера. Кольцо прогресса внутри остаётся 24×24. */
+.cancelBox {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  color: inherit;
+  background: var(--c-icon-tint);
+  transition: background-color 0.15s;
+
+  &:not(:disabled):hover {
+    background: color-mix(in srgb, currentColor 24%, transparent);
+  }
+}
+
+.failed {
+  color: var(--c-error);
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.subline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.filename {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 18px;
+  letter-spacing: -0.1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.size {
+  font-size: 12px;
+  line-height: 14px;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Проценты меняются каждую долю секунды: без табличных цифр и запаса под «100%»
+   ширина строки гуляет и бабл дышит на каждом обновлении прогресса. */
+.progress {
+  min-width: 4ch;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Кнопки ошибок заливки (повтор/убрать) — размера иконки типа файла, не кольца прогресса. */
+.actionBox {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  color: inherit;
+  background: var(--c-icon-tint);
+  transition: background-color 0.15s;
+
+  &:hover {
+    background: color-mix(in srgb, currentColor 24%, transparent);
+  }
+}

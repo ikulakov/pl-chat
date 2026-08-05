@@ -27,7 +27,12 @@
 //   /reply img  — то же картинкой, /reply file — файлом (входящая цитата на медиа)
 //   /sticker    — оператор присылает стикер
 //   /fail       — следующая отправка клиента вернёт ошибку (проверка «Повторить»)
-//   /failupload — следующая загрузка файла вернёт ошибку
+//   /failupload — следующая загрузка файла вернёт ошибку (сеть/5xx — повтор осмыслен)
+//   /rejectupload — следующая загрузка отклоняется fileguard'ом (400): повтора нет
+//   /failthumb  — превью отвечает 404 (не изображение) → клиент идёт за оригиналом
+//   /pendingmedia — download/thumbnail отвечают 504: файл ещё в карантине CDR
+//   /rejectmedia  — download/thumbnail отвечают 404: файл отклонён проверкой
+//   (три последние — переключатели, повторный ввод той же команды выключает режим)
 //
 // Авто-ответ приходит и на вложения (m.image/m.file), не только на текст.
 // =============================================================================
@@ -74,6 +79,12 @@ let waiters = [];
 // чтобы повтор («Отправить снова») сразу проходил — как при обычном сетевом сбое.
 let failNextSend = false;
 let failNextUpload = false;
+// Отказ fileguard'а — детерминированный вердикт: повтор того же файла даст тот же ответ,
+// поэтому клиент вместо «Повторить» предлагает убрать черновик.
+let rejectNextUpload = false;
+// Режимы отдачи медиа: имитируют статусную машину карантина CDR на стороне сервера.
+let mediaMode = "clean"; // clean | pending | rejected
+let failThumbnail = false;
 
 function push(type, sender, content, stateKey, txnId) {
   const ev = { event_id: nextId(), type, sender, origin_server_ts: Date.now(), content };
@@ -284,6 +295,9 @@ function historyPage(from, limit) {
 // не здесь: на них ответ сбивал бы проверку соответствующих сценариев.
 const REPLYABLE_MSGTYPES = new Set(["m.text", "m.image", "m.file"]);
 
+/** Свежий mediaId на каждую отправку — иначе клиентский кэш превью съест повторный запрос. */
+const freshMxc = () => `mxc://bank.ru/op${Date.now().toString(36)}`;
+
 const OPERATOR_IMAGE = {
   msgtype: "m.image",
   body: "квитанция.png",
@@ -348,11 +362,14 @@ function operatorRespond(text, ownEventId) {
       })
     );
   }
+  // Каждая отправка — новый mediaId: клиент кэширует байты по mxc, и с фиксированным адресом
+  // повторный /img брал бы их из кэша, не ходя в сеть. Тогда переключатели режимов отдачи
+  // (/failthumb, /pendingmedia, /rejectmedia) молча не действовали бы на второй и далее раз.
   if (t.startsWith("/img")) {
-    return delay(700, () => push("m.room.message", OP, { ...OPERATOR_IMAGE }));
+    return delay(700, () => push("m.room.message", OP, { ...OPERATOR_IMAGE, url: freshMxc() }));
   }
   if (t.startsWith("/file")) {
-    return delay(700, () => push("m.room.message", OP, { ...OPERATOR_FILE }));
+    return delay(700, () => push("m.room.message", OP, { ...OPERATOR_FILE, url: freshMxc() }));
   }
   // Ответ оператора цитатой на последнее сообщение клиента: `/reply`, `/reply img`,
   // `/reply file`. Медиа-варианты проверяют, что m.relates_to переживает маппинг
@@ -364,9 +381,9 @@ function operatorRespond(text, ownEventId) {
     const kind = t.slice("/reply".length).trim();
     const base =
       kind === "img"
-        ? { ...OPERATOR_IMAGE }
+        ? { ...OPERATOR_IMAGE, url: freshMxc() }
         : kind === "file"
-          ? { ...OPERATOR_FILE }
+          ? { ...OPERATOR_FILE, url: freshMxc() }
           : { msgtype: "m.text", body: "Отвечаю на ваше сообщение" };
 
     return delay(700, () =>
@@ -399,6 +416,31 @@ function operatorRespond(text, ownEventId) {
     return delay(300, () =>
       push("m.room.message", OP, { msgtype: "m.notice", body: "Следующая загрузка файла упадёт" })
     );
+  }
+  if (t.startsWith("/rejectupload")) {
+    rejectNextUpload = true;
+    return delay(300, () =>
+      push("m.room.message", OP, {
+        msgtype: "m.notice",
+        body: "Следующая загрузка будет отклонена проверкой",
+      })
+    );
+  }
+  // Подтверждение переключателя системной плашкой — иначе неясно, какой режим активен.
+  const notice = (body) => delay(300, () => push("m.room.message", OP, { msgtype: "m.notice", body }));
+
+  // Режимы отдачи медиа — переключатели: повторный ввод возвращает обычную отдачу байт.
+  if (t.startsWith("/failthumb")) {
+    failThumbnail = !failThumbnail;
+    return notice(`Превью ${failThumbnail ? "отвечает 404" : "снова отдаётся"}`);
+  }
+  if (t.startsWith("/pendingmedia")) {
+    mediaMode = mediaMode === "pending" ? "clean" : "pending";
+    return notice(`Медиа: ${mediaMode === "pending" ? "504, файл в карантине" : "готово"}`);
+  }
+  if (t.startsWith("/rejectmedia")) {
+    mediaMode = mediaMode === "rejected" ? "clean" : "rejected";
+    return notice(`Медиа: ${mediaMode === "rejected" ? "404, файл отклонён" : "готово"}`);
   }
   if (t.startsWith("/fail")) {
     failNextSend = true;
@@ -573,6 +615,17 @@ const server = createServer(async (req, res) => {
 
   // Media upload
   if (path.endsWith("/media/v3/upload")) {
+    // /rejectupload: отказ fileguard'а (тип не из whitelist, подмена типа, кривое имя).
+    // Вердикт детерминированный — клиент не предлагает повтор, только убрать черновик.
+    if (rejectNextUpload) {
+      rejectNextUpload = false;
+      return delay(UPLOAD_DELAY_MS, () =>
+        send(res, 400, {
+          errcode: "M_INVALID_PARAM",
+          error: "Mock: тип файла не поддерживается",
+        }),
+      );
+    }
     // /failupload: обрываем отдачу байт — черновик остаётся в ленте с текстом ошибки
     // и кнопкой «Повторить», повтор начинается заново с загрузки.
     if (failNextUpload) {
@@ -588,12 +641,28 @@ const server = createServer(async (req, res) => {
       send(res, 200, { content_uri: "mxc://bank.ru/mock" + Date.now() }),
     );
   }
-  // Media download/thumbnail → SVG-заглушка
-  const mediaMatch = path.match(/\/media\/(?:download|thumbnail)\/[^/]+\/([^/]+)/);
+  // Media download/thumbnail → SVG-заглушка либо ответ статусной машины карантина
+  const mediaMatch = path.match(/\/media\/(download|thumbnail)\/[^/]+\/([^/]+)/);
   if (mediaMatch) {
+    const isThumbnail = mediaMatch[1] === "thumbnail";
+
+    if (mediaMode === "pending") {
+      return send(res, 504, { errcode: "M_NOT_YET_UPLOADED", error: "Файл проверяется" });
+    }
+    if (mediaMode === "rejected") {
+      return send(res, 404, { errcode: "M_NOT_FOUND", error: "Файл не найден" });
+    }
+    // 404 на превью означает «превью не генерировалось» — клиент обязан уйти на оригинал.
+    if (isThumbnail && failThumbnail) {
+      return send(res, 404, { errcode: "M_NOT_FOUND", error: "Превью нет" });
+    }
+
+    // Подпись называет отдавший эндпоинт: у /failthumb весь смысл в том, что клиент молча
+    // уходит с превью на оригинал, и без метки эта подмена на глаз неотличима.
     const w = Number(url.searchParams.get("width") || "400");
     const h = Number(url.searchParams.get("height") || "300");
-    return send(res, 200, svgImage(w, h, `mock ${w}×${h}`), "image/svg+xml");
+    const label = isThumbnail ? `thumbnail ${w}×${h}` : `original ${w}×${h}`;
+    return send(res, 200, svgImage(w, h, label), "image/svg+xml");
   }
   // Публичные байты стикеров
   const stickerMatch = path.match(/\/_matrix\/sticker\/([^/]+)/);
@@ -624,5 +693,6 @@ server.listen(PORT, () => {
   console.log(`BankChat mock-сервер: http://localhost:${PORT}`);
   console.log(`Откройте виджет:     http://localhost:5174`);
   console.log(`Команды в чате: /card  /notice  /left  /join  /html  /img  /file  /sticker`);
-  console.log(`                /reply [img|file]  /fail  /failupload`);
+  console.log(`                /reply [img|file]  /fail  /failupload  /rejectupload`);
+  console.log(`                /failthumb  /pendingmedia  /rejectmedia`);
 });

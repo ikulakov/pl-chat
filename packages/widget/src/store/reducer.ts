@@ -117,7 +117,14 @@ export function chatRuntimeReducer(
         const failed: MessageTimelineItem = { ...m, sendStatus: 'failed' }
         if (!isMedia(failed) || !failed.upload) return failed
 
-        return { ...failed, upload: { ...failed.upload, pct: null } }
+        return {
+          ...failed,
+          upload: {
+            ...failed.upload,
+            pct: null,
+            ...(action.upload ? { error: action.upload } : {}),
+          },
+        }
       })
 
     case 'message.retrying':
@@ -126,7 +133,9 @@ export function chatRuntimeReducer(
 
         if (!isMedia(retrying) || !retrying.upload) return retrying
 
-        return { ...retrying, upload: { ...retrying.upload, pct: 0 } }
+        // error снимается: причина прошлого отказа больше не описывает текущую попытку.
+        const { error: _previous, ...upload } = retrying.upload
+        return { ...retrying, upload: { ...upload, pct: 0 } }
       })
 
     case 'message.uploadProgress':

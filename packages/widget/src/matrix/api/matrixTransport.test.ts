@@ -273,6 +273,28 @@ describe('MatrixTransport', () => {
     await expect(uploadPromise).rejects.toMatchObject({ name: 'MatrixError' })
   })
 
+  // Отказ заливки обязан долететь до classifyUploadError: fileguard отвечает 400 с errcode,
+  // и если транспорт отдаст это как успешный ответ — черновик застынет «отправленным»,
+  // а mxc-ссылки для сообщения не будет.
+  it('rejects an upload when the server answers with an error status', async () => {
+    const tokens = createFakeTokenStore('access-token')
+    const transport = new MatrixTransport(BASE_URL, tokens)
+
+    vi.stubGlobal('XMLHttpRequest', FakeXhr as unknown as typeof XMLHttpRequest)
+
+    const uploadPromise = transport.upload('/_matrix/media/v3/upload', new File(['x'], 'a.exe'))
+    const xhr = FakeXhr.instances[0]!
+    xhr.status = 400
+    xhr.responseText = JSON.stringify({ errcode: 'M_INVALID_PARAM', error: 'bad type' })
+    xhr.onload?.()
+
+    await expect(uploadPromise).rejects.toMatchObject({
+      name: 'MatrixError',
+      errcode: 'M_INVALID_PARAM',
+      status: 400,
+    })
+  })
+
   it('throws the terminal MatrixError when refresh reports a deactivated user', async () => {
     const tokens = createFakeTokenStore('old-token', 'refresh-token')
     const transport = new MatrixTransport(BASE_URL, tokens)
@@ -286,5 +308,40 @@ describe('MatrixTransport', () => {
       name: 'MatrixError',
       errcode: 'M_USER_DEACTIVATED',
     })
+  })
+
+  // Бинарный путь заведён отдельно от JSON, поэтому важно, что он не обходит тихий refresh:
+  // иначе протухший токен ломал бы картинки до того, как его заметит sync-петля.
+  it('download refreshes on 401 and retries with the new token', async () => {
+    const tokens = createFakeTokenStore('old-token', 'refresh-token')
+    const transport = new MatrixTransport(BASE_URL, tokens)
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        jsonResponse({ access_token: 'new-token', refresh_token: 'new-refresh' }),
+      )
+      .mockResolvedValueOnce(new Response('bytes', { status: 200 }))
+
+    const blob = await transport.download('/_matrix/client/v1/media/download/bank.ru/abc')
+
+    expect(blob.size).toBe('bytes'.length)
+    const retryHeaders = fetchSpy.mock.calls[2]![1]!.headers as Headers
+    expect(retryHeaders.get('Authorization')).toBe('Bearer new-token')
+  })
+
+  // Ветвление media-ошибок (404 → оригинал, 504 → «ещё проверяется») строится на статусе:
+  // шлюз отдаёт такие ответы не-JSON'ом, и errcode в них схлопывается в M_UNKNOWN.
+  it('download reports the HTTP status on error responses', async () => {
+    const transport = new MatrixTransport(BASE_URL, createFakeTokenStore('token', 'refresh'))
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('<html>gateway</html>', {
+        status: 504,
+      }),
+    )
+
+    await expect(
+      transport.download('/_matrix/client/v1/media/download/bank.ru/abc'),
+    ).rejects.toMatchObject({ name: 'MatrixError', status: 504 })
   })
 })

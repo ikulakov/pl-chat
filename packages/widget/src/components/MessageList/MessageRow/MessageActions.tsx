@@ -1,6 +1,6 @@
 import { isOptimistic } from '../../../domain/optimistic'
 import { replyText } from '../../../domain/reply'
-import type { MessageTimelineItem } from '../../../domain/timeline'
+import { isMedia, type MessageTimelineItem } from '../../../domain/timeline'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { t } from '../../../i18n'
 import { copyText } from '../../../shared/utils/clipboard'
@@ -18,7 +18,8 @@ export function MessageActions({ message, isOwn }: Props) {
 
   const reply = replyText(message)
 
-  const canRetry = isOwn && message.sendStatus === 'failed'
+  const uploadFailed = isMedia(message) && message.upload?.error
+  const canRetry = isOwn && message.sendStatus === 'failed' && !uploadFailed
   const canReply = !isOptimistic(message.eventId) && reply !== ''
   const canCopy = message.content.body.trim() !== ''
 

@@ -2,7 +2,7 @@ import { t } from '../../i18n'
 import styles from './Spinner.module.css'
 
 interface Props {
-  size?: 'inline' | 'block'
+  size?: 'inline' | 'icon' | 'block'
 }
 
 export function Spinner({ size = 'block' }: Props) {

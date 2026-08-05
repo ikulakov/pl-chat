@@ -2,12 +2,15 @@ import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService, SendFileOptions } from './matrix/matrixController'
+import type { ThumbnailSize } from './matrix/api/matrixApi'
 import type { ReplyTarget } from './store/state'
 import { chatStore } from './store/store'
 
 export interface ChatActions {
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
+  downloadFile: (mxcUrl: string) => Promise<Blob>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   replyTo: (target: ReplyTarget) => void
@@ -43,6 +46,8 @@ export class ChatController {
     this.actions = {
       sendMessage: this.sendMessage,
       sendFile: this.sendFile,
+      loadPreview: this.loadPreview,
+      downloadFile: this.downloadFile,
       cancelUpload: this.cancelUpload,
       resendMessage: this.resendMessage,
       replyTo: this.replyTo,
@@ -92,6 +97,11 @@ export class ChatController {
 
   sendFile = (file: File, options?: SendFileOptions): Promise<void> =>
     this.matrix.sendFile(file, options)
+
+  loadPreview = (mxcUrl: string, size: ThumbnailSize): Promise<Blob> =>
+    this.matrix.loadPreview(mxcUrl, size)
+
+  downloadFile = (mxcUrl: string): Promise<Blob> => this.matrix.downloadFile(mxcUrl)
 
   cancelUpload = (localId: string): void => this.matrix.cancelUpload(localId)
 
