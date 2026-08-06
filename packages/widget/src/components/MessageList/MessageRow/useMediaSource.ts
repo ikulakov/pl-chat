@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { toMediaFailure } from '../../../domain/mediaError'
 import type { ThumbnailSize } from '../../../matrix/api/matrixApi'
-import { isMediaPendingError, isNotFoundError } from '../../../matrix/api/matrixError'
 import { useChatActions } from '../../../hooks/useChatActions'
 
 /**
@@ -59,11 +59,13 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
       .catch((err: unknown) => {
         if (cancelled) return
 
-        const source = isMediaPendingError(err)
-          ? CHECKING
-          : isNotFoundError(err)
-            ? REJECTED
-            : { status: 'error' as const, retry }
+        const failure = toMediaFailure(err)
+        const source =
+          failure === 'pending'
+            ? CHECKING
+            : failure === 'rejected'
+              ? REJECTED
+              : { status: 'error' as const, retry }
 
         setResult({ key, source })
       })

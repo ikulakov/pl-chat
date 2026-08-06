@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MatrixError } from '../../../matrix/api/matrixError'
+import { MediaUnavailableError } from '../../../domain/mediaError'
 import { useMediaSource } from './useMediaSource'
 
 const loadPreview = vi.fn(() => Promise.resolve(new Blob(['bytes'])))
@@ -34,14 +34,12 @@ describe('useMediaSource', () => {
     expect(revoke).toHaveBeenCalledWith('blob:preview')
   })
 
-  it('различает карантин CDR (504) и окончательный отказ (404)', async () => {
-    loadPreview.mockRejectedValueOnce(
-      new MatrixError('M_NOT_YET_UPLOADED', 'processing', undefined, 504),
-    )
+  it('различает ожидание вердикта проверки и окончательный отказ', async () => {
+    loadPreview.mockRejectedValueOnce(new MediaUnavailableError('pending'))
     const pending = renderHook(() => useMediaSource({ mxcUrl: 'mxc://bank.ru/abc', size: SIZE }))
     await waitFor(() => expect(pending.result.current.status).toBe('checking'))
 
-    loadPreview.mockRejectedValueOnce(new MatrixError('M_NOT_FOUND', 'gone', undefined, 404))
+    loadPreview.mockRejectedValueOnce(new MediaUnavailableError('rejected'))
     const gone = renderHook(() => useMediaSource({ mxcUrl: 'mxc://bank.ru/other', size: SIZE }))
     await waitFor(() => expect(gone.result.current.status).toBe('rejected'))
   })
