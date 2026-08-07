@@ -85,6 +85,18 @@
   color: var(--c-error);
 }
 
+/* Отказ проверки CDR: файл уже не скачается — гасим иконку и имя, как «недоступно». */
+.rejected {
+  opacity: 0.5;
+}
+
+/* Причина отказа — фраза от сервера, ей нужен перенос, а не обрезка как у «PDF»/размера. */
+.reason {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+
 .info {
   display: flex;
   flex-direction: column;

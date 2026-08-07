@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OPERATOR_ID, textItem } from '../shared/testUtils/matrixFixtures'
+import { fileItem, OPERATOR_ID, textItem } from '../shared/testUtils/matrixFixtures'
 import type { RoomSyncPatch } from '../domain/roomSync'
 import type { TextTimelineItem } from '../domain/timeline'
 import { chatRuntimeReducer } from './reducer'
@@ -33,7 +33,14 @@ function connectedWithSentMessage(): ChatRuntimeState {
 }
 
 function roomPatch(overrides: Partial<RoomSyncPatch> = {}): RoomSyncPatch {
-  return { timeline: [], readMarkers: [], cardAnswers: [], prevBatch: null, ...overrides }
+  return {
+    timeline: [],
+    readMarkers: [],
+    cardAnswers: [],
+    mediaVerdicts: [],
+    prevBatch: null,
+    ...overrides,
+  }
 }
 
 // снимок «как при старте комнаты»: одно сообщение, активный оператор, курсор истории
@@ -494,6 +501,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
       type: 'history.loaded',
       items: [],
       cardAnswers: [],
+      mediaVerdicts: [],
       prevBatch: 'p2',
     })
 
@@ -513,6 +521,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
       type: 'history.loaded',
       items: [],
       cardAnswers: [],
+      mediaVerdicts: [],
       prevBatch: 'p2',
     })
 
@@ -561,6 +570,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
       type: 'history.loaded',
       items: [],
       cardAnswers: [],
+      mediaVerdicts: [],
       prevBatch: 'p2',
     })
     const settled = chatRuntimeReducer(loaded, { type: 'history.settled' })
@@ -574,6 +584,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
       type: 'history.loaded',
       items: [textItem({ localId: '$old', eventId: '$old', body: 'старое', ts: 0 })],
       cardAnswers: [],
+      mediaVerdicts: [],
       prevBatch: null,
     })
 
@@ -588,6 +599,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
       type: 'history.loaded',
       items: [],
       cardAnswers: [{ cardEventId: '$card', actionId: 'confirm', status: 'sent' }],
+      mediaVerdicts: [],
       prevBatch: 'p2',
     })
 
@@ -595,6 +607,109 @@ describe('chatRuntimeReducer — курсор истории', () => {
       cardEventId: '$card',
       actionId: 'confirm',
       status: 'sent',
+    })
+  })
+})
+
+describe('chatRuntimeReducer — вердикты kc.media.status', () => {
+  it('sync.received кладёт вердикт по media_id — не по event_id сообщения', () => {
+    // Бэкенд шлёт один вердикт на файл (media_id), а не на каждое сообщение, которое
+    // на него ссылается — привязка по event_id недоступна и не нужна.
+    const next = chatRuntimeReducer(connectedWithSentMessage(), {
+      type: 'sync.received',
+      cursor: 's2',
+      room: roomPatch({
+        mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'rejected', error: 'плохой файл' } }],
+      }),
+    })
+
+    expect(next.room.mediaVerdicts).toEqual({ abc: { status: 'rejected', error: 'плохой файл' } })
+  })
+
+  it('history.loaded мерджит вердикты даже при пустых items', () => {
+    const loaded = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'history.loaded',
+      items: [],
+      cardAnswers: [],
+      mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'ready' } }],
+      prevBatch: 'p2',
+    })
+
+    expect(loaded.room.mediaVerdicts).toEqual({ abc: { status: 'ready' } })
+  })
+
+  it('уже известный вердикт не перезаписывается повторной доставкой', () => {
+    const first = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'sync.received',
+      cursor: 's1',
+      room: roomPatch({ mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'ready' } }] }),
+    })
+
+    const second = chatRuntimeReducer(first, {
+      type: 'sync.received',
+      cursor: 's2',
+      room: roomPatch({
+        mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'rejected', error: 'дубль' } }],
+      }),
+    })
+
+    expect(second.room.mediaVerdicts).toEqual({ abc: { status: 'ready' } })
+  })
+
+  it('вердикт, пришедший раньше эха своей отправки, всё равно виден на черновике', () => {
+    // message.uploaded подставляет реальный mxc в content.url ещё ДО ответа PUT /send —
+    // значит mediaId у черновика известен раньше, чем событие вообще уйдёт на сервер.
+    // room.mediaVerdicts не привязан к конкретному элементу таймлайна, поэтому вердикт
+    // приходит и остаётся доступным независимо от того, дошло уже эхо или нет.
+    const draft = {
+      ...ownMessage({ txnId: 'txn-1' }),
+      kind: 'file' as const,
+      content: { body: '', url: '', filename: 'doc.pdf', info: { mimetype: '', size: 1 } },
+      upload: { file: new File([], 'doc.pdf'), pct: 40 },
+    }
+    const uploaded = chatRuntimeReducer(
+      chatRuntimeReducer(
+        { ...INITIAL_RUNTIME_STATE, identity: IDENTITY },
+        { type: 'message.optimisticAdded', message: draft },
+      ),
+      { type: 'message.uploaded', localId: 'l1', url: 'mxc://bank.ru/abc' },
+    )
+
+    // Вердикт долетает раньше /sync-эха — сообщение всё ещё optimistic (sendStatus: 'sending').
+    const withVerdict = chatRuntimeReducer(uploaded, {
+      type: 'sync.received',
+      cursor: 's2',
+      room: roomPatch({
+        mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'rejected', error: 'плохой файл' } }],
+      }),
+    })
+
+    expect(withVerdict.room.timeline[0]).toMatchObject({ sendStatus: 'sending' })
+    expect(withVerdict.room.mediaVerdicts).toEqual({
+      abc: { status: 'rejected', error: 'плохой файл' },
+    })
+
+    // Эхо приходит позже и резолвит черновик в реальное сообщение — вердикт переживает и это.
+    const resolved = chatRuntimeReducer(withVerdict, {
+      type: 'sync.received',
+      cursor: 's3',
+      room: roomPatch({
+        timeline: [
+          fileItem({
+            eventId: '$real',
+            txnId: 'txn-1',
+            sender: IDENTITY.userId,
+            sendStatus: 'sent',
+            content: { url: 'mxc://bank.ru/abc' },
+          }),
+        ],
+      }),
+    })
+
+    expect(resolved.room.timeline).toHaveLength(1)
+    expect(resolved.room.timeline[0]).toMatchObject({ eventId: '$real', sendStatus: 'sent' })
+    expect(resolved.room.mediaVerdicts).toEqual({
+      abc: { status: 'rejected', error: 'плохой файл' },
     })
   })
 })

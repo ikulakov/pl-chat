@@ -1,4 +1,4 @@
-import type { MatrixEventType, MsgType } from './consts'
+import type { MatrixEventType, MediaScanStatus, MsgType } from './consts'
 
 interface BaseClientEvent {
   event_id: string
@@ -106,6 +106,15 @@ export interface OperatorLeftEvent extends BaseClientEvent {
   }
 }
 
+export interface MediaStatusEvent extends BaseClientEvent {
+  type: typeof MatrixEventType.MediaStatus
+  content: {
+    media_id: string
+    status: (typeof MediaScanStatus)[keyof typeof MediaScanStatus]
+    error?: string
+  }
+}
+
 export interface GenericClientEvent extends BaseClientEvent {
   type: string
   content: Record<string, unknown>
@@ -116,6 +125,7 @@ export type ClientEvent =
   | OperatorCurrentEvent
   | OperatorJoinedEvent
   | OperatorLeftEvent
+  | MediaStatusEvent
   | GenericClientEvent
 
 export interface ReceiptEvent {

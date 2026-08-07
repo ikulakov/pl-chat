@@ -1,4 +1,5 @@
 import { applyCardAnswers } from '../domain/adaptiveCards'
+import { applyMediaVerdicts } from '../domain/mediaVerdict'
 import { mergeTimeline, prependTimeline } from '../domain/mergeTimeline'
 import { applyReadMarkers } from '../domain/receipts'
 import type { RoomSyncPatch } from '../domain/roomSync'
@@ -38,6 +39,7 @@ function applySync(room: RoomState, patch: RoomSyncPatch): RoomState {
     operator: patch.operator ?? room.operator,
     readReceipts: applyReadMarkers(room.readReceipts, patch.readMarkers, timeline),
     cardAnswers: applyCardAnswers(room.cardAnswers, patch.cardAnswers),
+    mediaVerdicts: applyMediaVerdicts(room.mediaVerdicts, patch.mediaVerdicts),
   }
 }
 
@@ -191,11 +193,12 @@ export function chatRuntimeReducer(
       return updateRoom(state, { isLoadingHistory: true })
 
     case 'history.loaded': {
-      const { items, cardAnswers, prevBatch } = action
+      const { items, cardAnswers, mediaVerdicts, prevBatch } = action
 
       return updateRoom(state, {
         timeline: prependTimeline(state.room.timeline, items),
         cardAnswers: applyCardAnswers(state.room.cardAnswers, cardAnswers),
+        mediaVerdicts: applyMediaVerdicts(state.room.mediaVerdicts, mediaVerdicts),
         prevBatch,
       })
     }

@@ -1,6 +1,7 @@
 import type { FileTimelineItem } from '../../../domain/timeline'
 import { isRetryableFailure, type UploadFailure } from '../../../domain/uploadError'
 import { useChatActions } from '../../../hooks/useChatActions'
+import { useChatStore } from '../../../hooks/useChatStore'
 import { useMediaDownload } from '../../../hooks/useMediaDownload'
 import { t } from '../../../i18n'
 import { ProgressRing } from '../../../shared/ui/ProgressRing'
@@ -9,6 +10,8 @@ import { CloseIcon, DownloadIcon, FileDocIcon, RetryIcon } from '../../../shared
 import { cn } from '../../../shared/utils/cn'
 import { getFileExtension } from '../../../shared/utils/fileValidation'
 import { formatSize } from '../../../shared/utils/formatSize'
+import { parseMxcUrl } from '../../../shared/utils/mxc'
+import { selectMediaVerdicts } from '../../../store/selectors'
 import { BubbleMeta, type BubbleMetaData } from './BubbleMeta'
 import styles from './FileChip.module.css'
 import { MediaCaption } from './MediaCaption'
@@ -25,7 +28,13 @@ export function FileChip({ item, meta }: Props) {
   const { uploadPct, failure, uploadFailed, isStatusHidden } = useMediaUploadView(item)
   const isUploading = uploadPct !== null
 
-  const { body, filename, info } = item.content
+  const { body, filename, info, url } = item.content
+
+  const verdicts = useChatStore(selectMediaVerdicts)
+  const mediaId = url ? parseMxcUrl(url)?.mediaId : undefined
+  const verdict = mediaId ? verdicts[mediaId] : undefined
+  // Отказ проверки терминален: файл уже не скачается, ретраить нечего — чип не кликабелен.
+  const isRejected = verdict?.status === 'rejected'
 
   const hasCaption = body.length > 0
 
@@ -34,18 +43,27 @@ export function FileChip({ item, meta }: Props) {
 
   // Причину не разворачиваем: пользователю она ничего не меняет — что делать, говорит само
   // действие рядом (повтор либо «убрать»). Различает случаи только текст aria-label кнопки.
-  const subline = uploadFailed
-    ? t('chat.upload.error')
-    : isUploading
-      ? t('composer.upload.progress', { percent: uploadPct })
-      : fileHint
+  // Текст отказа проверки уже написан сервером для пользователя — показываем как есть.
+  const subline = isRejected
+    ? (verdict.error ?? t('chat.media.rejected'))
+    : uploadFailed
+      ? t('chat.upload.error')
+      : isUploading
+        ? t('composer.upload.progress', { percent: uploadPct })
+        : fileHint
 
   const chipBody = (
-    <span className={styles.info}>
+    <span className={cn(styles.info, isRejected && styles.rejected)}>
       <span className={styles.filename}>{filename}</span>
       <span className={styles.subline}>
         <span
-          className={cn(styles.size, isUploading && styles.progress, uploadFailed && styles.failed)}
+          className={cn(
+            styles.size,
+            isUploading && styles.progress,
+            (uploadFailed || isRejected) && styles.failed,
+            // причина отказа — фраза, ей нужен перенос, а не обрезка как у «PDF»/размера
+            isRejected && styles.reason,
+          )}
         >
           {subline}
         </span>
@@ -84,6 +102,17 @@ export function FileChip({ item, meta }: Props) {
             () => resendMessage(item.localId),
             () => cancelUpload(item.localId),
           )}
+          {chipBody}
+        </div>
+      ) : isRejected ? (
+        // Отказ проверки: чип не кликабелен вовсе, скачивать нечего — сервер уже сказал «нет».
+        <div className={styles.chip}>
+          <span
+            className={cn(styles.iconBox, styles.rejected)}
+            aria-hidden
+          >
+            <FileDocIcon size={20} />
+          </span>
           {chipBody}
         </div>
       ) : (

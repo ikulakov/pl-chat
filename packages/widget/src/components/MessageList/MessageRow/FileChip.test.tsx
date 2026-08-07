@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { t } from '../../../i18n'
 import { fileItem } from '../../../shared/testUtils/matrixFixtures'
+import { chatStore } from '../../../store/store'
 import type { BubbleMetaData } from './BubbleMeta'
 import { FileChip } from './FileChip'
 
@@ -20,6 +21,7 @@ describe('FileChip', () => {
     cancelUpload.mockClear()
     resendMessage.mockClear()
     downloadFile.mockClear()
+    chatStore.getState().dispatch({ type: 'session.closed' })
   })
 
   it('показывает причину сбоя загрузки, только если она сорвалась — не когда упал сам /send', () => {
@@ -167,5 +169,57 @@ describe('FileChip', () => {
     ).not.toBeInTheDocument()
     screen.getByRole('button', { name: t('chat.action.removeFile') }).click()
     expect(cancelUpload).toHaveBeenCalledExactlyOnceWith('m1')
+  })
+
+  it('kc.media.status rejected гасит чип и показывает причину сервера вместо размера', () => {
+    chatStore.getState().dispatch({
+      type: 'sync.received',
+      cursor: 's1',
+      room: {
+        timeline: [],
+        readMarkers: [],
+        cardAnswers: [],
+        mediaVerdicts: [
+          { mediaId: 'abc', verdict: { status: 'rejected', error: 'Файл повреждён' } },
+        ],
+        prevBatch: null,
+      },
+    })
+
+    render(
+      <FileChip
+        item={fileItem({ sendStatus: 'sent' })}
+        meta={meta}
+      />,
+    )
+
+    expect(screen.getByText('Файл повреждён')).toBeInTheDocument()
+    expect(screen.queryByText('PDF')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: t('chat.media.download', { name: 'doc.pdf' }) }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('kc.media.status rejected без текста ошибки показывает свой i18n-фолбэк', () => {
+    chatStore.getState().dispatch({
+      type: 'sync.received',
+      cursor: 's1',
+      room: {
+        timeline: [],
+        readMarkers: [],
+        cardAnswers: [],
+        mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'rejected' } }],
+        prevBatch: null,
+      },
+    })
+
+    render(
+      <FileChip
+        item={fileItem({ sendStatus: 'sent' })}
+        meta={meta}
+      />,
+    )
+
+    expect(screen.getByText(t('chat.media.rejected'))).toBeInTheDocument()
   })
 })

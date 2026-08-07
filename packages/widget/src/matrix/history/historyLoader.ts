@@ -2,6 +2,7 @@ import { sleep } from '../../shared/utils/sleep'
 import type { RuntimeAction } from '../../store/state'
 import type { MatrixApi } from '../api/matrixApi'
 import { collectCardAnswers } from '../mappers/adaptiveCard'
+import { collectMediaVerdicts } from '../mappers/mediaStatus'
 import { timelineEventsToItems } from '../mappers/timeline'
 
 // Максимальное кол-во страниц для просмотра на случай если все события страницы будут не целевыми
@@ -126,10 +127,17 @@ export class MatrixHistoryLoader {
 
       const items = timelineEventsToItems(reversed)
       const cardAnswers = collectCardAnswers(reversed)
+      const mediaVerdicts = collectMediaVerdicts(reversed)
       // Пустой chunk — признак конца истории
       const nextBatch = chunk.length === 0 ? null : (end ?? null)
 
-      this.dispatch({ type: 'history.loaded', items, cardAnswers, prevBatch: nextBatch })
+      this.dispatch({
+        type: 'history.loaded',
+        items,
+        cardAnswers,
+        mediaVerdicts,
+        prevBatch: nextBatch,
+      })
 
       if (items.length > 0 || nextBatch === null) return
 
