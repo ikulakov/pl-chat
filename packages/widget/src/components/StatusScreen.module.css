@@ -1,0 +1,81 @@
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  text-align: center;
+  width: 328px;
+  margin: 0 auto;
+}
+
+.illustrationWrap {
+  width: 100%;
+  max-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.illustrationImg {
+  max-height: 260px;
+  width: auto;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.textBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--c-text-primary);
+  margin: 0;
+}
+
+.titleLarge {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.083;
+  color: var(--c-text-primary);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 14px;
+  line-height: 1.286;
+  color: var(--c-text-tertiary);
+  margin: 0;
+  max-width: 280px;
+}
+
+.action {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.retryBtn {
+  width: 100%;
+  height: 48px;
+  background: var(--c-surface-contrast);
+  color: var(--c-text-invert);
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+
+  &:hover {
+    background: color-mix(in srgb, var(--c-surface-contrast) 80%, #fff);
+  }
+
+  &:active {
+    background: color-mix(in srgb, var(--c-surface-contrast) 80%, #000);
+  }
+}

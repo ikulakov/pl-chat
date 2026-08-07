@@ -1,0 +1,39 @@
+.spinner {
+  display: inline-block;
+  border-style: solid;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+
+  &.inline {
+    width: 10px;
+    height: 10px;
+    border-width: 1.2px;
+    border-color: currentColor;
+    border-top-color: transparent;
+    vertical-align: middle;
+  }
+
+  /* Для слотов рядом с иконками 20px: inline там теряется, block не влезает. */
+  &.icon {
+    width: 16px;
+    height: 16px;
+    border-width: 1.5px;
+    border-color: currentColor;
+    border-top-color: transparent;
+  }
+
+  &.block {
+    display: block;
+    width: 36px;
+    height: 36px;
+    border-width: 3px;
+    border-color: var(--c-surface-secondary);
+    border-top-color: var(--c-surface-contrast);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

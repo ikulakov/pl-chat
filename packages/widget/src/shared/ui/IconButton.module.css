@@ -1,0 +1,75 @@
+.base {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+
+  /* Size */
+  &.sm {
+    width: 24px;
+    height: 24px;
+  }
+
+  &.md {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+  }
+
+  /* Variant */
+  &.surface {
+    color: var(--c-text-primary);
+    background-color: var(--c-surface-tertiary);
+
+    &:not(:disabled):hover {
+      background-color: var(--c-surface-secondary);
+    }
+  }
+
+  &.floating {
+    color: var(--c-text-primary);
+    background-color: var(--c-surface-primary);
+    box-shadow: var(--shadow-popover);
+
+    &:not(:disabled):hover {
+      background-color: var(--c-surface-secondary);
+    }
+  }
+
+  &.ghost {
+    color: var(--c-text-tertiary);
+
+    &:not(:disabled):hover {
+      color: var(--c-text-primary);
+    }
+  }
+
+  &.accent {
+    color: var(--c-text-invert);
+    background-color: var(--c-lime);
+
+    &:not(:disabled):hover {
+      background-color: color-mix(in srgb, var(--c-lime) 90%, #000);
+    }
+  }
+
+  &.contrast {
+    color: var(--c-text-invert);
+    background-color: var(--c-surface-contrast);
+
+    &:not(:disabled):hover {
+      background-color: color-mix(in srgb, var(--c-surface-contrast) 80%, #fff);
+    }
+  }
+
+  &:disabled {
+    color: var(--c-text-disabled);
+  }
+
+  &.accent:disabled,
+  &.contrast:disabled {
+    background-color: var(--c-surface-secondary);
+  }
+}

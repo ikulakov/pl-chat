@@ -1,0 +1,57 @@
+# nginx-конфиг bankchat. ${NGINX_PORT} подставляется envsubst'ом на старте контейнера;
+# остальные $-переменные — nginx-овые (NGINX_ENVSUBST_FILTER=^NGINX_ их не трогает).
+
+server {
+    listen      ${NGINX_PORT};
+    server_name _;
+
+    root  /usr/share/nginx/html;
+    index index.html;
+
+    # Liveness-проба для оркестратора / docker healthcheck.
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # loader.js — IIFE-скрипт для встраивания. Без content-hash в имени,
+    # поэтому no-cache: браузер ревалидирует при каждом обращении.
+    location = /loader.js {
+        add_header Cache-Control "no-cache";
+        try_files  $uri =404;
+    }
+
+    location = /loader.js.map {
+        add_header Cache-Control "no-cache";
+        try_files  $uri =404;
+    }
+
+    # Корень → виджет (живёт под base="/widget/").
+    location = / {
+        return 302 $scheme://$http_host/widget/;
+    }
+
+    # Хешированные ассеты виджета (vite content-hash в имени) — иммутабельный долгий кеш.
+    location /widget/assets/ {
+        access_log off;
+        expires    1y;
+        add_header Cache-Control "public, immutable";
+        try_files  $uri =404;
+    }
+
+    # SPA виджета: статичный файл или fallback на index.html. index.html — без кеша.
+    location /widget/ {
+        add_header Cache-Control "no-cache";
+        try_files  $uri $uri/ /widget/index.html;
+    }
+
+    # Опциональный прокси /_matrix → MatrixKC. Snippet создаётся entrypoint-скриптом
+    # только при заданном MATRIX_BACKEND; иначе wildcard-include пуст (чистая статика).
+    include /etc/nginx/snippets/matrix-proxy-*.conf;
+
+    gzip            on;
+    gzip_vary       on;
+    gzip_min_length 1024;
+    gzip_types      text/css application/javascript application/json image/svg+xml;
+}

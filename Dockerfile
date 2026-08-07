@@ -1,0 +1,73 @@
+# syntax=docker/dockerfile:1.7
+#
+# bankchat — встраиваемый чат-виджет банка.
+# Образ собирает монорепо (pnpm + turbo) и отдаёт два артефакта через nginx:
+#   /loader.js  — IIFE-скрипт, который хост вставляет <script src="...">
+#   /widget/    — SPA виджета (React-приложение в iframe, base="/widget")
+#
+# Env-переменные (runtime):
+#   NGINX_PORT      — порт nginx (default: 8080)
+#   MATRIX_BACKEND  — если задан, nginx проксирует /_matrix/* сюда
+#   DNS_RESOLVER    — DNS для резолва апстрима (default: 127.0.0.11 — Docker DNS)
+
+# ── Stage 1: сборка ──────────────────────────────────────────────────────────
+FROM nexus.isb/library/node:24-alpine-obru AS build
+WORKDIR /app
+
+ENV COREPACK_NPM_REGISTRY="https://nexus.isb/repository/npmjs-npm-proxy/"
+ENV NODE_EXTRA_CA_CERTS="/etc/ssl/certs/ca-certificates.crt"
+ENV npm_config_registry="https://nexus.isb/repository/npmjs-npm-proxy/"
+
+# Версия из package.json#packageManager — воспроизводимая сборка.
+RUN corepack enable && corepack prepare pnpm@10.34.3 --activate
+
+# Сначала только манифесты: слой pnpm install кешируется пока lock-файл не менялся.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/protocol/package.json  packages/protocol/
+COPY packages/loader/package.json    packages/loader/
+COPY packages/widget/package.json    packages/widget/
+COPY tools/host-demo/package.json    tools/host-demo/
+COPY tools/matrix-mock/package.json  tools/matrix-mock/
+
+RUN pnpm install --frozen-lockfile
+
+# Исходники + сборка prod-пакетов (только packages/*, tools/ не собирается).
+COPY . .
+
+# Allowlist родительских origin'ов для виджета (запятые как разделитель).
+# ОБЯЗАТЕЛЬНЫЙ аргумент — виджет упадёт при старте если не задан.
+# Пример: --build-arg VITE_ALLOWED_PARENTS="https://bank.ru,https://dbo.bank.ru"
+ARG VITE_ALLOWED_PARENTS
+ENV VITE_ALLOWED_PARENTS=$VITE_ALLOWED_PARENTS
+
+RUN pnpm build
+
+# ── Stage 2: runtime (nginx, отдача статики) ─────────────────────────────────
+FROM nexus.isb/library/nginx:1.27-alpine-obru AS runtime
+
+# Шаблон конфига: nginx прогоняет envsubst по /etc/nginx/templates/*.
+# NGINX_ENVSUBST_FILTER ограничивает подстановку только NGINX_*-переменными,
+# чтобы не затереть nginx-переменные $uri / $request_uri / $host.
+COPY docker/nginx/default.conf.template /etc/nginx/templates/default.conf.template
+
+# Скрипт включает прокси /_matrix только при заданном MATRIX_BACKEND.
+COPY docker/nginx/30-matrix-proxy.sh /docker-entrypoint.d/30-matrix-proxy.sh
+
+# Виджет-SPA (index.html + assets/*) — под /widget/, как и ожидает widgetUrl() в loader.
+COPY --from=build /app/packages/widget/dist /usr/share/nginx/html/widget
+
+# Лоадер — один файл в корне.
+COPY --from=build /app/packages/loader/dist/loader.js     /usr/share/nginx/html/loader.js
+COPY --from=build /app/packages/loader/dist/loader.js.map /usr/share/nginx/html/loader.js.map
+
+RUN chmod +x /docker-entrypoint.d/30-matrix-proxy.sh \
+    && mkdir -p /etc/nginx/snippets
+
+ENV NGINX_PORT=8080 \
+    NGINX_ENVSUBST_FILTER=^NGINX_ \
+    MATRIX_BACKEND="" \
+    DNS_RESOLVER=kube-dns.kube-system.svc.cluster.local
+
+EXPOSE 8080
+
+# CMD/ENTRYPOINT наследуются от nginx: docker-entrypoint.d → nginx -g "daemon off;"

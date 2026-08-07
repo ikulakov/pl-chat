@@ -1,0 +1,67 @@
+import type { ViewportMode } from '@bankchat/protocol'
+import { create } from 'zustand'
+import { devtools } from 'zustand/middleware'
+import { chatRuntimeReducer } from './reducer'
+import type { ChatRuntimeState, RoomState, RuntimeAction } from './state'
+
+export interface ChatStoreState extends ChatRuntimeState {
+  isOpen: boolean
+  viewport: ViewportMode
+  dispatch: (action: RuntimeAction) => void
+  openPanel: () => void
+  closePanel: () => void
+  setViewport: (mode: ViewportMode) => void
+}
+
+export const INITIAL_ROOM_STATE: RoomState = {
+  timeline: [],
+  operator: {
+    id: null,
+    displayName: null,
+    isActive: false,
+  },
+  readReceipts: {},
+  replyTarget: null,
+  prevBatch: null,
+  isLoadingHistory: false,
+}
+
+export const INITIAL_RUNTIME_STATE: ChatRuntimeState = {
+  phase: 'idle',
+  error: null,
+  identity: null,
+  cursor: null,
+  room: INITIAL_ROOM_STATE,
+}
+
+const DEVTOOLS_OPT_IN_KEY = 'plchat.devtools'
+
+export function createChatStore() {
+  return create<ChatStoreState>()(
+    devtools(
+      (set) => ({
+        isOpen: false,
+        viewport: 'docked',
+        ...INITIAL_RUNTIME_STATE,
+
+        dispatch: (action) => set((state) => chatRuntimeReducer(state, action), false, action),
+        openPanel: () => set({ isOpen: true }, false, 'panel.opened'),
+        closePanel: () => set({ isOpen: false }, false, 'panel.closed'),
+        setViewport: (mode) => set({ viewport: mode }, false, 'viewport.changed'),
+      }),
+      { name: 'PLChat', enabled: isDevtoolsEnabled() },
+    ),
+  )
+}
+
+function isDevtoolsEnabled(): boolean {
+  if (import.meta.env.DEV) return true
+
+  try {
+    return localStorage.getItem(DEVTOOLS_OPT_IN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export const chatStore = createChatStore()
