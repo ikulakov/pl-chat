@@ -1,0 +1,63 @@
+.wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+}
+
+.chip {
+  flex: 1 1 188px;
+  min-width: 0;
+  padding: 11px 16px;
+  background: var(--c-surface-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 18px;
+  letter-spacing: -0.1px;
+  color: var(--c-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.15s;
+  text-align: center;
+
+  &:hover:not(:disabled) {
+    background: var(--c-surface-secondary-hover);
+  }
+
+  &:disabled {
+    cursor: default;
+
+    &:not(.chosen) {
+      color: var(--c-text-tertiary);
+    }
+  }
+
+  &.chosen {
+    background: var(--c-neutral);
+  }
+
+  /* «одна из последних двух» n: 
+     при чётном total это предпоследняя (левый край пары), 
+     при нечётном единственная кнопка в своём ряду (нечётная позиция всегда у одиночных) 
+     */
+  &:nth-last-of-type(-n + 2):nth-of-type(odd) {
+    border-bottom-left-radius: var(--radius-lg);
+  }
+
+  &:nth-last-of-type(1) {
+    border-bottom-right-radius: var(--radius-lg);
+  }
+}
+
+.footer {
+  flex: 1 1 100%;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.error {
+  color: var(--c-error);
+}

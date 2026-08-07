@@ -1,5 +1,7 @@
 import { vi } from 'vitest'
+import type { AdaptiveCardPayload } from '../../domain/adaptiveCards'
 import type {
+  AdaptiveCardTimelineItem,
   FileTimelineItem,
   ImageTimelineItem,
   MediaContent,
@@ -109,6 +111,38 @@ export function imageItem(
       filename: 'p.png',
       info: { mimetype: 'image/png', size: 100 },
       ...content,
+    },
+  }
+}
+
+const DEFAULT_CARD: AdaptiveCardPayload = {
+  type: 'AdaptiveCard',
+  version: '1.5',
+  actions: [
+    { type: 'Action.Submit', id: 'confirm', title: 'Подтвердить', data: { action: 'confirm' } },
+  ],
+}
+
+export function adaptiveCardItem(
+  overrides: Partial<Omit<AdaptiveCardTimelineItem, 'kind' | 'content'>> & {
+    body?: string
+    card?: AdaptiveCardPayload
+    cardKind?: string
+  } = {},
+): AdaptiveCardTimelineItem {
+  const { body, card, cardKind, ...rest } = overrides
+  return {
+    kind: 'adaptiveCard',
+    localId: 'm1',
+    eventId: '$card',
+    sender: OPERATOR_ID,
+    ts: 0,
+    sendStatus: 'sent',
+    ...rest,
+    content: {
+      body: body ?? 'Карточка',
+      card: card ?? DEFAULT_CARD,
+      ...(cardKind ? { cardKind } : {}),
     },
   }
 }

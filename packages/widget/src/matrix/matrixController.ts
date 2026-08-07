@@ -1,12 +1,8 @@
+import type { CardAction } from '../domain/adaptiveCards'
 import { MediaUnavailableError } from '../domain/mediaError'
 import { createOptimisticMediaMessage, createOptimisticTextMessage } from '../domain/optimistic'
 import { canMoveMarker } from '../domain/receipts'
-import {
-  isMedia,
-  isSystem,
-  type MediaTimelineItem,
-  type MessageTimelineItem,
-} from '../domain/timeline'
+import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '../domain/timeline'
 import { isAbortError } from '../shared/utils/abort'
 import type { ImageDimensions } from '../shared/utils/imageDimensions'
 import { parseMxcUrl, type ParsedMxcUrl } from '../shared/utils/mxc'
@@ -23,7 +19,11 @@ import {
 } from './api/matrixError'
 import { MatrixHistoryLoader } from './history/historyLoader'
 import { classifyMediaError } from './mappers/mediaError'
-import { toOutgoingContent } from './mappers/outgoing'
+import {
+  toAdaptiveActionContent,
+  toMessageContent,
+  type OutgoingTimelineItem,
+} from './mappers/outgoing'
 import { toRoomSyncPatch } from './mappers/roomSync'
 import { classifyUploadError } from './mappers/uploadError'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
@@ -56,6 +56,7 @@ export interface MatrixService {
   disconnect: () => void
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
   cancelUpload: (localId: string) => void
@@ -169,6 +170,33 @@ export class MatrixController implements MatrixService {
     if (!uploaded) return
 
     await this.dispatchSend(connection.identity.roomId, uploaded, 'sendFile')
+  }
+
+  async sendCardAction(cardEventId: string, action: CardAction): Promise<void> {
+    const connection = this.requireConnection()
+    if (!connection) return
+
+    const existing = connection.room.cardAnswers[cardEventId]
+    if (existing?.status === 'sending' || existing?.status === 'sent') return
+
+    this.dispatch({ type: 'card.answering', cardEventId, actionId: action.id })
+    const lifecycleId = this.lifecycleId
+
+    try {
+      await this.api.sendMessage({
+        roomId: connection.identity.roomId,
+        txnId: crypto.randomUUID(),
+        content: toAdaptiveActionContent(cardEventId, action),
+      })
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      this.dispatch({ type: 'card.answered', cardEventId })
+    } catch (err) {
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      this.dispatch({ type: 'card.answerFailed', cardEventId })
+      this.handleAuthError(err, 'sendCardAction')
+    }
   }
 
   private async uploadFile(
@@ -320,7 +348,13 @@ export class MatrixController implements MatrixService {
     const { identity, room } = connection
     const message = room.timeline.find((m) => m.localId === localId)
 
-    if (!message || isSystem(message) || message.sendStatus !== 'failed' || !message.txnId) {
+    if (
+      !message ||
+      isSystem(message) ||
+      isAdaptiveCard(message) ||
+      message.sendStatus !== 'failed' ||
+      !message.txnId
+    ) {
       return
     }
 
@@ -394,7 +428,7 @@ export class MatrixController implements MatrixService {
 
   private async dispatchSend(
     roomId: string,
-    message: MessageTimelineItem,
+    message: OutgoingTimelineItem,
     context: AuthErrorContext,
   ): Promise<void> {
     const localId = message.localId
@@ -404,7 +438,7 @@ export class MatrixController implements MatrixService {
       const { event_id } = await this.api.sendMessage({
         roomId,
         txnId: message.txnId!,
-        content: toOutgoingContent(message),
+        content: toMessageContent(message),
       })
       if (!this.isCurrentLifecycle(lifecycleId)) return
 

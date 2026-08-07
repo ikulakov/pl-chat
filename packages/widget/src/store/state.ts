@@ -1,3 +1,4 @@
+import type { CardAnswer } from '../domain/adaptiveCards'
 import type { OperatorState } from '../domain/operator'
 import type { ReadReceipt } from '../domain/receipts'
 import type { RoomSyncPatch } from '../domain/roomSync'
@@ -23,8 +24,16 @@ export type RuntimeAction =
   | { type: 'reply.targeted'; target: ReplyTarget }
   | { type: 'reply.cleared' }
   | { type: 'history.loading' }
-  | { type: 'history.loaded'; items: TimelineItem[]; prevBatch: string | null }
+  | {
+      type: 'history.loaded'
+      items: TimelineItem[]
+      cardAnswers: CardAnswer[]
+      prevBatch: string | null
+    }
   | { type: 'history.settled' }
+  | { type: 'card.answering'; cardEventId: string; actionId: string }
+  | { type: 'card.answered'; cardEventId: string }
+  | { type: 'card.answerFailed'; cardEventId: string }
 
 export interface ChatRuntimeState {
   phase: ConnectionPhase
@@ -39,6 +48,9 @@ export interface RoomState {
   operator: OperatorState
   // m.read по юзерам: до какого события каждый дочитал
   readReceipts: Record<string, ReadReceipt>
+  // ответы на Adaptive Card по cardEventId — переживают merge ленты и перезагрузку,
+  // поэтому не элемент timeline (ответ клиента и не рисуется пузырём в ленте)
+  cardAnswers: Record<string, CardAnswer>
   // сообщение, на которое пользователь отвечает (превью в композере)
   replyTarget: ReplyTarget | null
   // курсор следующей страницы истории назад

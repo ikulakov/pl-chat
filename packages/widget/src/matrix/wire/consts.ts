@@ -11,6 +11,8 @@ export const MsgType = {
   Notice: 'm.notice',
   Image: 'm.image',
   File: 'm.file',
+  AdaptiveCard: 'kc.adaptive.v1',
+  AdaptiveAction: 'kc.adaptive.action',
 } as const
 
 export const ReceiptType = {

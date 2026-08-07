@@ -41,6 +41,7 @@
   "chat.reply.cancel": "Отменить ответ",
   "chat.reply.goToOriginal": "Перейти к исходному сообщению",
   "chat.action.cancelUpload": "Отменить загрузку",
+  "chat.adaptiveCard.submitError": "Не удалось отправить ответ",
   "chat.action.retryUpload": "Загрузить ещё раз",
   "chat.action.removeFile": "Убрать файл",
   "chat.media.download": "Скачать {name}",

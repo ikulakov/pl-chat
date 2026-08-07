@@ -1048,6 +1048,105 @@ describe('MatrixController (orchestrator)', () => {
   })
 })
 
+describe('MatrixController — sendCardAction (kc.adaptive.action)', () => {
+  const CARD_EVENT_ID = '$card'
+  const ACTION = { id: 'confirm', title: 'Подтвердить', data: { action: 'confirm' } }
+
+  it('шлёт контрактные поля, требуемые бэкендом: source_event_id и m.relates_to.rel_type=m.reference', async () => {
+    const api = makeMatrixApi()
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.sendCardAction(CARD_EVENT_ID, ACTION)
+
+    expect(api.sendMessage).toHaveBeenCalledWith({
+      roomId: IDENTITY.roomId,
+      txnId: expect.any(String),
+      content: {
+        msgtype: 'kc.adaptive.action',
+        body: expect.any(String),
+        adaptive_action: {
+          action_id: 'confirm',
+          source_event_id: CARD_EVENT_ID,
+          data: { action: 'confirm' },
+        },
+        'm.relates_to': { rel_type: 'm.reference', event_id: CARD_EVENT_ID },
+      },
+    })
+  })
+
+  it('успех переводит ответ в card.answering → card.answered', async () => {
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY })
+
+    await controller.sendCardAction(CARD_EVENT_ID, ACTION)
+
+    expect(applied).toContainEqual({
+      type: 'card.answering',
+      cardEventId: CARD_EVENT_ID,
+      actionId: 'confirm',
+    })
+    expect(applied).toContainEqual({ type: 'card.answered', cardEventId: CARD_EVENT_ID })
+  })
+
+  it('второй вызов по уже отправленной/отвечённой карточке не делает HTTP-запрос', async () => {
+    const api = makeMatrixApi()
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.sendCardAction(CARD_EVENT_ID, ACTION)
+    await controller.sendCardAction(CARD_EVENT_ID, ACTION)
+
+    expect(api.sendMessage).toHaveBeenCalledOnce()
+  })
+
+  it('дедуп проверяет актуальный стор, а не снимок на момент первого вызова — двойной клик до ответа сервера тоже одна отправка', async () => {
+    const inFlight = deferred<Awaited<ReturnType<MatrixApi['sendMessage']>>>()
+    const api = makeMatrixApi({
+      sendMessage: vi.fn<MatrixApi['sendMessage']>().mockReturnValue(inFlight.promise),
+    })
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    const first = controller.sendCardAction(CARD_EVENT_ID, ACTION)
+    await controller.sendCardAction(CARD_EVENT_ID, ACTION)
+
+    expect(api.sendMessage).toHaveBeenCalledOnce()
+    inFlight.resolve({ event_id: '$ev' })
+    await first
+  })
+
+  it('ошибку сети переводит ответ в failed и не бросает наружу', async () => {
+    const api = makeMatrixApi({
+      sendMessage: vi.fn<MatrixApi['sendMessage']>().mockRejectedValue(new Error('net')),
+    })
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.sendCardAction(CARD_EVENT_ID, ACTION)
+
+    expect(applied).toContainEqual({ type: 'card.answerFailed', cardEventId: CARD_EVENT_ID })
+  })
+
+  it('auth-ошибка эскалирует восстановление сессии, как и у обычной отправки', async () => {
+    const api = makeMatrixApi({
+      sendMessage: vi
+        .fn<MatrixApi['sendMessage']>()
+        .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
+    })
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.sendCardAction(CARD_EVENT_ID, ACTION)
+
+    await vi.waitFor(() => expect(applied).toContainEqual({ type: 'session.recovering' }))
+    controller.disconnect()
+  })
+
+  it('без подключения не делает ничего', async () => {
+    const api = makeMatrixApi()
+    const { controller } = harness({}, api)
+
+    await controller.sendCardAction(CARD_EVENT_ID, ACTION)
+
+    expect(api.sendMessage).not.toHaveBeenCalled()
+  })
+})
+
 describe('MatrixController — подгрузка истории вверх', () => {
   function connected(prevBatch: string | null, api: MatrixApi) {
     return harness(

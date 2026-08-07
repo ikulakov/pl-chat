@@ -33,7 +33,7 @@ function connectedWithSentMessage(): ChatRuntimeState {
 }
 
 function roomPatch(overrides: Partial<RoomSyncPatch> = {}): RoomSyncPatch {
-  return { timeline: [], readMarkers: [], prevBatch: null, ...overrides }
+  return { timeline: [], readMarkers: [], cardAnswers: [], prevBatch: null, ...overrides }
 }
 
 // снимок «как при старте комнаты»: одно сообщение, активный оператор, курсор истории
@@ -493,6 +493,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
     const paginated = chatRuntimeReducer(started(), {
       type: 'history.loaded',
       items: [],
+      cardAnswers: [],
       prevBatch: 'p2',
     })
 
@@ -511,6 +512,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
     const paginated = chatRuntimeReducer(started(), {
       type: 'history.loaded',
       items: [],
+      cardAnswers: [],
       prevBatch: 'p2',
     })
 
@@ -525,7 +527,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
   })
 
   it('новая комната берёт свой курсор с нуля', () => {
-    const resumed = chatRuntimeReducer(started(), {
+    const resumed = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
       type: 'session.started',
       identity: { userId: '@user2:bank', roomId: '!other:bank' },
       cursor: 's9',
@@ -558,6 +560,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
     const loaded = chatRuntimeReducer(loading, {
       type: 'history.loaded',
       items: [],
+      cardAnswers: [],
       prevBatch: 'p2',
     })
     const settled = chatRuntimeReducer(loaded, { type: 'history.settled' })
@@ -570,10 +573,110 @@ describe('chatRuntimeReducer — курсор истории', () => {
     const loaded = chatRuntimeReducer(started(), {
       type: 'history.loaded',
       items: [textItem({ localId: '$old', eventId: '$old', body: 'старое', ts: 0 })],
+      cardAnswers: [],
       prevBatch: null,
     })
 
     expect(loaded.room.timeline.map((item) => item.eventId)).toEqual(['$old', '$m1'])
     expect(loaded.room.prevBatch).toBeNull()
+  })
+
+  it('history.loaded мерджит cardAnswers даже при пустых items', () => {
+    // страница истории может состоять целиком из kc.adaptive.action — без этого
+    // ответ на карточку из истории терялся бы, и её кнопки снова стали бы активны
+    const loaded = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'history.loaded',
+      items: [],
+      cardAnswers: [{ cardEventId: '$card', actionId: 'confirm', status: 'sent' }],
+      prevBatch: 'p2',
+    })
+
+    expect(loaded.room.cardAnswers.$card).toEqual({
+      cardEventId: '$card',
+      actionId: 'confirm',
+      status: 'sent',
+    })
+  })
+})
+
+describe('chatRuntimeReducer — ответы на Adaptive Card', () => {
+  it('card.answering заводит запись со статусом sending', () => {
+    const next = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'card.answering',
+      cardEventId: '$card',
+      actionId: 'confirm',
+    })
+
+    expect(next.room.cardAnswers.$card).toEqual({
+      cardEventId: '$card',
+      actionId: 'confirm',
+      status: 'sending',
+    })
+  })
+
+  it('card.answering не откатывает уже подтверждённый (sent) ответ', () => {
+    const sent = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'card.answering',
+      cardEventId: '$card',
+      actionId: 'confirm',
+    })
+    const confirmed = chatRuntimeReducer(sent, { type: 'card.answered', cardEventId: '$card' })
+
+    // повторный клик/гонка с эхом sync — не должен вернуть кнопку в "sending"
+    const next = chatRuntimeReducer(confirmed, {
+      type: 'card.answering',
+      cardEventId: '$card',
+      actionId: 'confirm',
+    })
+
+    expect(next).toBe(confirmed)
+    expect(next.room.cardAnswers.$card?.status).toBe('sent')
+  })
+
+  it('card.answerFailed переводит sending → failed, кнопки снова доступны', () => {
+    const sending = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'card.answering',
+      cardEventId: '$card',
+      actionId: 'confirm',
+    })
+
+    const failed = chatRuntimeReducer(sending, { type: 'card.answerFailed', cardEventId: '$card' })
+
+    expect(failed.room.cardAnswers.$card?.status).toBe('failed')
+  })
+
+  it('card.answerFailed не трогает уже подтверждённый ответ (гонка с успешным эхом)', () => {
+    const sent = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'card.answering',
+      cardEventId: '$card',
+      actionId: 'confirm',
+    })
+    const confirmed = chatRuntimeReducer(sent, { type: 'card.answered', cardEventId: '$card' })
+
+    const next = chatRuntimeReducer(confirmed, { type: 'card.answerFailed', cardEventId: '$card' })
+
+    expect(next).toBe(confirmed)
+  })
+
+  it('sync-эхо (applySync) не откатывает уже подтверждённый локально ответ', () => {
+    const answering = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'card.answering',
+      cardEventId: '$card',
+      actionId: 'confirm',
+    })
+    const confirmedLocally = chatRuntimeReducer(answering, {
+      type: 'card.answered',
+      cardEventId: '$card',
+    })
+
+    const synced = chatRuntimeReducer(confirmedLocally, {
+      type: 'sync.received',
+      cursor: 's2',
+      room: roomPatch({
+        cardAnswers: [{ cardEventId: '$card', actionId: 'confirm', status: 'sent' }],
+      }),
+    })
+
+    expect(synced.room.cardAnswers.$card?.status).toBe('sent')
   })
 })
