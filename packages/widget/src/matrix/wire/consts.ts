@@ -3,7 +3,13 @@ export const MatrixEventType = {
   OperatorCurrent: 'kc.operator.current',
   OperatorJoined: 'kc.operator.joined',
   OperatorLeft: 'kc.operator.left',
+  MediaStatus: 'kc.media.status',
   Receipt: 'm.receipt',
+} as const
+
+export const MediaScanStatus = {
+  Ready: 'ready',
+  Rejected: 'rejected',
 } as const
 
 export const MsgType = {
