@@ -47,9 +47,33 @@ interface FileMessageContent extends MediaMessageContent {
   msgtype: typeof MsgType.File
 }
 
+export interface AdaptiveCardMessageContent extends WithRelation {
+  msgtype: typeof MsgType.AdaptiveCard
+  body: string
+  card_kind?: string
+  adaptive_card: unknown
+}
+
+export interface AdaptiveActionMessageContent {
+  msgtype: typeof MsgType.AdaptiveAction
+  body: string
+  adaptive_action: {
+    action_id: string
+    source_event_id: string
+    data?: Record<string, unknown>
+  }
+  'm.relates_to'?: { rel_type: 'm.reference'; event_id: string }
+}
+
 export interface RoomMessageEvent extends BaseClientEvent {
   type: typeof MatrixEventType.RoomMessage
-  content: TextMessageContent | NoticeMessageContent | ImageMessageContent | FileMessageContent
+  content:
+    | TextMessageContent
+    | NoticeMessageContent
+    | ImageMessageContent
+    | FileMessageContent
+    | AdaptiveCardMessageContent
+    | AdaptiveActionMessageContent
 }
 
 export interface OperatorCurrentEvent extends BaseClientEvent {

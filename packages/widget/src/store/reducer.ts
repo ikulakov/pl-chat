@@ -1,3 +1,4 @@
+import { applyCardAnswers } from '../domain/adaptiveCards'
 import { mergeTimeline, prependTimeline } from '../domain/mergeTimeline'
 import { applyReadMarkers } from '../domain/receipts'
 import type { RoomSyncPatch } from '../domain/roomSync'
@@ -36,6 +37,7 @@ function applySync(room: RoomState, patch: RoomSyncPatch): RoomState {
     timeline,
     operator: patch.operator ?? room.operator,
     readReceipts: applyReadMarkers(room.readReceipts, patch.readMarkers, timeline),
+    cardAnswers: applyCardAnswers(room.cardAnswers, patch.cardAnswers),
   }
 }
 
@@ -189,16 +191,55 @@ export function chatRuntimeReducer(
       return updateRoom(state, { isLoadingHistory: true })
 
     case 'history.loaded': {
-      const { items, prevBatch } = action
+      const { items, cardAnswers, prevBatch } = action
 
       return updateRoom(state, {
         timeline: prependTimeline(state.room.timeline, items),
+        cardAnswers: applyCardAnswers(state.room.cardAnswers, cardAnswers),
         prevBatch,
       })
     }
 
     case 'history.settled':
       return updateRoom(state, { isLoadingHistory: false })
+
+    case 'card.answering': {
+      const { cardEventId, actionId } = action
+
+      // Уже подтверждённый ответ не откатываем в "sending" повторным нажатием/эхом гонки.
+      if (state.room.cardAnswers[cardEventId]?.status === 'sent') return state
+
+      return updateRoom(state, {
+        cardAnswers: {
+          ...state.room.cardAnswers,
+          [cardEventId]: { cardEventId, actionId, status: 'sending' },
+        },
+      })
+    }
+
+    case 'card.answered': {
+      const current = state.room.cardAnswers[action.cardEventId]
+      if (!current) return state
+
+      return updateRoom(state, {
+        cardAnswers: {
+          ...state.room.cardAnswers,
+          [action.cardEventId]: { ...current, status: 'sent' },
+        },
+      })
+    }
+
+    case 'card.answerFailed': {
+      const current = state.room.cardAnswers[action.cardEventId]
+      if (!current || current.status !== 'sending') return state
+
+      return updateRoom(state, {
+        cardAnswers: {
+          ...state.room.cardAnswers,
+          [action.cardEventId]: { ...current, status: 'failed' },
+        },
+      })
+    }
 
     default:
       return assertNever(action)

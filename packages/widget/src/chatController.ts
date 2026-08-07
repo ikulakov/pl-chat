@@ -1,5 +1,6 @@
 import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
+import type { CardAction } from './domain/adaptiveCards'
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService, SendFileOptions } from './matrix/matrixController'
 import type { ThumbnailSize } from './matrix/api/matrixApi'
@@ -9,6 +10,7 @@ import { chatStore } from './store/store'
 export interface ChatActions {
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
   cancelUpload: (localId: string) => void
@@ -46,6 +48,7 @@ export class ChatController {
     this.actions = {
       sendMessage: this.sendMessage,
       sendFile: this.sendFile,
+      sendCardAction: this.sendCardAction,
       loadPreview: this.loadPreview,
       downloadFile: this.downloadFile,
       cancelUpload: this.cancelUpload,
@@ -97,6 +100,9 @@ export class ChatController {
 
   sendFile = (file: File, options?: SendFileOptions): Promise<void> =>
     this.matrix.sendFile(file, options)
+
+  sendCardAction = (cardEventId: string, action: CardAction): Promise<void> =>
+    this.matrix.sendCardAction(cardEventId, action)
 
   loadPreview = (mxcUrl: string, size: ThumbnailSize): Promise<Blob> =>
     this.matrix.loadPreview(mxcUrl, size)

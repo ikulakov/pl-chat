@@ -16,7 +16,12 @@
 // придёт через 5 сек, состояние загрузки видно на файле любого размера.
 //
 // Команды в поле ввода для тестирования сценариев:
-//   /card       — оператор шлёт Adaptive Card с полем ввода
+//   /card         — Adaptive Card с полем ввода (деградация в текст — Input.* не поддержан)
+//   /card buttons — Adaptive Card только с кнопками (основной кейс T-60)
+//   /card 3       — Adaptive Card с 3 кнопками (нечётный хвост — растягивается на всю строку)
+//   /card broken  — Adaptive Card с невалидным payload (деградация в текст)
+//   /card openurl — Adaptive Card только с Action.OpenUrl (кнопки нет — не Action.Submit)
+//   /card many    — Adaptive Card с 12 кнопками (проверка клиентского лимита MAX_BUTTONS=10)
 //   /notice     — системная плашка (m.notice)
 //   /left       — оператор завершает чат
 //   /join       — оператор возвращается (откат /left)
@@ -27,6 +32,7 @@
 //   /reply img  — то же картинкой, /reply file — файлом (входящая цитата на медиа)
 //   /sticker    — оператор присылает стикер
 //   /fail       — следующая отправка клиента вернёт ошибку (проверка «Повторить»)
+//   /failaction — следующий ответ на кнопку карточки вернёт ошибку (CardActions → failed)
 //   /failupload — следующая загрузка файла вернёт ошибку (сеть/5xx — повтор осмыслен)
 //   /rejectupload — следующая загрузка отклоняется fileguard'ом (400): повтора нет
 //   /failthumb  — превью отвечает 404 (не изображение) → клиент идёт за оригиналом
@@ -78,6 +84,7 @@ let waiters = [];
 // Одноразовые сбои по команде из чата: снимаются первым же сработавшим запросом,
 // чтобы повтор («Отправить снова») сразу проходил — как при обычном сетевом сбое.
 let failNextSend = false;
+let failNextAction = false;
 let failNextUpload = false;
 // Отказ fileguard'а — детерминированный вердикт: повтор того же файла даст тот же ответ,
 // поэтому клиент вместо «Повторить» предлагает убрать черновик.
@@ -325,16 +332,73 @@ function lastGuestMessageId(exclude) {
   return null;
 }
 
+// Синтетические варианты карточки, которые нет смысла держать в scenario.json — это тест-фикстуры
+// для проверки границ маппера/проекции (domain/adaptiveCards.ts toSubmitActions), не сид-данные.
+const CARD_BUTTONS = {
+  type: "AdaptiveCard",
+  version: "1.5",
+  body: [{ type: "TextBlock", text: "Подтвердите операцию", wrap: true }],
+  actions: [
+    { type: "Action.Submit", id: "confirm", title: "Подтвердить", data: { action: "confirm" } },
+    { type: "Action.Submit", id: "cancel", title: "Отменить", data: { action: "cancel" } },
+  ],
+};
+const CARD_THREE = {
+  type: "AdaptiveCard",
+  version: "1.5",
+  body: [{ type: "TextBlock", text: "Нечётное число кнопок", wrap: true }],
+  actions: [
+    { type: "Action.Submit", id: "one", title: "Вариант 1", data: { option: 1 } },
+    { type: "Action.Submit", id: "two", title: "Вариант 2", data: { option: 2 } },
+    { type: "Action.Submit", id: "three", title: "Вариант 3", data: { option: 3 } },
+  ],
+};
+const CARD_OPENURL = {
+  type: "AdaptiveCard",
+  version: "1.5",
+  body: [{ type: "TextBlock", text: "Открыть сайт банка?", wrap: true }],
+  actions: [{ type: "Action.OpenUrl", title: "Открыть", url: "https://bank.ru" }],
+};
+const CARD_MANY = {
+  type: "AdaptiveCard",
+  version: "1.5",
+  body: [{ type: "TextBlock", text: "Выберите один из вариантов", wrap: true }],
+  actions: Array.from({ length: 12 }, (_, i) => ({
+    type: "Action.Submit",
+    id: `opt${i + 1}`,
+    title: `Вариант ${i + 1}`,
+    data: { option: i + 1 },
+  })),
+};
+
+function buildCardContent(variant) {
+  switch (variant) {
+    case "buttons":
+      return { msgtype: "kc.adaptive.v1", body: "Карточка с кнопками", adaptive_card: CARD_BUTTONS };
+    case "broken":
+      // Невалидный payload (не AdaptiveCard) — клиент обязан деградировать в текст, не потерять сообщение.
+      return {
+        msgtype: "kc.adaptive.v1",
+        body: "Карточка (битый payload)",
+        adaptive_card: { type: "NotAdaptiveCard" },
+      };
+    case "3":
+      return { msgtype: "kc.adaptive.v1", body: "Карточка (3 кнопки)", adaptive_card: CARD_THREE };
+    case "openurl":
+      return { msgtype: "kc.adaptive.v1", body: "Карточка (только OpenUrl)", adaptive_card: CARD_OPENURL };
+    case "many":
+      return { msgtype: "kc.adaptive.v1", body: "Карточка (много кнопок)", adaptive_card: CARD_MANY };
+    default:
+      // Карточка с Input.Text — деградация в текст (клиент не собирает поля ввода в T-60).
+      return { msgtype: "kc.adaptive.v1", body: "Карточка", adaptive_card: scenario.card };
+  }
+}
+
 function operatorRespond(text, ownEventId) {
   const t = (text || "").trim();
   if (t.startsWith("/card")) {
-    return delay(700, () =>
-      push("m.room.message", OP, {
-        msgtype: "kc.adaptive.v1",
-        body: "Карточка",
-        adaptive_card: scenario.card,
-      })
-    );
+    const variant = t.slice("/card".length).trim();
+    return delay(700, () => push("m.room.message", OP, buildCardContent(variant)));
   }
   if (t.startsWith("/notice")) {
     return delay(500, () =>
@@ -441,6 +505,15 @@ function operatorRespond(text, ownEventId) {
   if (t.startsWith("/rejectmedia")) {
     mediaMode = mediaMode === "rejected" ? "clean" : "rejected";
     return notice(`Медиа: ${mediaMode === "rejected" ? "404, файл отклонён" : "готово"}`);
+  }
+  // Отдельный флаг от /fail — иначе тест ответа на карточку случайно ловил бы и обычный /fail,
+  // выставленный для другого сценария, и наоборот. Проверяем content.msgtype === kc.adaptive.action
+  // в самом PUT /send, поэтому команда не мешает следующей текстовой/медиа отправке.
+  if (t.startsWith("/failaction")) {
+    failNextAction = true;
+    return delay(300, () =>
+      push("m.room.message", OP, { msgtype: "m.notice", body: "Следующий ответ на карточку упадёт" })
+    );
   }
   if (t.startsWith("/fail")) {
     failNextSend = true;
@@ -593,6 +666,12 @@ const server = createServer(async (req, res) => {
       failNextSend = false;
       return send(res, 500, { errcode: "M_UNKNOWN", error: "Mock: отправка отклонена" });
     }
+    // /failaction: роняем именно ответ на карточку — cardAnswers.status уходит в failed,
+    // кнопки в CardActions разблокируются обратно (см. card.answerFailed в matrixController).
+    if (failNextAction && content.msgtype === "kc.adaptive.action") {
+      failNextAction = false;
+      return send(res, 500, { errcode: "M_UNKNOWN", error: "Mock: ответ на карточку отклонён" });
+    }
 
     const ev = push(type, GUEST, content, undefined, txnId);
     // Оператор «прочитал» — ✓✓.
@@ -604,6 +683,13 @@ const server = createServer(async (req, res) => {
     // путь «печатает… → autoReply» и на вложение тоже приходил ответ оператора.
     if (type === "m.room.message" && REPLYABLE_MSGTYPES.has(content.msgtype)) {
       operatorRespond(content.msgtype === "m.text" ? content.body : "", ev.event_id);
+    }
+    // Ack на нажатие кнопки карточки — отдельно от generic REPLYABLE_MSGTYPES (см. комментарий
+    // выше): это не канед-автоответ, а адресный отклик на конкретный action_id, нужен чтобы
+    // вручную проверить ветвление бота и что sending → sent доезжает через реальный /sync-эхо.
+    if (type === "m.room.message" && content.msgtype === "kc.adaptive.action") {
+      const actionId = content.adaptive_action?.action_id ?? "?";
+      delay(500, () => push("m.room.message", OP, { msgtype: "m.text", body: `Принято: ${actionId}` }));
     }
     return send(res, 200, { event_id: ev.event_id });
   }
@@ -692,7 +778,7 @@ server.on("error", (err) => {
 server.listen(PORT, () => {
   console.log(`BankChat mock-сервер: http://localhost:${PORT}`);
   console.log(`Откройте виджет:     http://localhost:5174`);
-  console.log(`Команды в чате: /card  /notice  /left  /join  /html  /img  /file  /sticker`);
-  console.log(`                /reply [img|file]  /fail  /failupload  /rejectupload`);
-  console.log(`                /failthumb  /pendingmedia  /rejectmedia`);
+  console.log(`Команды в чате: /card [buttons|3|broken|openurl|many]  /notice  /left  /join  /html`);
+  console.log(`                /img  /file  /sticker  /reply [img|file]  /fail  /failaction`);
+  console.log(`                /failupload  /rejectupload  /failthumb  /pendingmedia  /rejectmedia`);
 });

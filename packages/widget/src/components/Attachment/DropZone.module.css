@@ -57,7 +57,7 @@
     width: calc(100% - 1px);
     height: calc(100% - 1px);
     fill: none;
-    stroke: var(--c-dashed-border);
+    stroke: var(--c-neutral);
     stroke-width: 1px;
     stroke-dasharray: 8 8;
   }
