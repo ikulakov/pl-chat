@@ -1,6 +1,7 @@
 .wrap {
   flex-shrink: 0;
   padding: 8px;
+  border-top: 1px solid var(--c-border);
 }
 
 .replyRow {

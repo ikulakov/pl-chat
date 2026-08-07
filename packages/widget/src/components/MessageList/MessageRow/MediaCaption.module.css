@@ -1,0 +1,7 @@
+.caption {
+  font-size: 14px;
+  line-height: 18px;
+  padding: 4px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

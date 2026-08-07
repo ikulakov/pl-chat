@@ -200,6 +200,34 @@ describe('MessageActions', () => {
     )
   })
 
+  // Повтор должен предлагаться ровно в одном месте: у сорвавшейся заливки он живёт в самом
+  // чипе (там же видна причина и есть «Удалить»), у сорвавшегося /send — в этом меню.
+  it('у медиа отдаёт повтор чипу, если упала заливка байт, и оставляет себе — если упал /send', () => {
+    const { rerender } = render(
+      <MessageActions
+        message={fileItem({
+          localId: 'm1',
+          sendStatus: 'failed',
+          upload: { file: new File([], 'doc.pdf'), pct: null, error: 'network' },
+        })}
+        isOwn={true}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+    expect(screen.queryByText(t('chat.action.retry'))).not.toBeInTheDocument()
+
+    // байты доехали, упал сам /send — upload снят редьюсером, повтор снова за меню
+    rerender(
+      <MessageActions
+        message={fileItem({ localId: 'm1', sendStatus: 'failed' })}
+        isOwn={true}
+      />,
+    )
+
+    expect(screen.getByText(t('chat.action.retry'))).toBeInTheDocument()
+  })
+
   it('does not render "Повторить отправку" for a non-own or non-failed message', () => {
     render(
       <MessageActions

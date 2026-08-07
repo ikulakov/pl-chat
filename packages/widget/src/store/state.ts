@@ -2,6 +2,7 @@ import type { OperatorState } from '../domain/operator'
 import type { ReadReceipt } from '../domain/receipts'
 import type { RoomSyncPatch } from '../domain/roomSync'
 import type { TimelineItem } from '../domain/timeline'
+import type { UploadFailure } from '../domain/uploadError'
 
 export type RuntimeAction =
   | { type: 'connection.connecting' }
@@ -12,7 +13,7 @@ export type RuntimeAction =
   | { type: 'sync.received'; cursor: string; room?: RoomSyncPatch }
   | { type: 'message.optimisticAdded'; message: TimelineItem }
   | { type: 'message.sent'; localId: string; eventId: string }
-  | { type: 'message.failed'; localId: string }
+  | { type: 'message.failed'; localId: string; upload?: UploadFailure }
   | { type: 'message.retrying'; localId: string }
   | { type: 'message.uploadProgress'; localId: string; pct: number }
   | { type: 'message.uploaded'; localId: string; url: string }

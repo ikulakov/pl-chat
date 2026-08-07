@@ -1,4 +1,5 @@
 import type { SystemMessageKey } from '../i18n'
+import type { UploadFailure } from './uploadError'
 
 export type SendStatus = 'sending' | 'sent' | 'failed'
 
@@ -47,6 +48,7 @@ export interface MediaUpload {
   file: File
   // проценты отдачи; null — загрузка не идёт (ошибка или уже загружено)
   pct: number | null
+  error?: UploadFailure
 }
 
 export interface ImageTimelineItem extends BaseTimelineItem {

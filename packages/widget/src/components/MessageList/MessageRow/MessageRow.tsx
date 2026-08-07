@@ -1,11 +1,12 @@
 import { memo } from 'react'
-import { isMedia, type MessageTimelineItem } from '../../../domain/timeline'
+import type { MessageTimelineItem } from '../../../domain/timeline'
 import { ITEM_ID_ATTR } from '../../../hooks/useLoadMoreHistory'
 import { RECEIPT_ID_ATTR } from '../../../hooks/useSendReadReceipts'
 import { cn } from '../../../shared/utils/cn'
 import { ReplyPreview } from '../../ReplyPreview'
 import type { BubbleMetaData } from './BubbleMeta'
-import { MediaContent } from './MediaContent'
+import { FileChip } from './FileChip'
+import { ImageMessage } from './ImageMessage'
 import { MessageActions } from './MessageActions'
 import { MessageBubble, type BubblePosition } from './MessageBubble'
 import styles from './MessageRow.module.css'
@@ -69,8 +70,13 @@ export const MessageRow = memo(
           position={position}
           reply={reply}
         >
-          {isMedia(message) ? (
-            <MediaContent
+          {message.kind === 'image' ? (
+            <ImageMessage
+              item={message}
+              meta={meta}
+            />
+          ) : message.kind === 'file' ? (
+            <FileChip
               item={message}
               meta={meta}
             />

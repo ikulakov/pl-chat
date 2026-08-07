@@ -9,12 +9,15 @@ export class MatrixError extends Error {
   // Только для M_LIMIT_EXCEEDED (429): сервер отдаёт задержку в теле, заголовка
   // Retry-After нет. Повторять раньше бессмысленно — окно фиксированное.
   readonly retryAfterMs?: number
+  // HTTP-статус ответа
+  readonly status?: number
 
-  constructor(errcode: string, message: string, retryAfterMs?: number) {
+  constructor(errcode: string, message: string, retryAfterMs?: number, status?: number) {
     super(message)
     this.name = 'MatrixError'
     this.errcode = errcode
     if (retryAfterMs !== undefined) this.retryAfterMs = retryAfterMs
+    if (status !== undefined) this.status = status
   }
 }
 
@@ -25,9 +28,10 @@ export function makeMatrixError(status: number, text: string): MatrixError {
       body.errcode ?? MatrixErrCode.Unknown,
       body.error ?? `HTTP ${status}`,
       body.retry_after_ms,
+      status,
     )
   } catch {
-    return new MatrixError(MatrixErrCode.Unknown, `HTTP ${status}`)
+    return new MatrixError(MatrixErrCode.Unknown, `HTTP ${status}`, undefined, status)
   }
 }
 
@@ -37,6 +41,10 @@ export const MatrixErrCode = {
   UserDeactivated: 'M_USER_DEACTIVATED',
   RoomNotFound: 'M_ROOM_NOT_FOUND',
   LimitExceeded: 'M_LIMIT_EXCEEDED',
+  InvalidParam: 'M_INVALID_PARAM',
+  TooLarge: 'M_TOO_LARGE',
+  Forbidden: 'M_FORBIDDEN',
+  NotYetUploaded: 'M_NOT_YET_UPLOADED',
 } as const
 
 type MatrixErrCodeValue = (typeof MatrixErrCode)[keyof typeof MatrixErrCode]
@@ -56,6 +64,26 @@ export function isUserDeactivatedError(err: unknown): boolean {
 
 export function isRateLimitedError(err: unknown): err is MatrixError {
   return isMatrixError(err, MatrixErrCode.LimitExceeded)
+}
+
+/** Единственное место, где читается HTTP-статус ошибки: остальные предикаты идут через него. */
+export function isHttpStatus(err: unknown, status: number): boolean {
+  return err instanceof MatrixError && err.status === status
+}
+
+/** 404 — терминально: неизвестный mediaId, отклонённый CDR файл либо превью не генерировалось. */
+export function isNotFoundError(err: unknown): boolean {
+  return isHttpStatus(err, 404)
+}
+
+/** 403 — нет прав на файл (в т.ч. пока writer не записал привязку файла к комнате). */
+export function isForbiddenError(err: unknown): boolean {
+  return isHttpStatus(err, 403) && !isUserDeactivatedError(err)
+}
+
+/** 504 M_NOT_YET_UPLOADED — файл ещё в конвейере проверки. Это не ошибка, а «подождите». */
+export function isMediaPendingError(err: unknown): boolean {
+  return isHttpStatus(err, 504) || isMatrixError(err, MatrixErrCode.NotYetUploaded)
 }
 
 export type AuthErrorContext =

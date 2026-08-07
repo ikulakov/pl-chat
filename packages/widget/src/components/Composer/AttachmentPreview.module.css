@@ -1,17 +1,17 @@
 .attachment {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 0 4px 8px;
-  padding: 8px 10px;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 9px 11px;
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   background: var(--c-surface-primary);
 }
 
 .thumb {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-sm);
   object-fit: cover;
   flex-shrink: 0;
@@ -20,8 +20,8 @@
 .icon {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-sm);
   flex-shrink: 0;
   color: var(--c-text-tertiary);
@@ -60,10 +60,9 @@
 .meta {
   font-size: 12px;
   line-height: 14px;
-  color: var(--c-text-tertiary);
+  color: var(--c-text-disabled);
 }
 
 .metaError {
   color: var(--c-error);
 }
-

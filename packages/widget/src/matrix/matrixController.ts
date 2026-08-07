@@ -1,3 +1,4 @@
+import { MediaUnavailableError } from '../domain/mediaError'
 import { createOptimisticMediaMessage, createOptimisticTextMessage } from '../domain/optimistic'
 import { canMoveMarker } from '../domain/receipts'
 import {
@@ -8,12 +9,23 @@ import {
 } from '../domain/timeline'
 import { isAbortError } from '../shared/utils/abort'
 import type { ImageDimensions } from '../shared/utils/imageDimensions'
+import { parseMxcUrl, type ParsedMxcUrl } from '../shared/utils/mxc'
+import { sleep } from '../shared/utils/sleep'
 import type { ChatRuntimeState, RuntimeAction } from '../store/state'
-import { type MatrixApi } from './api/matrixApi'
-import { isMatrixAuthError, isUserDeactivatedError, type AuthErrorContext } from './api/matrixError'
+import { type MatrixApi, type ThumbnailSize } from './api/matrixApi'
+import {
+  isForbiddenError,
+  isMatrixAuthError,
+  isMediaPendingError,
+  isNotFoundError,
+  isUserDeactivatedError,
+  type AuthErrorContext,
+} from './api/matrixError'
 import { MatrixHistoryLoader } from './history/historyLoader'
+import { classifyMediaError } from './mappers/mediaError'
 import { toOutgoingContent } from './mappers/outgoing'
 import { toRoomSyncPatch } from './mappers/roomSync'
+import { classifyUploadError } from './mappers/uploadError'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
 
@@ -25,11 +37,27 @@ export interface SendFileOptions {
   dims?: ImageDimensions | undefined
 }
 
+// Право на скачивание появляется, когда writer запишет привязку файла к комнате, а событие
+// в /sync может обогнать её на доли секунды — отсюда единственный отложенный повтор на 403.
+const FORBIDDEN_RETRY_DELAY_MS = 400
+
+// Сколько миниатюр держим. Вытеснение безопасно в любой момент: object-URL сам держит свой
+// blob живым, пока компонент его не освободит.
+const MAX_CACHED_PREVIEWS = 40
+
+// Сколько своих файлов держим целиком (до 10 МБ каждый — размер режется ещё в композере).
+// Копия живёт до первого ответа сервера по этому mxc, а у чипа файла сервер спрашивают только
+// по клику «скачать»: без потолка всё отправленное за сеанс осталось бы в памяти до конца
+// сессии. Одновременно «в полёте» бывает один-два файла, поэтому запас минимальный.
+const MAX_LOCAL_ORIGINALS = 3
+
 export interface MatrixService {
   connect: () => Promise<void>
   disconnect: () => void
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
+  downloadFile: (mxcUrl: string) => Promise<Blob>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   markRead: (eventId: string) => Promise<void>
@@ -57,6 +85,15 @@ export class MatrixController implements MatrixService {
   private sessionRecovery: Promise<void> | null = null
 
   private readonly uploads = new Map<string, AbortController>()
+
+  // Кэш байтов превью, а не object-URL: URL создаёт и освобождает тот компонент, который
+  // рисует картинку — только он знает, когда revoke безопасен. Хранится промис, а не блоб:
+  // он же и дедуп — два ряда с одной картинкой (и двойной эффект StrictMode) делят один запрос.
+  private readonly previews = new Map<string, Promise<Blob>>()
+  // Оригиналы своих отправленных файлов, по mxc. Не кэш ради скорости, а подмена недоступного:
+  // до вердикта CDR сервер отвечает на них 504, и без локальной копии своя же картинка
+  // пропадала бы из ленты сразу после отправки. Отвечает и на превью, и на оригинал.
+  private readonly localOriginals = new Map<string, Blob>()
 
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
@@ -158,7 +195,7 @@ export class MatrixController implements MatrixService {
     } catch (err) {
       if (isAbortError(err) || !this.isCurrentLifecycle(lifecycleId)) return null
 
-      this.dispatch({ type: 'message.failed', localId })
+      this.dispatch({ type: 'message.failed', localId, upload: classifyUploadError(err) })
       this.handleAuthError(err, context)
       return null
     } finally {
@@ -166,17 +203,100 @@ export class MatrixController implements MatrixService {
     }
     if (controller.signal.aborted || !this.isCurrentLifecycle(lifecycleId)) return null
 
+    // Перекладываем локальный файл в память контроллера,
+    // пока идет проверка со стороны сервера, для отображения превью
+    this.localOriginals.set(contentUri, file)
+    evictOldest(this.localOriginals, MAX_LOCAL_ORIGINALS)
+
     this.dispatch({ type: 'message.uploaded', localId, url: contentUri })
 
     return { ...draft, content: { ...content, url: contentUri } }
   }
 
-  cancelUpload(localId: string): void {
-    const controller = this.uploads.get(localId)
-    if (!controller) return
+  loadPreview(mxcUrl: string, size: ThumbnailSize): Promise<Blob> {
+    return this.withLocalFallback(mxcUrl, (parsed) => this.previewBytes(parsed, size))
+  }
 
+  downloadFile(mxcUrl: string): Promise<Blob> {
+    return this.withLocalFallback(mxcUrl, (parsed) =>
+      this.fetchMediaBytes(() => this.api.downloadMedia(parsed)),
+    )
+  }
+
+  private async withLocalFallback(
+    mxcUrl: string,
+    fetch: (parsed: ParsedMxcUrl) => Promise<Blob>,
+  ): Promise<Blob> {
+    const parsed = parseMxcUrl(mxcUrl)
+    // Битую ссылку не вылечит ни повтор, ни ожидание вердикта — для UI это тот же «файла нет».
+    if (!parsed) throw new MediaUnavailableError('rejected')
+
+    try {
+      const blob = await fetch(parsed)
+      // Сервер отдал файл сам — локальная копия больше не нужна
+      this.localOriginals.delete(mxcUrl)
+
+      return blob
+    } catch (err) {
+      // 504 — файл ещё в карантине CDR; 403 переживший отложенный повтор — привязка файла
+      // к комнате всё ещё не записана. Ни то, ни другое не вердикт «нет», а свои байты у нас
+      // есть: показываем их, не выдумывая пользователю ошибку по только что отправленному файлу.
+      const local = this.localOriginals.get(mxcUrl)
+      if (local && (isMediaPendingError(err) || isForbiddenError(err))) return local
+
+      throw new MediaUnavailableError(classifyMediaError(err), { cause: err })
+    }
+  }
+
+  private async previewBytes(parsed: ParsedMxcUrl, size: ThumbnailSize): Promise<Blob> {
+    try {
+      return await this.cachedPreview(parsed, size)
+    } catch (err) {
+      // 404 у превью означает «превью не генерировалось» (нестандартный формат, сбой) — идём за
+      // оригиналом. 504 (карантин) и 403 сюда не попадают: их повторным запросом не вылечить.
+      if (!isNotFoundError(err)) throw err
+
+      // Оригинал в кэш превью не кладём: он на порядки тяжелее миниатюры и обесценил бы лимит,
+      // посчитанный в записях. Цена честнее, чем кажется: такая картинка качается целиком на
+      // каждый ремаунт ряда, и параллельные ряды с одним файлом не делят запрос (дедуп даёт
+      // только кэш). Размен принят ради простоты кэша — случай редкий, форматов без превью мало.
+      return this.fetchMediaBytes(() => this.api.downloadMedia(parsed))
+    }
+  }
+
+  private cachedPreview(parsed: ParsedMxcUrl, size: ThumbnailSize): Promise<Blob> {
+    const key = `${parsed.serverName}/${parsed.mediaId}#${size.width}x${size.height}`
+    const cached = this.previews.get(key)
+    if (cached) return cached
+
+    const request = this.fetchMediaBytes(() => this.api.getThumbnail(parsed, size)).catch(
+      (err: unknown) => {
+        // Упавший запрос в кэше не держим: следующий mount (или кнопка «повторить») пробует заново.
+        this.previews.delete(key)
+        throw err
+      },
+    )
+
+    this.previews.set(key, request)
+    evictOldest(this.previews, MAX_CACHED_PREVIEWS)
+
+    return request
+  }
+
+  private async fetchMediaBytes(call: () => Promise<Blob>): Promise<Blob> {
+    try {
+      return await call()
+    } catch (err) {
+      if (!isForbiddenError(err)) throw err
+
+      await sleep(FORBIDDEN_RETRY_DELAY_MS)
+      return call()
+    }
+  }
+
+  cancelUpload(localId: string): void {
+    this.uploads.get(localId)?.abort()
     this.uploads.delete(localId)
-    controller.abort()
     this.dispatch({ type: 'message.discarded', localId })
   }
 
@@ -185,7 +305,8 @@ export class MatrixController implements MatrixService {
 
     for (const [localId, controller] of this.uploads) {
       controller.abort()
-      this.dispatch({ type: 'message.failed', localId })
+      // Заливку оборвали мы сами, сервер ничего не решал: причина заведомо повторяемая.
+      this.dispatch({ type: 'message.failed', localId, upload: 'network' })
     }
     this.uploads.clear()
 
@@ -395,6 +516,9 @@ export class MatrixController implements MatrixService {
   private nextLifecycle(): number {
     this.lifecycleId += 1
     this.sessionRecovery = null
+    // Смена сессии — смена прав на медиа: чужие байты в кэше держать нельзя.
+    this.previews.clear()
+    this.localOriginals.clear()
     return this.lifecycleId
   }
 
@@ -412,5 +536,18 @@ export class MatrixController implements MatrixService {
       return null
     }
     return { identity, room }
+  }
+}
+
+/**
+ * Держит кэш в пределах `max` записей, выбрасывая самые давние. Оба кэша медиа считают записи,
+ * а не байты: вес записи в каждом из них ограничен сверху (миниатюра — по построению,
+ * свой файл — лимитом композера), поэтому число записей и есть предсказуемый потолок памяти.
+ */
+function evictOldest<T>(entries: Map<string, T>, max: number): void {
+  // Map хранит порядок вставки — он же порядок вытеснения.
+  for (const oldest of entries.keys()) {
+    if (entries.size <= max) break
+    entries.delete(oldest)
   }
 }

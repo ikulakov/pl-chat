@@ -46,6 +46,13 @@ export function Composer() {
 
   return (
     <div className={styles.wrap}>
+      {attachment.pending && (
+        <AttachmentPreview
+          pending={attachment.pending}
+          onCancel={attachment.cancel}
+        />
+      )}
+
       {replyTarget && (
         <div className={styles.replyRow}>
           <div className={styles.replyPreview}>
@@ -63,13 +70,6 @@ export function Composer() {
             <CloseIcon size={16} />
           </IconButton>
         </div>
-      )}
-
-      {attachment.pending && (
-        <AttachmentPreview
-          pending={attachment.pending}
-          onCancel={attachment.cancel}
-        />
       )}
 
       <div className={styles.field}>
