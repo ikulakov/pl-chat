@@ -21,6 +21,7 @@ function makeMatrix(): MatrixService {
     disconnect: vi.fn(),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     sendFile: vi.fn().mockResolvedValue(undefined),
+    sendCardAction: vi.fn().mockResolvedValue(undefined),
     downloadFile: vi.fn().mockResolvedValue(new Blob()),
     cancelUpload: vi.fn(),
     resendMessage: vi.fn().mockResolvedValue(undefined),
@@ -164,6 +165,16 @@ describe('ChatController — wiring', () => {
 
     expect(matrix.sendMessage).toHaveBeenCalledWith('hi', undefined)
     expect(matrix.connect).toHaveBeenCalledOnce()
+  })
+
+  it('sendCardAction delegates to the backend', () => {
+    const matrix = makeMatrix()
+    const controller = new ChatController(makeBridge(), matrix)
+    const action = { id: 'confirm', title: 'Подтвердить', data: { action: 'confirm' } }
+
+    void controller.sendCardAction('$card', action)
+
+    expect(matrix.sendCardAction).toHaveBeenCalledWith('$card', action)
   })
 
   // actions раздаётся как стабильная ссылка (не геттер, пересоздающий объект) —

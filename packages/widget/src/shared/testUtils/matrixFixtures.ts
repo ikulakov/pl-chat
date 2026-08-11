@@ -1,5 +1,7 @@
 import { vi } from 'vitest'
+import type { AdaptiveCardPayload } from '../../domain/adaptiveCards'
 import type {
+  AdaptiveCardTimelineItem,
   FileTimelineItem,
   ImageTimelineItem,
   MediaContent,
@@ -8,12 +10,13 @@ import type {
 } from '../../domain/timeline'
 import type { MatrixApi } from '../../matrix/api/matrixApi'
 import type { SessionInit } from '../../matrix/session/types'
-import { MatrixEventType, MsgType, OperatorStatus } from '../../matrix/wire/consts'
+import { MatrixEventType, MediaScanStatus, MsgType, OperatorStatus } from '../../matrix/wire/consts'
 import type { MessagesResponse, SyncResponse } from '../../matrix/wire/dto'
 import type {
   ClientEvent,
   EphemeralEvent,
   JoinedRoom,
+  MediaStatusEvent,
   OperatorCurrentEvent,
   OperatorJoinedEvent,
   OperatorLeftEvent,
@@ -113,6 +116,38 @@ export function imageItem(
   }
 }
 
+const DEFAULT_CARD: AdaptiveCardPayload = {
+  type: 'AdaptiveCard',
+  version: '1.5',
+  actions: [
+    { type: 'Action.Submit', id: 'confirm', title: 'Подтвердить', data: { action: 'confirm' } },
+  ],
+}
+
+export function adaptiveCardItem(
+  overrides: Partial<Omit<AdaptiveCardTimelineItem, 'kind' | 'content'>> & {
+    body?: string
+    card?: AdaptiveCardPayload
+    cardKind?: string
+  } = {},
+): AdaptiveCardTimelineItem {
+  const { body, card, cardKind, ...rest } = overrides
+  return {
+    kind: 'adaptiveCard',
+    localId: 'm1',
+    eventId: '$card',
+    sender: OPERATOR_ID,
+    ts: 0,
+    sendStatus: 'sent',
+    ...rest,
+    content: {
+      body: body ?? 'Карточка',
+      card: card ?? DEFAULT_CARD,
+      ...(cardKind ? { cardKind } : {}),
+    },
+  }
+}
+
 export function makeFile(name: string, size = 1, type = ''): File {
   // jsdom File: реальные байты не создаём — переопределяем size напрямую.
   const blob = new Blob([new Uint8Array(Math.min(size, 1024))], { type })
@@ -201,6 +236,24 @@ export function operatorLeftEvent(
     content: {
       operator_id: OPERATOR_ID,
       reason: 'completed',
+      ...overrides,
+    },
+  }
+}
+
+// Сопоставляем по media_id, а не по content.event_id: вердикт может прийти раньше сообщения,
+// и тогда ссылаться ему не на что.
+export function mediaStatusEvent(
+  overrides: Partial<MediaStatusEvent['content']> = {},
+): MediaStatusEvent {
+  return {
+    type: MatrixEventType.MediaStatus,
+    event_id: '$media-status',
+    sender: OPERATOR_ID,
+    origin_server_ts: 3,
+    content: {
+      media_id: 'AbCdEfGhIjKlMnOpQrStUvWx',
+      status: MediaScanStatus.Rejected,
       ...overrides,
     },
   }

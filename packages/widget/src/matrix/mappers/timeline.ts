@@ -1,3 +1,4 @@
+import { isAdaptiveCardPayload } from '../../domain/adaptiveCards'
 import type { SystemLabel, TimelineItem, TimelineRelation } from '../../domain/timeline'
 import { MsgType } from '../wire/consts'
 import { isOperatorJoined, isOperatorLeft, isRoomMessage } from '../wire/guards'
@@ -20,9 +21,7 @@ function operatorLeftLabel(reason: Matrix.OperatorLeftEvent['content']['reason']
   }
 }
 
-function toRelation(
-  content: Matrix.TextMessageContent | Matrix.MediaMessageContent,
-): TimelineRelation | undefined {
+function toRelation(content: Matrix.WithRelation): TimelineRelation | undefined {
   const eventId = content['m.relates_to']?.['m.in_reply_to']?.event_id
   return eventId ? { type: 'reply', eventId } : undefined
 }
@@ -41,7 +40,9 @@ function createPlaqueItem(
   }
 }
 
-function messageBaseFields(event: Matrix.RoomMessageEvent) {
+function messageBaseFields(event: Matrix.RoomMessageEvent, content: Matrix.WithRelation) {
+  const relation = toRelation(content)
+
   return {
     localId: event.event_id,
     eventId: event.event_id,
@@ -49,6 +50,7 @@ function messageBaseFields(event: Matrix.RoomMessageEvent) {
     ts: event.origin_server_ts,
     sendStatus: 'sent' as const,
     ...(event.unsigned?.transaction_id ? { txnId: event.unsigned.transaction_id } : {}),
+    ...(relation ? { relation } : {}),
   }
 }
 
@@ -56,13 +58,10 @@ function createTextItem(
   event: Matrix.RoomMessageEvent,
   content: Matrix.TextMessageContent,
 ): TimelineItem {
-  const relation = toRelation(content)
-
   return {
-    ...messageBaseFields(event),
+    ...messageBaseFields(event, content),
     kind: 'text',
     content: { body: content.body },
-    ...(relation ? { relation } : {}),
   }
 }
 
@@ -72,13 +71,12 @@ function createMediaItem(
   content: Matrix.MediaMessageContent,
 ): TimelineItem {
   const { body, url, filename: rawFilename, info } = content
-  const relation = toRelation(content)
 
   const filename = rawFilename ?? body
   const caption = body !== filename ? body : ''
 
   return {
-    ...messageBaseFields(event),
+    ...messageBaseFields(event, content),
     kind,
     content: {
       body: caption,
@@ -91,7 +89,30 @@ function createMediaItem(
         ...(info?.h ? { h: info.h } : {}),
       },
     },
-    ...(relation ? { relation } : {}),
+  }
+}
+
+function createAdaptiveCardItem(
+  event: Matrix.RoomMessageEvent,
+  content: Matrix.AdaptiveCardMessageContent,
+): TimelineItem {
+  // Битый payload карточки не роняет сообщение — деградируем в текст
+  if (!isAdaptiveCardPayload(content.adaptive_card)) {
+    return {
+      ...messageBaseFields(event, content),
+      kind: 'text',
+      content: { body: content.body },
+    }
+  }
+
+  return {
+    ...messageBaseFields(event, content),
+    kind: 'adaptiveCard',
+    content: {
+      body: content.body,
+      card: content.adaptive_card,
+      ...(content.card_kind ? { cardKind: content.card_kind } : {}),
+    },
   }
 }
 
@@ -105,6 +126,11 @@ function roomMessageToItem(event: Matrix.RoomMessageEvent): TimelineItem | undef
       return createMediaItem('image', event, event.content)
     case MsgType.File:
       return createMediaItem('file', event, event.content)
+    case MsgType.AdaptiveCard:
+      return createAdaptiveCardItem(event, event.content)
+    case MsgType.AdaptiveAction:
+      // Ответ клиента на карточку в ленте не рисуем
+      return undefined
     default:
       return undefined
   }

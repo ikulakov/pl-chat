@@ -32,3 +32,15 @@
     pointer-events: auto;
   }
 }
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 380px;
+
+  &:has(> [data-role='card-actions']) {
+    width: 100%;
+  }
+}
