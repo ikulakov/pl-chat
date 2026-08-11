@@ -41,6 +41,7 @@
   "chat.reply.cancel": "Cancel reply",
   "chat.reply.goToOriginal": "Go to the original message",
   "chat.action.cancelUpload": "Cancel upload",
+  "chat.adaptiveCard.submitError": "Failed to send the response",
   "chat.action.retryUpload": "Upload again",
   "chat.action.removeFile": "Remove file",
   "chat.media.download": "Download {name}",

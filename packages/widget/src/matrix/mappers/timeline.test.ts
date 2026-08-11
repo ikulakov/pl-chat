@@ -145,6 +145,64 @@ describe('timelineEventsToItems — варианты контента', () => {
     })
   })
 
+  it('kc.adaptive.v1 с валидным payload даёт kind: adaptiveCard, card едет целиком', () => {
+    const card = {
+      type: 'AdaptiveCard',
+      version: '1.5',
+      actions: [{ type: 'Action.Submit', id: 'confirm', title: 'Подтвердить' }],
+    }
+    const [item] = timelineEventsToItems([
+      roomMessageEvent({
+        content: { msgtype: MsgType.AdaptiveCard, body: 'Карточка', adaptive_card: card },
+      }),
+    ])
+
+    expect(item).toMatchObject({ kind: 'adaptiveCard', content: { body: 'Карточка', card } })
+  })
+
+  it('kc.adaptive.v1 с card_kind сохраняет его для гейта CSI (T-61)', () => {
+    const [item] = timelineEventsToItems([
+      roomMessageEvent({
+        content: {
+          msgtype: MsgType.AdaptiveCard,
+          body: 'Анкета',
+          card_kind: 'csi',
+          adaptive_card: { type: 'AdaptiveCard' },
+        },
+      }),
+    ])
+
+    expect(item).toMatchObject({ content: { cardKind: 'csi' } })
+  })
+
+  it('kc.adaptive.v1 с битым payload деградирует в текст, а не пропадает', () => {
+    const [item] = timelineEventsToItems([
+      roomMessageEvent({
+        content: {
+          msgtype: MsgType.AdaptiveCard,
+          body: 'Карточка',
+          adaptive_card: { type: 'NotACard' },
+        },
+      }),
+    ])
+
+    expect(item).toMatchObject({ kind: 'text', content: { body: 'Карточка' } })
+  })
+
+  it('kc.adaptive.action не даёт элемент ленты — ответ клиента виден по подсветке кнопки, не пузырём', () => {
+    const items = timelineEventsToItems([
+      roomMessageEvent({
+        content: {
+          msgtype: MsgType.AdaptiveAction,
+          body: '[action: confirm]',
+          adaptive_action: { action_id: 'confirm', source_event_id: '$card' },
+        },
+      }),
+    ])
+
+    expect(items).toEqual([])
+  })
+
   it('неподдерживаемый контент молча выпадает, не роняя соседнее валидное сообщение', () => {
     // m.audio ещё не реализован (только text/image/file), m.reaction виджет не рендерит —
     // оба события должны отброситься, но НЕ сорвать маппинг текста между ними

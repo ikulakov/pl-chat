@@ -1,4 +1,5 @@
 import type { SystemMessageKey } from '../i18n'
+import type { AdaptiveCardPayload } from './adaptiveCards'
 import type { UploadFailure } from './uploadError'
 
 export type SendStatus = 'sending' | 'sent' | 'failed'
@@ -65,6 +66,15 @@ export interface FileTimelineItem extends BaseTimelineItem {
 
 export type MediaTimelineItem = ImageTimelineItem | FileTimelineItem
 
+export interface AdaptiveCardTimelineItem extends BaseTimelineItem {
+  kind: 'adaptiveCard'
+  content: {
+    body: string
+    card: AdaptiveCardPayload
+    cardKind?: string
+  }
+}
+
 export type SystemLabel =
   | { source: 'literal'; body: string }
   | { source: 'i18n'; key: SystemMessageKey; params?: Record<string, string> }
@@ -77,7 +87,7 @@ export interface SystemTimelineItem {
   label: SystemLabel
 }
 
-export type MessageTimelineItem = TextTimelineItem | MediaTimelineItem
+export type MessageTimelineItem = TextTimelineItem | MediaTimelineItem | AdaptiveCardTimelineItem
 
 export type TimelineItem = MessageTimelineItem | SystemTimelineItem
 
@@ -86,3 +96,6 @@ export const isSystem = (item: TimelineItem): item is SystemTimelineItem =>
 
 export const isMedia = (item: TimelineItem): item is MediaTimelineItem =>
   item.kind === 'image' || item.kind === 'file'
+
+export const isAdaptiveCard = (item: TimelineItem): item is AdaptiveCardTimelineItem =>
+  item.kind === 'adaptiveCard'

@@ -2,11 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { toMediaFailure } from '../../../domain/mediaError'
 import type { ThumbnailSize } from '../../../matrix/api/matrixApi'
 import { useChatActions } from '../../../hooks/useChatActions'
+import { useChatStore } from '../../../hooks/useChatStore'
+import { parseMxcUrl } from '../../../shared/utils/mxc'
+import { selectMediaVerdicts } from '../../../store/selectors'
 
 /**
- * `checking` и `rejected` — состояния конвейера проверки файла на сервере. Сейчас единственный
- * их источник — код ответа download'а (504 / 404); когда появится разбор события
- * `kc.media.status`, оно станет вторым источником тех же состояний, не меняя UI.
+ * `checking` и `rejected` — состояния конвейера проверки файла на сервере. Два источника:
+ * код ответа download'а (504 / 404) — фолбэк, пока вердикта не было; и `kc.media.status` из
+ * `/sync` — как только он приходит, читаем его напрямую (для `rejected` — вообще без сети) и
+ * подталкиваем застрявший `checking` к повторной попытке.
  */
 export type MediaSource =
   | { status: 'idle' }
@@ -35,6 +39,10 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
 
   const { loadPreview } = useChatActions()
 
+  const verdicts = useChatStore(selectMediaVerdicts)
+  const mediaId = mxcUrl ? parseMxcUrl(mxcUrl)?.mediaId : undefined
+  const verdict = mediaId ? verdicts[mediaId] : undefined
+
   const [attempt, setAttempt] = useState(0)
   const retry = useCallback(() => setAttempt((value) => value + 1), [])
 
@@ -44,7 +52,9 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
   const key = mxcUrl ? `${mxcUrl}#${width}x${height}#${attempt}` : ''
 
   useEffect(() => {
-    if (!key) return
+    // Вердикт уже отрицателен — сеть не нужна вовсе, сервер уже вынес финальное «нет».
+    // Сам REJECTED вернётся ниже как производное значение — эффекту тут делать нечего.
+    if (!key || verdict?.status === 'rejected') return
 
     let cancelled = false
     let objectUrl: string | null = null
@@ -80,9 +90,15 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
       URL.revokeObjectURL(objectUrl)
       setResult(null)
     }
-  }, [key, mxcUrl, width, height, loadPreview, retry])
+    // verdict?.status — намеренно в зависимостях: переход undefined → ready/rejected
+    // перезапускает эффект и берёт вердикт как второй источник тех же состояний (см. шапку
+    // файла), не дожидаясь, пока пользователь сам спровоцирует повторный рендер.
+  }, [key, mxcUrl, width, height, loadPreview, retry, verdict?.status])
 
   if (!key) return IDLE
+  // Вердикт приоритетнее любого сетевого результата — актуален и тогда, когда он пришёл
+  // уже после того, как сеть успела вернуть что-то другое (например, ещё не 404).
+  if (verdict?.status === 'rejected') return REJECTED
 
   return result?.key === key ? result.source : LOADING
 }

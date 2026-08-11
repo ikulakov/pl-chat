@@ -1,4 +1,4 @@
-import type { MatrixEventType, MsgType } from './consts'
+import type { MatrixEventType, MediaScanStatus, MsgType } from './consts'
 
 interface BaseClientEvent {
   event_id: string
@@ -47,9 +47,33 @@ interface FileMessageContent extends MediaMessageContent {
   msgtype: typeof MsgType.File
 }
 
+export interface AdaptiveCardMessageContent extends WithRelation {
+  msgtype: typeof MsgType.AdaptiveCard
+  body: string
+  card_kind?: string
+  adaptive_card: unknown
+}
+
+export interface AdaptiveActionMessageContent {
+  msgtype: typeof MsgType.AdaptiveAction
+  body: string
+  adaptive_action: {
+    action_id: string
+    source_event_id: string
+    data?: Record<string, unknown>
+  }
+  'm.relates_to'?: { rel_type: 'm.reference'; event_id: string }
+}
+
 export interface RoomMessageEvent extends BaseClientEvent {
   type: typeof MatrixEventType.RoomMessage
-  content: TextMessageContent | NoticeMessageContent | ImageMessageContent | FileMessageContent
+  content:
+    | TextMessageContent
+    | NoticeMessageContent
+    | ImageMessageContent
+    | FileMessageContent
+    | AdaptiveCardMessageContent
+    | AdaptiveActionMessageContent
 }
 
 export interface OperatorCurrentEvent extends BaseClientEvent {
@@ -82,6 +106,15 @@ export interface OperatorLeftEvent extends BaseClientEvent {
   }
 }
 
+export interface MediaStatusEvent extends BaseClientEvent {
+  type: typeof MatrixEventType.MediaStatus
+  content: {
+    media_id: string
+    status: (typeof MediaScanStatus)[keyof typeof MediaScanStatus]
+    error?: string
+  }
+}
+
 export interface GenericClientEvent extends BaseClientEvent {
   type: string
   content: Record<string, unknown>
@@ -92,6 +125,7 @@ export type ClientEvent =
   | OperatorCurrentEvent
   | OperatorJoinedEvent
   | OperatorLeftEvent
+  | MediaStatusEvent
   | GenericClientEvent
 
 export interface ReceiptEvent {

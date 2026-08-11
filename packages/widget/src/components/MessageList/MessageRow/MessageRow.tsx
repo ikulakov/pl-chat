@@ -1,9 +1,10 @@
 import { memo } from 'react'
-import type { MessageTimelineItem } from '../../../domain/timeline'
+import { type MessageTimelineItem } from '../../../domain/timeline'
 import { ITEM_ID_ATTR } from '../../../hooks/useLoadMoreHistory'
 import { RECEIPT_ID_ATTR } from '../../../hooks/useSendReadReceipts'
 import { cn } from '../../../shared/utils/cn'
 import { ReplyPreview } from '../../ReplyPreview'
+import { AdaptiveCardActions } from './AdaptiveCardActions'
 import type { BubbleMetaData } from './BubbleMeta'
 import { FileChip } from './FileChip'
 import { ImageMessage } from './ImageMessage'
@@ -65,28 +66,32 @@ export const MessageRow = memo(
           isOwn={isOwn}
         />
 
-        <MessageBubble
-          type={isOwn ? 'user' : 'operator'}
-          position={position}
-          reply={reply}
-        >
-          {message.kind === 'image' ? (
-            <ImageMessage
-              item={message}
-              meta={meta}
-            />
-          ) : message.kind === 'file' ? (
-            <FileChip
-              item={message}
-              meta={meta}
-            />
-          ) : (
-            <TextContent
-              text={message.content.body}
-              meta={meta}
-            />
-          )}
-        </MessageBubble>
+        <div className={styles.content}>
+          <MessageBubble
+            type={isOwn ? 'user' : 'operator'}
+            position={position}
+            reply={reply}
+          >
+            {message.kind === 'image' ? (
+              <ImageMessage
+                item={message}
+                meta={meta}
+              />
+            ) : message.kind === 'file' ? (
+              <FileChip
+                item={message}
+                meta={meta}
+              />
+            ) : (
+              <TextContent
+                text={message.content.body}
+                meta={meta}
+              />
+            )}
+          </MessageBubble>
+
+          {message.kind === 'adaptiveCard' && <AdaptiveCardActions item={message} />}
+        </div>
       </div>
     )
   },

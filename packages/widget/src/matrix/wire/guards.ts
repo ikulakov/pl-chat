@@ -17,6 +17,10 @@ export function isOperatorCurrent(event: Matrix.ClientEvent): event is Matrix.Op
   return event.type === MatrixEventType.OperatorCurrent && event.state_key === ''
 }
 
+export function isMediaStatusEvent(event: Matrix.ClientEvent): event is Matrix.MediaStatusEvent {
+  return event.type === MatrixEventType.MediaStatus
+}
+
 export function isReceiptEvent(event: Matrix.EphemeralEvent): event is Matrix.ReceiptEvent {
   return event.type === MatrixEventType.Receipt
 }

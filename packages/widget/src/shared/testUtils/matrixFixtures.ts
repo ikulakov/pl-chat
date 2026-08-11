@@ -1,5 +1,7 @@
 import { vi } from 'vitest'
+import type { AdaptiveCardPayload } from '../../domain/adaptiveCards'
 import type {
+  AdaptiveCardTimelineItem,
   FileTimelineItem,
   ImageTimelineItem,
   MediaContent,
@@ -8,12 +10,13 @@ import type {
 } from '../../domain/timeline'
 import type { MatrixApi } from '../../matrix/api/matrixApi'
 import type { SessionInit } from '../../matrix/session/types'
-import { MatrixEventType, MsgType, OperatorStatus } from '../../matrix/wire/consts'
+import { MatrixEventType, MediaScanStatus, MsgType, OperatorStatus } from '../../matrix/wire/consts'
 import type { MessagesResponse, SyncResponse } from '../../matrix/wire/dto'
 import type {
   ClientEvent,
   EphemeralEvent,
   JoinedRoom,
+  MediaStatusEvent,
   OperatorCurrentEvent,
   OperatorJoinedEvent,
   OperatorLeftEvent,
@@ -113,6 +116,38 @@ export function imageItem(
   }
 }
 
+const DEFAULT_CARD: AdaptiveCardPayload = {
+  type: 'AdaptiveCard',
+  version: '1.5',
+  actions: [
+    { type: 'Action.Submit', id: 'confirm', title: 'Подтвердить', data: { action: 'confirm' } },
+  ],
+}
+
+export function adaptiveCardItem(
+  overrides: Partial<Omit<AdaptiveCardTimelineItem, 'kind' | 'content'>> & {
+    body?: string
+    card?: AdaptiveCardPayload
+    cardKind?: string
+  } = {},
+): AdaptiveCardTimelineItem {
+  const { body, card, cardKind, ...rest } = overrides
+  return {
+    kind: 'adaptiveCard',
+    localId: 'm1',
+    eventId: '$card',
+    sender: OPERATOR_ID,
+    ts: 0,
+    sendStatus: 'sent',
+    ...rest,
+    content: {
+      body: body ?? 'Карточка',
+      card: card ?? DEFAULT_CARD,
+      ...(cardKind ? { cardKind } : {}),
+    },
+  }
+}
+
 export function makeFile(name: string, size = 1, type = ''): File {
   // jsdom File: реальные байты не создаём — переопределяем size напрямую.
   const blob = new Blob([new Uint8Array(Math.min(size, 1024))], { type })
@@ -203,6 +238,31 @@ export function operatorLeftEvent(
       reason: 'completed',
       ...overrides,
     },
+  }
+}
+
+export const MEDIA_REJECT_REASON = 'Файл не прошёл проверку безопасности'
+
+// Не привязано к event_id: бэкенд шлёт один вердикт на media_id, не на упоминание в сообщении.
+export function mediaStatusEvent(
+  overrides: Partial<MediaStatusEvent['content']> = {},
+): MediaStatusEvent {
+  const content: MediaStatusEvent['content'] = {
+    media_id: 'AbCdEfGhIjKlMnOpQrStUvWx',
+    status: MediaScanStatus.Rejected,
+    ...overrides,
+  }
+
+  return {
+    type: MatrixEventType.MediaStatus,
+    event_id: '$media-status',
+    sender: OPERATOR_ID,
+    origin_server_ts: 3,
+    // error приходит только при rejected — у ready поля нет вовсе
+    content:
+      content.status === MediaScanStatus.Rejected
+        ? { ...content, error: content.error ?? MEDIA_REJECT_REASON }
+        : content,
   }
 }
 
