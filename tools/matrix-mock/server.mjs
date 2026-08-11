@@ -40,6 +40,11 @@
 //   /rejectmedia  — download/thumbnail отвечают 404: файл отклонён проверкой
 //   (три последние — переключатели, повторный ввод той же команды выключает режим)
 //
+// /rejectmedia и /pendingmedia также решают, что придёт вердиктом kc.media.status на
+// СЛЕДУЮЩЕЕ ваше вложение (картинку/файл): включённый /rejectmedia — событие "rejected"
+// через ~1.5с после отправки; /pendingmedia — событие не приходит вовсе (конвейер ещё не
+// решил); иначе — "ready".
+//
 // Авто-ответ приходит и на вложения (m.image/m.file), не только на текст.
 // =============================================================================
 import { createServer } from "node:http";
@@ -301,6 +306,7 @@ function historyPage(from, limit) {
 // На что оператор отвечает автоматически. Стикеры и kc.adaptive.action намеренно
 // не здесь: на них ответ сбивал бы проверку соответствующих сценариев.
 const REPLYABLE_MSGTYPES = new Set(["m.text", "m.image", "m.file"]);
+const MEDIA_MSGTYPES = new Set(["m.image", "m.file"]);
 
 /** Свежий mediaId на каждую отправку — иначе клиентский кэш превью съест повторный запрос. */
 const freshMxc = () => `mxc://bank.ru/op${Date.now().toString(36)}`;
@@ -677,6 +683,24 @@ const server = createServer(async (req, res) => {
     // Оператор «прочитал» — ✓✓.
     if (type === "m.room.message" || type === "m.sticker") {
       delay(600, () => operatorRead(ev.event_id));
+    }
+    // Вердикт CDR по своему вложению: как на настоящем бэкенде, приходит отдельным событием
+    // ПОСЛЕ самого сообщения, привязан к media_id (не к event_id — один вердикт на файл,
+    // не на каждое упоминание). При mediaMode === "pending" событие не шлём вовсе: конвейер
+    // ещё не вынес решения, download продолжает штатно отвечать 504.
+    if (type === "m.room.message" && MEDIA_MSGTYPES.has(content.msgtype) && mediaMode !== "pending") {
+      const mediaId = String(content.url || "").split("/").pop();
+      if (mediaId) {
+        delay(1500, () =>
+          push(
+            "kc.media.status",
+            OP,
+            mediaMode === "rejected"
+              ? { media_id: mediaId, status: "rejected", error: "Файл не прошёл проверку безопасности" }
+              : { media_id: mediaId, status: "ready" },
+          ),
+        );
+      }
     }
     // Авто-ответ на сообщения клиента. У медиа body — это подпись или имя файла,
     // слэш-команды там разбирать нечего: отдаём пустую строку, чтобы ушёл обычный

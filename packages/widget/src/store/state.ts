@@ -1,4 +1,5 @@
 import type { CardAnswer } from '../domain/adaptiveCards'
+import type { MediaVerdict, MediaVerdictEntry } from '../domain/mediaVerdict'
 import type { OperatorState } from '../domain/operator'
 import type { ReadReceipt } from '../domain/receipts'
 import type { RoomSyncPatch } from '../domain/roomSync'
@@ -28,6 +29,7 @@ export type RuntimeAction =
       type: 'history.loaded'
       items: TimelineItem[]
       cardAnswers: CardAnswer[]
+      mediaVerdicts: MediaVerdictEntry[]
       prevBatch: string | null
     }
   | { type: 'history.settled' }
@@ -51,6 +53,9 @@ export interface RoomState {
   // ответы на Adaptive Card по cardEventId — переживают merge ленты и перезагрузку,
   // поэтому не элемент timeline (ответ клиента и не рисуется пузырём в ленте)
   cardAnswers: Record<string, CardAnswer>
+  // результат проверки вложений (kc.media.status) по media_id:
+  // бэкенд шлёт один вердикт на файл, а не на каждое упоминание
+  mediaVerdicts: Record<string, MediaVerdict>
   // сообщение, на которое пользователь отвечает (превью в композере)
   replyTarget: ReplyTarget | null
   // курсор следующей страницы истории назад
