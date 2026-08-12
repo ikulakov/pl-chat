@@ -1,8 +1,11 @@
 import type { EmojiAnimation } from '../../domain/emoji'
 import type { ParsedMxcUrl } from '../../shared/utils/mxc'
+import { RelType } from '../wire/consts'
 import type {
   MessagesResponse,
   OutgoingContent,
+  OutgoingReactionContent,
+  OutgoingRedactionContent,
   RegisterResponse,
   SendEventResponse,
   SyncResponse,
@@ -33,6 +36,19 @@ interface SendMessageParams {
   roomId: string
   txnId: string
   content: OutgoingContent
+}
+
+interface SendReactionParams {
+  roomId: string
+  txnId: string
+  targetEventId: string
+  key: string
+}
+
+interface RedactEventParams {
+  roomId: string
+  txnId: string
+  eventId: string
 }
 
 export function createMatrixApi(transport: MatrixTransport) {
@@ -77,6 +93,32 @@ export function createMatrixApi(transport: MatrixTransport) {
 
     sendMessage({ roomId, txnId, content }: SendMessageParams): Promise<SendEventResponse> {
       return transport.request(Endpoints.SEND_MESSAGE({ roomId, txnId }), {
+        method: 'PUT',
+        body: content,
+      })
+    },
+
+    sendReaction({
+      roomId,
+      txnId,
+      targetEventId,
+      key,
+    }: SendReactionParams): Promise<SendEventResponse> {
+      const content: OutgoingReactionContent = {
+        'm.relates_to': { rel_type: RelType.Annotation, event_id: targetEventId, key },
+      }
+
+      return transport.request(Endpoints.SEND_REACTION({ roomId, txnId }), {
+        method: 'PUT',
+        body: content,
+      })
+    },
+
+    // Снятие реакции — редакция самого события реакции; сообщения клиент не редактирует.
+    redactEvent({ roomId, txnId, eventId }: RedactEventParams): Promise<SendEventResponse> {
+      const content: OutgoingRedactionContent = { redacts: eventId }
+
+      return transport.request(Endpoints.SEND_REDACTION({ roomId, txnId }), {
         method: 'PUT',
         body: content,
       })

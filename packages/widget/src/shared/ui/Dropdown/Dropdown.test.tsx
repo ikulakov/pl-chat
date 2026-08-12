@@ -1,12 +1,13 @@
 /* eslint-disable i18next/no-literal-string -- тестовые метки пунктов, не UI-текст */
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Dropdown } from './Dropdown'
 import { DropdownItem } from './DropdownItem'
 
-function renderDropdown() {
+function renderDropdown(above?: React.ReactNode) {
   return render(
     <Dropdown
+      above={above}
       trigger={(props) => (
         <button
           {...props}
@@ -88,5 +89,43 @@ describe('Dropdown a11y', () => {
 
     fireEvent.keyDown(one, { key: 'ArrowUp' })
     expect(two).toHaveFocus()
+  })
+
+  it('рендерит надстройку above в том же слое, что и меню', () => {
+    renderDropdown(<button type="button">react</button>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'menu' }))
+
+    expect(screen.getByRole('button', { name: 'react' })).toBeInTheDocument()
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+  })
+
+  it('не считает клик по надстройке внешним — иначе он не долетел бы до её кнопки', () => {
+    const onClick = vi.fn()
+    renderDropdown(
+      <button
+        type="button"
+        onClick={onClick}
+      >
+        react
+      </button>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'menu' }))
+    const item = screen.getByRole('button', { name: 'react' })
+
+    fireEvent.pointerDown(item)
+    fireEvent.click(item)
+
+    expect(onClick).toHaveBeenCalledOnce()
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+  })
+
+  it('закрывает надстройку вместе с меню по Escape', () => {
+    renderDropdown(<button type="button">react</button>)
+    fireEvent.click(screen.getByRole('button', { name: 'menu' }))
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('button', { name: 'react' })).not.toBeInTheDocument()
   })
 })

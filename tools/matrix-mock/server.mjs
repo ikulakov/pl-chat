@@ -37,6 +37,8 @@
 //   /reply img  — то же картинкой, /reply file — файлом (входящая цитата на медиа)
 //   /sticker    — оператор присылает стикер
 //   /emoji      — три сообщения с эмодзи: большое, среднее и строчные внутри текста
+//   /react [эм] — оператор ставит реакцию (по умолчанию 👍) на последнее сообщение клиента;
+//                 повторный ввод той же реакции снимает её (m.room.redaction)
 //   /fail       — следующая отправка клиента вернёт ошибку (проверка «Повторить»)
 //   /failaction — следующий ответ на кнопку карточки вернёт ошибку (CardActions → failed)
 //   /failupload — следующая загрузка файла вернёт ошибку (сеть/5xx — повтор осмыслен)
@@ -396,6 +398,23 @@ function lastGuestMessageId(exclude) {
   return null;
 }
 
+// Активная реакция оператора — поставленная и не снятая редакцией. Реакцию снимает
+// редакция её собственного события, а не сообщения, поэтому ищем по event_id самой реакции.
+function activeOperatorReaction(target, key) {
+  const redacted = new Set(
+    events.filter((e) => e.type === "m.room.redaction").map((e) => e.content.redacts)
+  );
+  const hit = events.findLast(
+    (e) =>
+      e.type === "m.reaction" &&
+      e.sender === OP &&
+      e.content["m.relates_to"]?.event_id === target &&
+      e.content["m.relates_to"]?.key === key &&
+      !redacted.has(e.event_id)
+  );
+  return hit?.event_id ?? null;
+}
+
 // Синтетические варианты карточки, которые нет смысла держать в scenario.json — это тест-фикстуры
 // для проверки границ маппера/проекции (domain/adaptiveCards.ts toSubmitActions), не сид-данные.
 const CARD_BUTTONS = {
@@ -520,6 +539,25 @@ function operatorRespond(text, ownEventId) {
         "m.relates_to": { "m.in_reply_to": { event_id: target } },
       })
     );
+  }
+  // Реакция оператора на последнее сообщение клиента: `/react`, `/react 🔥`.
+  // Повторный ввод той же реакции снимает её — так проверяется разбор m.room.redaction.
+  if (t.startsWith("/react")) {
+    const target = lastGuestMessageId(ownEventId);
+    if (!target) return;
+
+    const key = t.slice("/react".length).trim() || "👍";
+
+    return delay(500, () => {
+      const existing = activeOperatorReaction(target, key);
+      if (existing) {
+        push("m.room.redaction", OP, { redacts: existing });
+        return;
+      }
+      push("m.reaction", OP, {
+        "m.relates_to": { rel_type: "m.annotation", event_id: target, key },
+      });
+    });
   }
   // Возврат оператора после /left — иначе состояние «чат завершён» не откатить без рестарта.
   if (t.startsWith("/join")) {
@@ -1012,19 +1050,6 @@ const server = createServer(async (req, res) => {
   if (stickerMatch) {
     return send(res, 200, svgSticker(STICKER_EMOJI[stickerMatch[1]] || "🙂"), "image/svg+xml");
   }
-  // Каталог эмодзи (в реале — с Bearer, мок токен не проверяет)
-  if (/emoji\/v1\/packs$/.test(path)) {
-    return send(res, 200, { packs: [EMOJI_PACK] });
-  }
-  // Байты анимации эмодзи: публичные, ключ — канонический codepoint. ?v игнорируем —
-  // это cache-buster для браузера, серверу он ничего не меняет.
-  const emojiMatch = path.match(/^\/_matrix\/emoji\/([0-9a-f-]+)$/);
-  if (emojiMatch) {
-    if (!EMOJI_CODEPOINTS.has(emojiMatch[1])) {
-      return send(res, 404, { errcode: "M_NOT_FOUND", error: "нет в паке: " + emojiMatch[1] });
-    }
-    return send(res, 200, lottieEmoji(emojiMatch[1]));
-  }
   // Каталог стикеров
   if (/stickers\/v1\/packs$/.test(path)) {
     return send(res, 200, { packs: [{ id: "otp", display_name: "OTP", stickers: STICKERS }] });
@@ -1108,6 +1133,7 @@ server.listen(PORT, () => {
   console.log(`BankChat mock-сервер: http://localhost:${PORT}`);
   console.log(`Откройте виджет:     http://localhost:5174`);
   console.log(`Команды в чате: /card [buttons|3|broken|openurl|many]  /notice  /left  /join  /html`);
-  console.log(`                /img  /file  /sticker  /emoji  /reply [img|file]  /fail  /failaction`);
-  console.log(`                /failupload  /rejectupload  /failthumb  /pendingmedia  /rejectmedia`);
+  console.log(`                /img  /file  /sticker  /emoji  /reply [img|file]  /react [эмодзи]`);
+  console.log(`                /fail  /failaction  /failupload  /rejectupload  /failthumb`);
+  console.log(`                /pendingmedia  /rejectmedia`);
 });

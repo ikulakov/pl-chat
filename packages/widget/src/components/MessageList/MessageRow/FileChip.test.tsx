@@ -178,6 +178,7 @@ describe('FileChip', () => {
       room: {
         timeline: [],
         readMarkers: [],
+        reactions: [],
         cardAnswers: [],
         mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'rejected' } }],
         prevBatch: null,

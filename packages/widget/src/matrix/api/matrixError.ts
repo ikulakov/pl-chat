@@ -93,4 +93,5 @@ export type AuthErrorContext =
   | 'sendFile'
   | 'sendCardAction'
   | 'markRead'
+  | 'toggleReaction'
   | 'loadHistory'

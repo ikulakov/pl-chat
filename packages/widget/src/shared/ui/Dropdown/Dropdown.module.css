@@ -1,6 +1,13 @@
-.dropdown {
+.layer {
   position: fixed;
   z-index: var(--z-dropdown);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.dropdown {
   min-width: 160px;
   padding: 4px;
   border-radius: var(--radius-md);

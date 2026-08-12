@@ -3,6 +3,7 @@ import type { RuntimeAction } from '../../store/state'
 import type { MatrixApi } from '../api/matrixApi'
 import { collectCardAnswers } from '../mappers/adaptiveCard'
 import { collectMediaVerdicts } from '../mappers/mediaStatus'
+import { toReactionDelta } from '../mappers/reactions'
 import { timelineEventsToItems } from '../mappers/timeline'
 
 // Максимальное кол-во страниц для просмотра на случай если все события страницы будут не целевыми
@@ -128,6 +129,8 @@ export class MatrixHistoryLoader {
       const items = timelineEventsToItems(reversed)
       const cardAnswers = collectCardAnswers(reversed)
       const mediaVerdicts = collectMediaVerdicts(reversed)
+      // Реакции едут даже со страницы без видимых сообщений — она обычно из них и состоит.
+      const reactions = toReactionDelta(reversed)
       // Пустой chunk — признак конца истории
       const nextBatch = chunk.length === 0 ? null : (end ?? null)
 
@@ -136,6 +139,7 @@ export class MatrixHistoryLoader {
         items,
         cardAnswers,
         mediaVerdicts,
+        reactions,
         prevBatch: nextBatch,
       })
 

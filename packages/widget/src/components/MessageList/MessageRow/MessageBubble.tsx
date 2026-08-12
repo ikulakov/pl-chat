@@ -9,10 +9,11 @@ interface Props {
   type: BubbleType
   position?: BubblePosition
   reply?: ReactNode
+  reactions?: ReactNode
   children: ReactNode
 }
 
-export function MessageBubble({ type, position = 'single', reply, children }: Props) {
+export function MessageBubble({ type, position = 'single', reply, reactions, children }: Props) {
   return (
     <div
       className={cn(styles.bubble, styles[type], styles[position])}
@@ -20,6 +21,8 @@ export function MessageBubble({ type, position = 'single', reply, children }: Pr
     >
       {reply}
       {children}
+      {/* слот, а не рендер внутри контента: реакции одинаково нужны тексту, картинке и файлу */}
+      {reactions}
     </div>
   )
 }

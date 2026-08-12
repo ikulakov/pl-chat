@@ -36,6 +36,7 @@ function renderRow(body: string, replyText?: string) {
       userId="@me:bank"
       position="single"
       readByOperator={false}
+      reactions={undefined}
       replyAuthor={replyText ? 'Оля' : undefined}
       replyText={replyText}
       replyTargetId={undefined}

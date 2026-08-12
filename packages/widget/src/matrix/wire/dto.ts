@@ -1,4 +1,4 @@
-import type { MsgType } from './consts'
+import type { MsgType, RelType } from './consts'
 import type { ClientEvent, JoinedRoom, MediaInfo, WithRelation } from './types'
 
 export interface OutgoingTextContent extends WithRelation {
@@ -29,6 +29,18 @@ export type OutgoingContent =
   | OutgoingTextContent
   | OutgoingMediaContent
   | OutgoingAdaptiveActionContent
+
+export interface OutgoingReactionContent {
+  'm.relates_to': {
+    rel_type: typeof RelType.Annotation
+    event_id: string
+    key: string
+  }
+}
+
+export interface OutgoingRedactionContent {
+  redacts: string
+}
 
 export interface RegisterResponse {
   user_id: string

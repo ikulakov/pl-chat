@@ -1,5 +1,7 @@
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
+import { aggregateReactions, type ReactionEntry } from '../../../domain/reactions'
 import { type MessageTimelineItem } from '../../../domain/timeline'
+import { useChatActions } from '../../../hooks/useChatActions'
 import { useEmojiSegments } from '../../../hooks/useEmojiSegments'
 import { ITEM_ID_ATTR } from '../../../hooks/useLoadMoreHistory'
 import { RECEIPT_ID_ATTR } from '../../../hooks/useSendReadReceipts'
@@ -13,6 +15,7 @@ import { ImageMessage } from './ImageMessage'
 import { MessageActions } from './MessageActions'
 import { MessageBubble, type BubblePosition } from './MessageBubble'
 import styles from './MessageRow.module.css'
+import { ReactionBar } from './ReactionBar'
 import { TextContent } from './TextContent'
 
 interface Props {
@@ -20,6 +23,7 @@ interface Props {
   userId: string
   position: BubblePosition
   readByOperator: boolean
+  reactions: ReactionEntry[] | undefined
   replyAuthor: string | undefined
   replyText: string | undefined
   replyTargetId: string | undefined
@@ -32,17 +36,22 @@ export const MessageRow = memo(
     message,
     position,
     readByOperator,
+    reactions,
     replyAuthor,
     replyText,
     replyTargetId,
     onReplyClick,
   }: Props) => {
+    const { toggleReaction } = useChatActions()
     const isOwn = message.sender === userId
     const isGroupStart = position === 'single' || position === 'first'
 
     const { segments, layout, version } = useEmojiSegments(
       message.kind === 'text' ? message.content.body : '',
     )
+
+    // Свёртка — новая коллекция на выходе, поэтому живёт здесь, а не в селекторе.
+    const summaries = useMemo(() => aggregateReactions(reactions, userId), [reactions, userId])
 
     const meta: BubbleMetaData = {
       ts: message.ts,
@@ -59,9 +68,10 @@ export const MessageRow = memo(
       />
     ) : undefined
 
-    // Сообщение из одних эмодзи рисуется крупно и без плашки. С цитатой так нельзя: её не на
-    // чем показать, поэтому такое сообщение остаётся обычным баблом со строчными эмодзи.
-    const emojiOnlyLayout = layout !== 'inline' && !reply ? layout : null
+    // Сообщение из одних эмодзи рисуется крупно и без плашки. С цитатой и с реакциями так
+    // нельзя: их не на чем показать, поэтому такое сообщение остаётся обычным баблом со
+    // строчными эмодзи.
+    const emojiOnlyLayout = layout !== 'inline' && !reply && summaries.length === 0 ? layout : null
 
     return (
       <div
@@ -74,6 +84,7 @@ export const MessageRow = memo(
         <MessageActions
           message={message}
           isOwn={isOwn}
+          reactions={summaries}
         />
 
         {emojiOnlyLayout ? (
@@ -89,6 +100,14 @@ export const MessageRow = memo(
               type={isOwn ? 'user' : 'operator'}
               position={position}
               reply={reply}
+              reactions={
+                summaries.length > 0 ? (
+                  <ReactionBar
+                    summaries={summaries}
+                    onToggle={(key) => void toggleReaction(message.eventId, key)}
+                  />
+                ) : undefined
+              }
             >
               {message.kind === 'image' ? (
                 <ImageMessage

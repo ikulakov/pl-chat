@@ -6,9 +6,10 @@ import { MessageActions } from './MessageActions'
 
 const resendMessage = vi.fn()
 const replyTo = vi.fn()
+const toggleReaction = vi.fn()
 
 vi.mock('../../../hooks/useChatActions', () => ({
-  useChatActions: () => ({ resendMessage, replyTo }),
+  useChatActions: () => ({ resendMessage, replyTo, toggleReaction }),
 }))
 
 describe('MessageActions', () => {
@@ -16,6 +17,7 @@ describe('MessageActions', () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
     resendMessage.mockClear()
     replyTo.mockClear()
+    toggleReaction.mockClear()
   })
 
   afterEach(() => {
@@ -30,6 +32,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello world' })}
         isOwn={false}
+        reactions={[]}
       />,
     )
 
@@ -44,6 +47,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello world' })}
         isOwn={false}
+        reactions={[]}
       />,
     )
 
@@ -69,6 +73,7 @@ describe('MessageActions', () => {
           sendStatus: 'failed',
         })}
         isOwn={true}
+        reactions={[]}
       />,
     )
 
@@ -83,6 +88,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={textItem({ eventId: 'optimistic:m1', sender: '@user:bank', body: 'hello' })}
         isOwn={false}
+        reactions={[]}
       />,
     )
 
@@ -96,6 +102,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={textItem({ eventId: '$m1', sender: '@operator:bank', body: '   ' })}
         isOwn={false}
+        reactions={[]}
       />,
     )
 
@@ -109,6 +116,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello' })}
         isOwn={false}
+        reactions={[]}
       />,
     )
 
@@ -127,6 +135,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={fileItem()}
         isOwn={false}
+        reactions={[]}
       />,
     )
 
@@ -140,6 +149,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={fileItem()}
         isOwn={false}
+        reactions={[]}
       />,
     )
 
@@ -153,6 +163,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={fileItem()}
         isOwn={false}
+        reactions={[]}
       />,
     )
 
@@ -171,6 +182,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={fileItem({ body: 'договор на подпись' })}
         isOwn={false}
+        reactions={[]}
       />,
     )
 
@@ -189,6 +201,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={fileItem({ body: 'договор на подпись' })}
         isOwn={false}
+        reactions={[]}
       />,
     )
 
@@ -211,6 +224,7 @@ describe('MessageActions', () => {
           upload: { file: new File([], 'doc.pdf'), pct: null, error: 'network' },
         })}
         isOwn={true}
+        reactions={[]}
       />,
     )
 
@@ -222,10 +236,56 @@ describe('MessageActions', () => {
       <MessageActions
         message={fileItem({ localId: 'm1', sendStatus: 'failed' })}
         isOwn={true}
+        reactions={[]}
       />,
     )
 
     expect(screen.getByText(t('chat.action.retry'))).toBeInTheDocument()
+  })
+
+  it('показывает панель быстрых реакций вместе с меню и отдаёт выбранный ключ', () => {
+    render(
+      <MessageActions
+        message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello' })}
+        isOwn={false}
+        reactions={[]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+    fireEvent.click(screen.getByRole('button', { name: t('chat.reaction.add', { emoji: '👍' }) }))
+
+    expect(toggleReaction).toHaveBeenCalledExactlyOnceWith('$m1', '👍')
+  })
+
+  it('помечает уже поставленную реакцию — тот же слот её и снимает', () => {
+    render(
+      <MessageActions
+        message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello' })}
+        isOwn={false}
+        reactions={[{ key: '👍', count: 1, ownEventId: '$r1' }]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+
+    expect(
+      screen.getByRole('button', { name: t('chat.reaction.remove', { emoji: '👍' }) }),
+    ).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('прячет панель реакций у сообщения с оптимистичным eventId — аннотировать нечего', () => {
+    render(
+      <MessageActions
+        message={textItem({ eventId: 'optimistic:m1', sender: '@user:bank', body: 'hello' })}
+        isOwn={true}
+        reactions={[]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+
+    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
   })
 
   it('does not render "Повторить отправку" for a non-own or non-failed message', () => {
@@ -233,6 +293,7 @@ describe('MessageActions', () => {
       <MessageActions
         message={textItem({ eventId: '$m1', sender: '@operator:bank' })}
         isOwn={false}
+        reactions={[]}
       />,
     )
 

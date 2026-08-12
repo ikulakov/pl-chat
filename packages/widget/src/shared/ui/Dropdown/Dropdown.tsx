@@ -10,10 +10,12 @@ import type { DropdownTriggerProps } from './types'
 
 interface Props {
   trigger: (props: DropdownTriggerProps) => ReactNode
+  /** Своя всплывашка над меню (панель реакций): живёт в том же слое и закрывается вместе с ним. */
+  above?: ReactNode
   children: ReactNode
 }
 
-export function Dropdown({ trigger, children }: Props) {
+export function Dropdown({ trigger, above, children }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   // до первого замера меню скрыто (visibility), чтобы не мигнуть в углу 0,0
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
@@ -136,12 +138,11 @@ export function Dropdown({ trigger, children }: Props) {
       {isOpen &&
         container &&
         createPortal(
+          // Слой меряется и позиционируется целиком: коллизия с краями вьюпорта должна учитывать
+          // и надстройку `above`, а внешний клик — не считаться внешним при попадании в неё.
           <div
             ref={dropdownRef}
-            role="menu"
-            aria-label={t('chat.action.menu')}
-            className={styles.dropdown}
-            onKeyDown={handleMenuKeyDown}
+            className={styles.layer}
             onClick={(event) => {
               // выбор пункта мышью (detail>0) — фокус вернём в body, а не на триггер:
               // иначе :focus-within оставит кнопку действий видимой после закрытия.
@@ -154,7 +155,16 @@ export function Dropdown({ trigger, children }: Props) {
               visibility: position ? 'visible' : 'hidden',
             }}
           >
-            <DropdownContext value={contextValue}>{children}</DropdownContext>
+            {above}
+
+            <div
+              role="menu"
+              aria-label={t('chat.action.menu')}
+              className={styles.dropdown}
+              onKeyDown={handleMenuKeyDown}
+            >
+              <DropdownContext value={contextValue}>{children}</DropdownContext>
+            </div>
           </div>,
           container,
         )}

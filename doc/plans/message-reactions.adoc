@@ -1,0 +1,299 @@
+= Реакции на сообщение
+:toc: macro
+:toclevels: 2
+:icons: font
+:status: planned
+
+Клиентская часть. Контракт — `matrixkc/docs/client/client-protocol.adoc`, секции `[#send]`
+(`m.reaction`, `m.room.redaction`), `[#idempotency]` и таблица типов событий.
+
+toc::[]
+
+== Контекст
+
+В виджете нет реакций: `m.reaction` из `/sync` и `/messages` молча отбрасывается маппером
+(`matrix/mappers/timeline.ts:108`), а в меню сообщения есть только «Ответить / Копировать /
+Повторить». Бэкенд matrixkc фичу поддерживает полностью, мок — тоже: `PUT …/send/{type}/{txnId}`
+(`tools/matrix-mock/server.mjs:584`) принимает любой тип события и эхом отдаёт его в `/sync`.
+В моке даже лежит синтетический блок `m.reaction` (`server.mjs:229`), который сегодня служит
+только проверкой сценария «страница истории без видимых событий».
+
+Макет — Figma `Chatbot`, node `1346-16421` (чип) и скрин `doc/img_2.png` (панель):
+
+* панель быстрых реакций разворачивается *над* меню «…» — обе всплывашки видны одновременно и
+выровнены по правому краю;
+* поставленная реакция — *чип внутри пузыря*, последней строкой: пилюля `#edf6fd` с эмодзи 16×16
+и счётчиком (`Caption/1M` — Onest Medium 12/14).
+
+Итог итерации: по «…» открывается меню с рядом из шести быстрых реакций над ним; тап ставит
+реакцию (optimistic), повторный тап по своей — снимает; свои и чужие реакции видны в пузыре и
+переживают перезагрузку (приходят из `/sync` и из истории).
+
+== Границы задачи
+
+=== Входит
+
+* Ряд быстрых реакций `👍 ❤️ 😂 😮 😢 🙏` над меню сообщения; тоггл (поставить/снять).
+* Чипы реакций в пузыре: эмодзи + счётчик при `count > 1`, своя подсвечена.
+* Агрегация `m.reaction` / `m.room.redaction` из `/sync` *и* из страниц истории.
+* Optimistic-постановка и снятие с откатом при ошибке.
+* Мок: команда `/react` — реакция от оператора.
+
+=== Не входит — осознанно
+
+* *Шеврон «⌄» и полный пикер эмодзи* — параллельная задача
+xref:emoji-sticker-picker.adoc[emoji-sticker-picker]. Кнопку не рисуем вовсе: обработчика для неё
+нет, а заглушка в интерфейсе — мусор. Пикер, когда приземлится, добавит седьмой слот в
+`ReactionPicker` и переиспользует ту же `toggleReaction`.
+* *Анимированные эмодзи* в чипах и панели — обычный юникод системным шрифтом (в макете чип
+нарисован иконкой 16×16, у нас это текстовый глиф того же кегля).
+* *Список «кто поставил»* — в support-чате участников двое, счётчик исчерпывает информацию.
+* *Плашка «сообщение удалено»* для `m.room.redaction` по самому сообщению: редакция сообщений
+клиенту недоступна, обработка редакций ограничена реакциями.
+* *Гейт по `capabilities.ru.otpbank.kc.features.reactions`* — лишний запрос в критическом пути
+подключения. При выключенной фиче `PUT` вернёт `403`, оптимистичная реакция откатится.
+
+== Контракт бэкенда
+
+Сверено с исходником протокола, не по памяти.
+
+[cols="1,4", options="header"]
+|===
+| Операция | Запрос
+
+| Поставить
+| `PUT /_matrix/client/v3/rooms/{roomId}/send/m.reaction/{txnId}`, тело
+`{"m.relates_to":{"rel_type":"m.annotation","event_id":"$target","key":"👍"}}` → `{event_id}`
+
+| Снять
+| `PUT /_matrix/client/v3/rooms/{roomId}/send/m.room.redaction/{txnId}`, тело
+`{"redacts":"$reactionEventId"}` → `{event_id}`
+|===
+
+Ключевые свойства, на которых стоит дизайн:
+
+* *Дедуп по `(target, sender, key)`* — повторная отправка возвращает существующий `event_id` без
+записи. Двойной тап не создаёт вторую реакцию даже при гонке.
+* *Bundled aggregations сервер не отдаёт* (`m.relations` / `unsigned.m.relations` в контракте нет).
+Клиент обязан агрегировать сырые события сам — и из `/sync`, и из `/messages`.
+* *Редакция не удаляет событие*: у цели `content` становится `{}` во всех read-путях. Значит
+реакция, снятая до подгрузки истории, приедет как `m.reaction` без `m.relates_to` — такие события
+пропускаем.
+* `m.reaction` *не открывает обращение* (в отличие от `m.room.message` / `m.sticker`), так что
+реакция на старое сообщение не поднимает диалог.
+
+== Реализация
+
+=== Wire → домен
+
+`matrix/wire/consts.ts` — `MatrixEventType.Reaction`, `MatrixEventType.Redaction`, новый
+`RelType.Annotation = 'm.annotation'`.
+
+`matrix/wire/types.ts` — `ReactionEvent` (поля `m.relates_to` опциональны: у отредактированной
+реакции `content` пуст) и `RedactionEvent` (`content.redacts?`). `matrix/wire/guards.ts` —
+`isReaction`, `isRedaction` рядом с существующими гардами.
+
+`matrix/mappers/reactions.ts` — единственное место перевода:
+
+[source,ts]
+----
+export function toReactionDelta(events: Matrix.ClientEvent[] = []): ReactionDelta
+----
+
+Проходит события в хронологическом порядке, собирает `added` (валидные `m.reaction`: есть
+`rel_type === 'm.annotation'`, `event_id`, непустой `key`) и `removed` (`redacts` из
+`m.room.redaction`). `mappers/timeline.ts` не трогаем: реакция остаётся невидимым событием ленты.
+
+=== Домен — `domain/reactions.ts`
+
+Чистая логика, без React и Matrix (граница проверяется линтером, `eslint.config.mjs:42-58`):
+
+[source,ts]
+----
+export interface ReactionEntry { eventId: string; sender: string; key: string }
+export type ReactionIndex = Record<string /* targetEventId */, ReactionEntry[]>
+export interface ReactionDelta {
+  added: (ReactionEntry & { targetEventId: string })[]
+  removed: string[]
+}
+export interface ReactionSummary { key: string; count: number; ownEventId: string | null }
+
+applyReactionDelta(index, delta)
+addReaction(index, targetEventId, entry)     // upsert по (sender, key)
+confirmReaction(index, targetEventId, localEventId, eventId)
+removeReaction(index, targetEventId, eventId)
+aggregateReactions(entries, ownUserId): ReactionSummary[]
+----
+
+Отдельный индекс по `targetEventId`, а не поле в `TimelineItem`, — по тем же причинам, что и
+`readReceipts`: реакция регулярно приходит *раньше* своего сообщения (страница истории `dir=b`
+отдаёт реакцию до цели) и должна переживать пересборку элемента ленты в `mergeTimeline`.
+
+Инварианты, ради которых это отдельные функции с тестами:
+
+* `addReaction` — *upsert по `(sender, key)`*: он же и дедуп оптимистичной записи с эхом из
+`/sync`, в любом порядке прихода (реальный `eventId` вытесняет `optimistic:`).
+* Порядок чипов — порядок первого появления ключа: чип не должен прыгать, когда оператор поставил
+ту же реакцию.
+* Ссылочная стабильность: массив нетронутого сообщения возвращается тем же — иначе `memo` на
+`MessageRow` перестанет работать.
+
+=== Стор
+
+* `RoomState.reactions: ReactionIndex`, `INITIAL_ROOM_STATE.reactions = {}`.
+* `RoomSyncPatch.reactions: ReactionDelta` — заполняется в `mappers/roomSync.ts` из тех же
+`joinedRoom.timeline.events`.
+* `history.loaded` получает поле `reactions`; `historyLoader.ts:124` считает его по уже
+развёрнутому в хронологию чанку. Страница «без видимых событий» всё равно диспатчит
+`history.loaded`, так что реакции доезжают и оттуда.
+* Новые экшены: `reaction.added { targetEventId, entry }`,
+`reaction.confirmed { targetEventId, localEventId, eventId }`,
+`reaction.removed { targetEventId, eventId }`.
+* `selectors.ts` — `selectReactions` (стабильная ссылка на индекс). Агрегация — в `useMemo`
+компонента, как `readOwnEventIds` в `MessageList.tsx:35`.
+
+=== Сеть и контроллер
+
+`matrix/api/endpoints.ts`:
+
+[source,ts]
+----
+SEND_REACTION:  `${MATRIX_CLIENT}/v3/rooms/{roomId}/send/m.reaction/{txnId}`,
+SEND_REDACTION: `${MATRIX_CLIENT}/v3/rooms/{roomId}/send/m.room.redaction/{txnId}`,
+----
+
+Отдельные шаблоны, а не параметризация `{eventType}` в `SEND_MESSAGE`: тип события — часть
+контракта конкретного вызова, а не аргумент.
+
+`matrix/api/matrixApi.ts` — две тонкие обёртки рядом с `sendMessage`: `sendReaction` и
+`redactEvent`, обе → `SendEventResponse`.
+
+`MatrixController.toggleReaction(targetEventId, key)` (+ `MatrixService`, `ChatActions`,
+`ChatController` — форма ровно как у `markRead`):
+
+* `requireConnection()`; если своя реакция с этим `key` уже есть — ветка снятия, иначе постановки.
+* *Постановка*: `entry = { eventId: 'optimistic:{uuid}', sender, key }`, `txnId` —
+`crypto.randomUUID()` → `reaction.added` → `PUT` → `reaction.confirmed`. На ошибке —
+`reaction.removed` (откат) + `handleAuthError(err, 'toggleReaction')`.
+* *Снятие*: если `isOptimistic(ownEventId)` — выходим (постановка ещё в полёте, редактировать
+нечего); иначе `reaction.removed` → `PUT` редакции → на ошибке возвращаем запись обратно.
+* На всех await-границах — `isCurrentLifecycle(lifecycleId)`, как везде в контроллере.
+
+Своя реакция снимается *оптимистично до запроса* по той же причине, что и read-маркер: гард «есть
+ли уже своя реакция» смотрит в стор, и без немедленного обновления повторный тап ушёл бы вторым
+запросом.
+
+=== UI
+
+`shared/ui/Dropdown/Dropdown.tsx` — необязательный слот `above`::
+Портал рендерит позиционируемую обёртку (`flex-direction: column; align-items: flex-end; gap: 4`),
+внутри — `{above}` и существующий `div[role="menu"]`. `computeDropdownPosition` меряет обёртку
+целиком, поэтому коллизии с краями вьюпорта и возврат фокуса работают без изменений. Выравнивание
+по правому краю совпадает с макетом. Клавиатура меню (`handleMenuKeyDown`) остаётся на
+`role="menu"`, у панели своя навигация Left/Right + Home/End.
+
+`MessageRow/ReactionPicker.tsx`::
+`role="toolbar"`, шесть `<button>` с `aria-label` (`chat.reaction.add` / `chat.reaction.remove` для
+уже поставленной) и `aria-pressed`. Набор — константа `QUICK_REACTIONS`. Панель не закрывается по
+выбору: подряд можно поставить и снять.
+
+`MessageRow/ReactionBar.tsx`::
+Чипы в пузыре. Чип — `<button>`: эмодзи 16px + счётчик `Caption/1M` при `count > 1`;
+`height: 30`, `padding: 0 9`, `gap: 4`, радиус-пилюля. Фон своей — новый токен
+`--c-surface-accent-soft: #edf6fd` (`Colorfull/Surface/Secondary/Standard/blue-normal` из Figma;
+в `styles/variables.css` такого цвета нет), фон чужой — `--c-surface-secondary`.
+
+`MessageBubble.tsx`::
+Новый слот `reactions` последним flex-ребёнком: `gap: 8px` у `.bubble` даёт ровно макетные 8px от
+текста. Слот, а не рендер внутри `TextContent`, — потому что реакция одинаково нужна тексту,
+картинке и файлу.
+
+`MessageRow.tsx` / `MessageList.tsx`::
+Ряд получает `reactions` пропом (`reactionsIndex[item.eventId]`), считает `aggregateReactions`
+в `useMemo`, отдаёт `<ReactionBar>` в слот пузыря, а `<ReactionPicker>` — в `above` меню.
+`MessageActions` считает `canReact = !isOptimistic(message.eventId)` и учитывает его в `disabled`
+триггера.
+
+=== i18n
+
+Новые плоские ключи в `ru.json` *и* `en.json` (пропуск в `en` ломает typecheck):
+`chat.reaction.pick`, `chat.reaction.add` («Поставить реакцию {emoji}»), `chat.reaction.remove`,
+`chat.reaction.count` («{emoji}, реакций: {count}» — `aria-label` чипа).
+
+=== Мок
+
+`tools/matrix-mock/server.mjs` — команда `/react [эмодзи]`: оператор ставит реакцию на последнее
+сообщение клиента, повторный ввод снимает её через `m.room.redaction`. Описание — в шапку
+`server.mjs` и в список команд в `CLAUDE.md`. Клиентские `PUT` обрабатывать не нужно:
+generic-ветка `send` уже эхом отдаёт любое событие в `/sync` с `unsigned.transaction_id`.
+
+== Тесты
+
+[cols="2,3", options="header"]
+|===
+| Тест | Что проверяет
+
+| `domain/reactions.test.ts`
+| Upsert по `(sender,key)` в обе стороны прихода (эхо после и до подтверждения `PUT`);
+`aggregateReactions` — счётчик, `ownEventId`, стабильный порядок ключей; `removeReaction` не
+трогает соседей и возвращает ту же ссылку для нетронутых сообщений.
+
+| `matrix/mappers/reactions.test.ts`
+| Валидный `m.reaction` → `added`; снятая реакция с пустым `content` отбрасывается;
+`m.room.redaction` → `removed`; чужой `rel_type` игнорируется.
+
+| `store/reducer.test.ts` (дополнить)
+| `reaction.added/confirmed/removed`; реакция из `sync.received` на ещё не пришедшее сообщение
+сохраняется и «оживает» после его прихода; `history.loaded` приносит реакции со страницы без
+видимых сообщений.
+
+| `matrix/matrixController.test.ts` (дополнить)
+| Тоггл: второй вызов с тем же ключом шлёт редакцию, а не вторую реакцию; откат при 5xx на
+постановке и на снятии; нет запроса при `optimistic:`-цели; ответ мёртвого поколения не диспатчится.
+
+| `MessageActions.test.tsx` (дополнить)
+| Панель реакций видна при открытом меню; тап зовёт `toggleReaction(eventId, key)`; панели нет у
+сообщения с `optimistic:`-eventId.
+
+| `ReactionBar.test.tsx`
+| Счётчик скрыт при одной реакции; своя подсвечена и по клику зовёт `toggleReaction`; `aria-label`
+содержит счётчик.
+
+| `Dropdown.test.tsx` (дополнить)
+| `above` рендерится в портале вместе с меню; `Escape` и внешний `pointerdown` закрывают обе части;
+клик по элементу `above` меню не рушит.
+|===
+
+== Проверка
+
+[source,bash]
+----
+pnpm dev            # host-demo :5173, widget :5174/widget, mock :3001
+pnpm test && pnpm typecheck && pnpm lint
+----
+
+Вручную на `http://localhost:5174/widget`:
+
+. «…» у сообщения оператора → над меню ряд из шести эмодзи; тап по `👍` — чип появляется в пузыре
+мгновенно, меню остаётся открытым.
+. Повторный тап по `👍` (и клик по чипу) снимает реакцию; в Network — `m.room.redaction`.
+. `/react ❤️` → реакция оператора; поставить сверху свою `❤️` — один чип со счётчиком `2`.
+. Перезагрузка страницы: реакции на месте (пришли из initial `/sync`).
+. Скролл к верху ленты: реакции на старых сообщениях подтягиваются вместе с историей.
+. `/fail` перед тапом по эмодзи → чип появляется и откатывается.
+. Реакция на своё сообщение и на картинку/файл — чип рисуется так же.
+. Клавиатура: `Tab` до «…», `Enter`, `Left/Right` по панели, `Escape` закрывает обе всплывашки и
+возвращает фокус на триггер.
+
+== Открытые вопросы
+
+* *Метрики панели быстрых реакций* сняты со скриншота `doc/img_2.png` (высота 48, слот 40×40,
+эмодзи 26px, паддинг 4/8, радиус-пилюля, тень `--shadow-popover`): лимит вызовов Figma MCP на
+View-seat исчерпан, ноду панели прочитать нечем. Метрики *чипа* сняты из Figma точно
+(`1346:16572`).
+* *Чип и время в макете стоят одной полосой* (чип слева, `11:40` справа). У нас время остаётся
+внутри `<p>` (`float: right`, `BubbleMeta.module.css:7`), а чипы идут строкой ниже — пузырь выше
+макетного на высоту чипа. Свести в один ряд можно, но это `isMetaHidden` через `TextContent`,
+`MediaCaption`, `ImageMessage`, `FileChip`.
+* *Цвет чужой реакции макетом не задан* — взят `--c-surface-secondary`.
+* Реакции на *свои* сообщения разрешаем (Matrix это позволяет).

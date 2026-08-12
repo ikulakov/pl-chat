@@ -7,7 +7,12 @@ import type {
   StickerPack,
 } from '../domain/emoji'
 import { MediaUnavailableError } from '../domain/mediaError'
-import { createOptimisticMediaMessage, createOptimisticTextMessage } from '../domain/optimistic'
+import {
+  createOptimisticMediaMessage,
+  createOptimisticTextMessage,
+  isOptimistic,
+} from '../domain/optimistic'
+import { findOwnReaction, type ReactionEntry } from '../domain/reactions'
 import { canMoveMarker } from '../domain/receipts'
 import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '../domain/timeline'
 import { isAbortError } from '../shared/utils/abort'
@@ -79,6 +84,7 @@ export interface MatrixService {
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   markRead: (eventId: string) => Promise<void>
+  toggleReaction: (targetEventId: string, key: string) => Promise<void>
   loadMoreHistory: () => Promise<void>
   stopLoadingHistory: () => void
 }
@@ -456,6 +462,78 @@ export class MatrixController implements MatrixService {
         })
         return
       }
+    }
+  }
+
+  /**
+   * Ставит или снимает свою реакцию — одно действие на оба направления: что делать, знает стор,
+   * а не вызывающий компонент.
+   *
+   * Стор правим ДО запроса (и откатываем на ошибке) по той же причине, что и у read-маркера:
+   * ветку «поставить/снять» выбирает гард по стору, и без немедленного обновления второй тап
+   * ушёл бы вторым PUT'ом на постановку.
+   */
+  async toggleReaction(targetEventId: string, key: string): Promise<void> {
+    const connection = this.requireConnection()
+    if (!connection) return
+
+    const { identity, room } = connection
+    // У черновика нет серверного id — реакции не на что вешать.
+    if (isOptimistic(targetEventId)) return
+
+    const own = findOwnReaction(room.reactions, targetEventId, identity.userId, key)
+
+    if (!own) {
+      await this.addReaction(identity.roomId, targetEventId, identity.userId, key)
+      return
+    }
+    // Постановка ещё в полёте: редактировать нечего, снимет следующий тап.
+    if (isOptimistic(own.eventId)) return
+
+    await this.removeReaction(identity.roomId, targetEventId, own)
+  }
+
+  private async addReaction(
+    roomId: string,
+    targetEventId: string,
+    sender: string,
+    key: string,
+  ): Promise<void> {
+    const localEventId = `optimistic:${crypto.randomUUID()}`
+    const txnId = crypto.randomUUID()
+    const entry: ReactionEntry = { eventId: localEventId, sender, key }
+
+    this.dispatch({ type: 'reaction.added', targetEventId, entry })
+    const lifecycleId = this.lifecycleId
+
+    try {
+      const { event_id } = await this.api.sendReaction({ roomId, txnId, targetEventId, key })
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      this.dispatch({ type: 'reaction.confirmed', targetEventId, localEventId, eventId: event_id })
+    } catch (err) {
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      this.dispatch({ type: 'reaction.removed', targetEventId, eventId: localEventId })
+      this.handleAuthError(err, 'toggleReaction')
+    }
+  }
+
+  private async removeReaction(
+    roomId: string,
+    targetEventId: string,
+    entry: ReactionEntry,
+  ): Promise<void> {
+    this.dispatch({ type: 'reaction.removed', targetEventId, eventId: entry.eventId })
+    const lifecycleId = this.lifecycleId
+
+    try {
+      await this.api.redactEvent({ roomId, txnId: crypto.randomUUID(), eventId: entry.eventId })
+    } catch (err) {
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      this.dispatch({ type: 'reaction.added', targetEventId, entry })
+      this.handleAuthError(err, 'toggleReaction')
     }
   }
 
