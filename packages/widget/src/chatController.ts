@@ -1,7 +1,13 @@
 import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
 import type { CardAction } from './domain/adaptiveCards'
-import type { EmojiAnimation, EmojiCatalog, EmojiCategory, StickerPack } from './domain/emoji'
+import type {
+  EmojiAnimation,
+  EmojiCatalog,
+  EmojiCategory,
+  EmojiIndex,
+  StickerPack,
+} from './domain/emoji'
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService, SendFileOptions } from './matrix/matrixController'
 import type { ThumbnailSize } from './matrix/api/matrixApi'
@@ -16,6 +22,7 @@ export interface ChatActions {
   downloadFile: (mxcUrl: string) => Promise<Blob>
   loadEmojiCatalog: () => Promise<EmojiCatalog>
   loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
+  loadEmojiIndex: () => Promise<EmojiIndex>
   loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
   loadStickerPacks: () => Promise<StickerPack[]>
   cancelUpload: (localId: string) => void
@@ -59,6 +66,7 @@ export class ChatController {
       downloadFile: this.downloadFile,
       loadEmojiCatalog: this.loadEmojiCatalog,
       loadEmojiCategory: this.loadEmojiCategory,
+      loadEmojiIndex: this.loadEmojiIndex,
       loadEmojiAnimation: this.loadEmojiAnimation,
       loadStickerPacks: this.loadStickerPacks,
       cancelUpload: this.cancelUpload,
@@ -124,6 +132,8 @@ export class ChatController {
 
   loadEmojiCategory = (categoryId: string): Promise<EmojiCategory> =>
     this.matrix.loadEmojiCategory(categoryId)
+
+  loadEmojiIndex = (): Promise<EmojiIndex> => this.matrix.loadEmojiIndex()
 
   loadEmojiAnimation = (codepoint: string, version: string): Promise<EmojiAnimation> =>
     this.matrix.loadEmojiAnimation(codepoint, version)

@@ -36,6 +36,7 @@
 //   /reply      — оператор отвечает цитатой на последнее сообщение клиента
 //   /reply img  — то же картинкой, /reply file — файлом (входящая цитата на медиа)
 //   /sticker    — оператор присылает стикер
+//   /emoji      — три сообщения с эмодзи: большое, среднее и строчные внутри текста
 //   /react [эм] — оператор ставит реакцию (по умолчанию 👍) на последнее сообщение клиента;
 //                 повторный ввод той же реакции снимает её (m.room.redaction)
 //   /fail       — следующая отправка клиента вернёт ошибку (проверка «Повторить»)
@@ -626,6 +627,14 @@ function operatorRespond(text, ownEventId) {
     const s = STICKERS[0];
     return delay(700, () => push("m.sticker", OP, { body: s.body, info: s.info, url: s.url }));
   }
+  // Три размера рендера эмодзи одной командой: большое, среднее и строчные внутри текста.
+  if (t.startsWith("/emoji")) {
+    // Символы — из встроенного набора мока, иначе байтов для них нет и рисовать нечего.
+    const bodies = ["😀", "😀😂❤️", "Держи 🙃 и ещё 😭 в тексте"];
+    return bodies.forEach((body, i) =>
+      delay(400 + i * 300, () => push("m.room.message", OP, { msgtype: "m.text", body })),
+    );
+  }
   // Обычный путь: «печатает…» → ответ.
   delay(400, () => setTyping([OP]));
   delay(1700, () => {
@@ -1056,6 +1065,24 @@ const server = createServer(async (req, res) => {
       })),
     });
   }
+  // Весь пак разом, без силуэтов: по нему лента строит индекс «символ → codepoint».
+  if (/emoji\/v1\/packs$/.test(path)) {
+    return send(res, 200, {
+      packs: [
+        {
+          id: "tg-animated",
+          display_name: "Анимированные эмодзи",
+          version: EMOJI_PACK_VERSION,
+          categories: EMOJI_CATEGORIES.map((c) => ({
+            id: c.id,
+            display_name: c.display_name,
+            count: c.emoji.length,
+            emoji: c.emoji.map(([codepoint, e]) => ({ codepoint, e })),
+          })),
+        },
+      ],
+    });
+  }
   // Состав одной вкладки — вместе с силуэтами
   const categoryMatch = path.match(/emoji\/v1\/categories\/([^/]+)$/);
   if (categoryMatch) {
@@ -1106,7 +1133,7 @@ server.listen(PORT, () => {
   console.log(`BankChat mock-сервер: http://localhost:${PORT}`);
   console.log(`Откройте виджет:     http://localhost:5174`);
   console.log(`Команды в чате: /card [buttons|3|broken|openurl|many]  /notice  /left  /join  /html`);
-  console.log(`                /img  /file  /sticker  /reply [img|file]  /react [эмодзи]  /fail`);
-  console.log(`                /failaction  /failupload  /rejectupload  /failthumb  /pendingmedia`);
-  console.log(`                /rejectmedia`);
+  console.log(`                /img  /file  /sticker  /emoji  /reply [img|file]  /react [эмодзи]`);
+  console.log(`                /fail  /failaction  /failupload  /rejectupload  /failthumb`);
+  console.log(`                /pendingmedia  /rejectmedia`);
 });

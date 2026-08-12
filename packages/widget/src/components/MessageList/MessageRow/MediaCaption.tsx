@@ -1,3 +1,4 @@
+import { EmojiText } from '../../Emoji/EmojiText'
 import { BubbleMeta, type BubbleMetaData } from './BubbleMeta'
 import styles from './MediaCaption.module.css'
 
@@ -14,7 +15,7 @@ interface Props {
 export function MediaCaption({ body, meta, isStatusHidden }: Props) {
   return (
     <p className={styles.caption}>
-      {body}
+      <EmojiText text={body} />
       <BubbleMeta
         {...meta}
         isStatusHidden={isStatusHidden}

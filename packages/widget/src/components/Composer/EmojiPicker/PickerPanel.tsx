@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { t } from '../../../i18n'
-import { getAnimationCache } from './animationCache'
+import { getAnimationCache } from '../../../shared/lottie/animationCache'
 import { EmojiGrid } from './EmojiGrid'
 import styles from './EmojiPicker.module.css'
 import { PickerTabs, type PickerTab } from './PickerTabs'

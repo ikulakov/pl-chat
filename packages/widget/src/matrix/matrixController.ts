@@ -1,5 +1,11 @@
 import type { CardAction } from '../domain/adaptiveCards'
-import type { EmojiAnimation, EmojiCatalog, EmojiCategory, StickerPack } from '../domain/emoji'
+import type {
+  EmojiAnimation,
+  EmojiCatalog,
+  EmojiCategory,
+  EmojiIndex,
+  StickerPack,
+} from '../domain/emoji'
 import { MediaUnavailableError } from '../domain/mediaError'
 import {
   createOptimisticMediaMessage,
@@ -28,7 +34,7 @@ import {
   type AuthErrorContext,
 } from './api/matrixError'
 import { MatrixHistoryLoader } from './history/historyLoader'
-import { toEmojiCatalog, toEmojiCategory, toStickerPacks } from './mappers/emoji'
+import { toEmojiCatalog, toEmojiCategory, toEmojiIndex, toStickerPacks } from './mappers/emoji'
 import { classifyMediaError } from './mappers/mediaError'
 import {
   toAdaptiveActionContent,
@@ -72,6 +78,7 @@ export interface MatrixService {
   downloadFile: (mxcUrl: string) => Promise<Blob>
   loadEmojiCatalog: () => Promise<EmojiCatalog>
   loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
+  loadEmojiIndex: () => Promise<EmojiIndex>
   loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
   loadStickerPacks: () => Promise<StickerPack[]>
   cancelUpload: (localId: string) => void
@@ -111,6 +118,11 @@ export class MatrixController implements MatrixService {
   // до вердикта CDR сервер отвечает на них 504, и без локальной копии своя же картинка
   // пропадала бы из ленты сразу после отправки. Отвечает и на превью, и на оригинал.
   private readonly localOriginals = new Map<string, Blob>()
+
+  // Индекс пака. В отличие от медиа это server-managed справочник — один и тот же ответ для
+  // всех, поэтому смена сессии его не обесценивает и nextLifecycle() его не чистит. Хранится
+  // промис: он же дедуп параллельных запросов, пока первый ещё в полёте.
+  private emojiIndex: Promise<EmojiIndex> | null = null
 
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
@@ -275,6 +287,23 @@ export class MatrixController implements MatrixService {
 
   async loadEmojiCategory(categoryId: string): Promise<EmojiCategory> {
     return toEmojiCategory(await this.api.getEmojiCategory(categoryId))
+  }
+
+  /**
+   * Индекс пака для ленты. В отличие от каталога вкладок, запрашивается один раз за жизнь
+   * вкладки: он нужен на каждое текстовое сообщение, а меняется только с версией пака.
+   */
+  loadEmojiIndex(): Promise<EmojiIndex> {
+    this.emojiIndex ??= this.api
+      .getEmojiPacks()
+      .then(toEmojiIndex)
+      .catch((err: unknown) => {
+        // Упавший запрос в кэше не держим: следующая попытка начнёт заново.
+        this.emojiIndex = null
+        throw err
+      })
+
+    return this.emojiIndex
   }
 
   loadEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {

@@ -1,7 +1,15 @@
-import type { EmojiCatalog, EmojiCategory, EmojiItem, StickerPack } from '../../domain/emoji'
+import { normalizeEmojiKey } from '../../domain/emoji'
+import type {
+  EmojiCatalog,
+  EmojiCategory,
+  EmojiIndex,
+  EmojiItem,
+  StickerPack,
+} from '../../domain/emoji'
 import type {
   EmojiCategoriesResponse,
   EmojiCategoryWire,
+  EmojiPacksResponse,
   EmojiWire,
   StickerPacksResponse,
 } from '../wire/emoji'
@@ -28,6 +36,28 @@ export function toEmojiCategory(wire: EmojiCategoryWire): EmojiCategory {
     count: items.length,
     items,
   }
+}
+
+/**
+ * Плоский индекс для рендера ленты: символ → codepoint по всему паку.
+ *
+ * Ключ нормализуется так же, как при разборе текста, — без вариационного селектора. Иначе ❤️
+ * (`2764 fe0f`) из сообщения не найдётся, хотя `2764` в паке есть.
+ */
+export function toEmojiIndex(wire: EmojiPacksResponse): EmojiIndex {
+  const packs = wire.packs ?? []
+  const codepointByChar = new Map<string, string>()
+
+  for (const pack of packs) {
+    for (const category of pack.categories ?? []) {
+      for (const { codepoint, e } of category.emoji ?? []) {
+        codepointByChar.set(normalizeEmojiKey(e), codepoint)
+      }
+    }
+  }
+
+  // Версия одна на пак; паков сервер публикует ровно один, но структура допускает список.
+  return { version: packs[0]?.version ?? '', codepointByChar }
 }
 
 /**

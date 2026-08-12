@@ -14,6 +14,7 @@ import type {
 import type {
   EmojiCategoriesResponse,
   EmojiCategoryWire,
+  EmojiPacksResponse,
   StickerPacksResponse,
 } from '../wire/emoji'
 import { Endpoints } from './endpoints'
@@ -149,6 +150,11 @@ export function createMatrixApi(transport: MatrixTransport) {
 
     getEmojiCategory(categoryId: string): Promise<EmojiCategoryWire> {
       return transport.request(Endpoints.EMOJI_CATEGORY({ categoryId }))
+    },
+
+    /** Весь пак разом: по нему лента строит индекс «символ → codepoint». */
+    getEmojiPacks(): Promise<EmojiPacksResponse> {
+      return transport.request(Endpoints.EMOJI_PACKS)
     },
 
     /**
