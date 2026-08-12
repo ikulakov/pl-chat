@@ -92,4 +92,5 @@ export type AuthErrorContext =
   | 'resendMessage'
   | 'sendFile'
   | 'markRead'
+  | 'toggleReaction'
   | 'loadHistory'

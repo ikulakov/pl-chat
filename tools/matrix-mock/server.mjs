@@ -26,6 +26,8 @@
 //   /reply      — оператор отвечает цитатой на последнее сообщение клиента
 //   /reply img  — то же картинкой, /reply file — файлом (входящая цитата на медиа)
 //   /sticker    — оператор присылает стикер
+//   /react [эм] — оператор ставит реакцию (по умолчанию 👍) на последнее сообщение клиента;
+//                 повторный ввод той же реакции снимает её (m.room.redaction)
 //   /fail       — следующая отправка клиента вернёт ошибку (проверка «Повторить»)
 //   /failupload — следующая загрузка файла вернёт ошибку (сеть/5xx — повтор осмыслен)
 //   /rejectupload — следующая загрузка отклоняется fileguard'ом (400): повтора нет
@@ -325,6 +327,23 @@ function lastGuestMessageId(exclude) {
   return null;
 }
 
+// Активная реакция оператора — поставленная и не снятая редакцией. Реакцию снимает
+// редакция её собственного события, а не сообщения, поэтому ищем по event_id самой реакции.
+function activeOperatorReaction(target, key) {
+  const redacted = new Set(
+    events.filter((e) => e.type === "m.room.redaction").map((e) => e.content.redacts)
+  );
+  const hit = events.findLast(
+    (e) =>
+      e.type === "m.reaction" &&
+      e.sender === OP &&
+      e.content["m.relates_to"]?.event_id === target &&
+      e.content["m.relates_to"]?.key === key &&
+      !redacted.has(e.event_id)
+  );
+  return hit?.event_id ?? null;
+}
+
 function operatorRespond(text, ownEventId) {
   const t = (text || "").trim();
   if (t.startsWith("/card")) {
@@ -392,6 +411,25 @@ function operatorRespond(text, ownEventId) {
         "m.relates_to": { "m.in_reply_to": { event_id: target } },
       })
     );
+  }
+  // Реакция оператора на последнее сообщение клиента: `/react`, `/react 🔥`.
+  // Повторный ввод той же реакции снимает её — так проверяется разбор m.room.redaction.
+  if (t.startsWith("/react")) {
+    const target = lastGuestMessageId(ownEventId);
+    if (!target) return;
+
+    const key = t.slice("/react".length).trim() || "👍";
+
+    return delay(500, () => {
+      const existing = activeOperatorReaction(target, key);
+      if (existing) {
+        push("m.room.redaction", OP, { redacts: existing });
+        return;
+      }
+      push("m.reaction", OP, {
+        "m.relates_to": { rel_type: "m.annotation", event_id: target, key },
+      });
+    });
   }
   // Возврат оператора после /left — иначе состояние «чат завершён» не откатить без рестарта.
   if (t.startsWith("/join")) {
@@ -693,6 +731,7 @@ server.listen(PORT, () => {
   console.log(`BankChat mock-сервер: http://localhost:${PORT}`);
   console.log(`Откройте виджет:     http://localhost:5174`);
   console.log(`Команды в чате: /card  /notice  /left  /join  /html  /img  /file  /sticker`);
-  console.log(`                /reply [img|file]  /fail  /failupload  /rejectupload`);
+  console.log(`                /reply [img|file]  /react [эмодзи]  /fail  /failupload`);
+  console.log(`                /rejectupload`);
   console.log(`                /failthumb  /pendingmedia  /rejectmedia`);
 });

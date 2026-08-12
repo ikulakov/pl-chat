@@ -9,6 +9,8 @@ export const Endpoints = createEndpoints({
   SYNC: `${MATRIX_CLIENT}/v3/sync`,
   LOAD_HISTORY: `${MATRIX_CLIENT}/v3/rooms/{roomId}/messages`,
   SEND_MESSAGE: `${MATRIX_CLIENT}/v3/rooms/{roomId}/send/m.room.message/{txnId}`,
+  SEND_REACTION: `${MATRIX_CLIENT}/v3/rooms/{roomId}/send/m.reaction/{txnId}`,
+  SEND_REDACTION: `${MATRIX_CLIENT}/v3/rooms/{roomId}/send/m.room.redaction/{txnId}`,
   MARK_READ: `${MATRIX_CLIENT}/v3/rooms/{roomId}/receipt/m.read/{eventId}`,
   UPLOAD_MEDIA: `${MATRIX_MEDIA}/v3/upload`,
   DOWNLOAD_MEDIA: `${MATRIX_CLIENT}/v1/media/download/{serverName}/{mediaId}`,

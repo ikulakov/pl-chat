@@ -954,6 +954,97 @@ describe('MatrixController (orchestrator)', () => {
     expect(api.registerGuest).not.toHaveBeenCalled()
   })
 
+  it('toggleReaction ставит реакцию оптимистично и подтверждает её серверным eventId', async () => {
+    const api = makeMatrixApi()
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('$m1', '👍')
+
+    expect(api.sendReaction).toHaveBeenCalledExactlyOnceWith({
+      roomId: IDENTITY.roomId,
+      txnId: expect.any(String),
+      targetEventId: '$m1',
+      key: '👍',
+    })
+    expect(getState().room.reactions['$m1']).toEqual([
+      { eventId: '$reaction', sender: IDENTITY.userId, key: '👍' },
+    ])
+  })
+
+  it('toggleReaction вторым вызовом снимает свою реакцию редакцией, а не шлёт вторую', async () => {
+    const api = makeMatrixApi()
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('$m1', '👍')
+    await controller.toggleReaction('$m1', '👍')
+
+    expect(api.sendReaction).toHaveBeenCalledOnce()
+    expect(api.redactEvent).toHaveBeenCalledExactlyOnceWith({
+      roomId: IDENTITY.roomId,
+      txnId: expect.any(String),
+      eventId: '$reaction',
+    })
+    expect(getState().room.reactions).toEqual({})
+  })
+
+  it('toggleReaction откатывает реакцию, если отправка не прошла', async () => {
+    const api = makeMatrixApi({
+      sendReaction: vi.fn<MatrixApi['sendReaction']>().mockRejectedValue(new Error('net')),
+    })
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('$m1', '👍')
+
+    expect(getState().room.reactions).toEqual({})
+  })
+
+  it('toggleReaction возвращает реакцию на место, если редакция не прошла', async () => {
+    const api = makeMatrixApi({
+      redactEvent: vi.fn<MatrixApi['redactEvent']>().mockRejectedValue(new Error('net')),
+    })
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('$m1', '👍')
+    await controller.toggleReaction('$m1', '👍')
+
+    expect(getState().room.reactions['$m1']).toEqual([
+      { eventId: '$reaction', sender: IDENTITY.userId, key: '👍' },
+    ])
+  })
+
+  it('toggleReaction ничего не шлёт на черновик: аннотировать нечего, серверного id ещё нет', async () => {
+    const api = makeMatrixApi()
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('optimistic:l1', '👍')
+
+    expect(api.sendReaction).not.toHaveBeenCalled()
+  })
+
+  it('toggleReaction молчит вне подключения', async () => {
+    const api = makeMatrixApi()
+    const { controller } = harness({ phase: 'connecting', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('$m1', '👍')
+
+    expect(api.sendReaction).not.toHaveBeenCalled()
+  })
+
+  it('toggleReaction не подтверждает реакцию из мёртвого поколения сессии', async () => {
+    const send = deferred<{ event_id: string }>()
+    const api = makeMatrixApi({
+      sendReaction: vi.fn<MatrixApi['sendReaction']>().mockReturnValue(send.promise),
+    })
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    const promise = controller.toggleReaction('$m1', '👍')
+    controller.disconnect()
+    send.resolve({ event_id: '$r1' })
+    await promise
+
+    expect(applied.some((action) => action.type === 'reaction.confirmed')).toBe(false)
+  })
+
   it('markRead moves the store marker optimistically and posts the receipt', async () => {
     const api = makeMatrixApi()
     const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)

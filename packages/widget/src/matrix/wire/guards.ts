@@ -5,6 +5,14 @@ export function isRoomMessage(event: Matrix.ClientEvent): event is Matrix.RoomMe
   return event.type === MatrixEventType.RoomMessage
 }
 
+export function isReaction(event: Matrix.ClientEvent): event is Matrix.ReactionEvent {
+  return event.type === MatrixEventType.Reaction
+}
+
+export function isRedaction(event: Matrix.ClientEvent): event is Matrix.RedactionEvent {
+  return event.type === MatrixEventType.Redaction
+}
+
 export function isOperatorJoined(event: Matrix.ClientEvent): event is Matrix.OperatorJoinedEvent {
   return event.type === MatrixEventType.OperatorJoined
 }

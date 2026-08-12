@@ -228,6 +228,8 @@ export function makeMatrixApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
     longPollSync: vi.fn<MatrixApi['longPollSync']>().mockReturnValue(new Promise<never>(() => {})),
     getRoomHistory: vi.fn<MatrixApi['getRoomHistory']>().mockResolvedValue(messagesResponse()),
     sendMessage: vi.fn<MatrixApi['sendMessage']>().mockResolvedValue({ event_id: '$real' }),
+    sendReaction: vi.fn<MatrixApi['sendReaction']>().mockResolvedValue({ event_id: '$reaction' }),
+    redactEvent: vi.fn<MatrixApi['redactEvent']>().mockResolvedValue({ event_id: '$redaction' }),
     uploadMedia: vi
       .fn<MatrixApi['uploadMedia']>()
       .mockResolvedValue({ content_uri: 'mxc://bank.ru/abc' }),

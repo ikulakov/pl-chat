@@ -1,4 +1,10 @@
 import { mergeTimeline, prependTimeline } from '../domain/mergeTimeline'
+import {
+  addReaction,
+  applyReactionDelta,
+  confirmReaction,
+  removeReaction,
+} from '../domain/reactions'
 import { applyReadMarkers } from '../domain/receipts'
 import type { RoomSyncPatch } from '../domain/roomSync'
 import type { MessageTimelineItem, TimelineItem } from '../domain/timeline'
@@ -36,6 +42,7 @@ function applySync(room: RoomState, patch: RoomSyncPatch): RoomState {
     timeline,
     operator: patch.operator ?? room.operator,
     readReceipts: applyReadMarkers(room.readReceipts, patch.readMarkers, timeline),
+    reactions: applyReactionDelta(room.reactions, patch.reactions),
   }
 }
 
@@ -179,6 +186,26 @@ export function chatRuntimeReducer(
       return updateRoom(state, { readReceipts })
     }
 
+    case 'reaction.added':
+      return updateRoom(state, {
+        reactions: addReaction(state.room.reactions, action.targetEventId, action.entry),
+      })
+
+    case 'reaction.confirmed':
+      return updateRoom(state, {
+        reactions: confirmReaction(
+          state.room.reactions,
+          action.targetEventId,
+          action.localEventId,
+          action.eventId,
+        ),
+      })
+
+    case 'reaction.removed':
+      return updateRoom(state, {
+        reactions: removeReaction(state.room.reactions, action.targetEventId, action.eventId),
+      })
+
     case 'reply.targeted':
       return updateRoom(state, { replyTarget: action.target })
 
@@ -189,10 +216,11 @@ export function chatRuntimeReducer(
       return updateRoom(state, { isLoadingHistory: true })
 
     case 'history.loaded': {
-      const { items, prevBatch } = action
+      const { items, reactions, prevBatch } = action
 
       return updateRoom(state, {
         timeline: prependTimeline(state.room.timeline, items),
+        reactions: applyReactionDelta(state.room.reactions, reactions),
         prevBatch,
       })
     }

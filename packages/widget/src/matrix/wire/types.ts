@@ -1,4 +1,4 @@
-import type { MatrixEventType, MsgType } from './consts'
+import type { MatrixEventType, MsgType, RelType } from './consts'
 
 interface BaseClientEvent {
   event_id: string
@@ -52,6 +52,27 @@ export interface RoomMessageEvent extends BaseClientEvent {
   content: TextMessageContent | NoticeMessageContent | ImageMessageContent | FileMessageContent
 }
 
+/**
+ * Эмодзи-реакция. У снятой (отредактированной) реакции сервер отдаёт пустой `content`
+ * во всех read-путях — поэтому связь опциональна и её наличие проверяет маппер.
+ */
+export interface ReactionEvent extends BaseClientEvent {
+  type: typeof MatrixEventType.Reaction
+  content: {
+    'm.relates_to'?: {
+      rel_type?: typeof RelType.Annotation
+      event_id?: string
+      key?: string
+    }
+  }
+}
+
+/** Удаление события: снятие реакции — редакция самого события реакции. */
+export interface RedactionEvent extends BaseClientEvent {
+  type: typeof MatrixEventType.Redaction
+  content: { redacts?: string }
+}
+
 export interface OperatorCurrentEvent extends BaseClientEvent {
   type: typeof MatrixEventType.OperatorCurrent
   state_key: ''
@@ -89,6 +110,8 @@ export interface GenericClientEvent extends BaseClientEvent {
 
 export type ClientEvent =
   | RoomMessageEvent
+  | ReactionEvent
+  | RedactionEvent
   | OperatorCurrentEvent
   | OperatorJoinedEvent
   | OperatorLeftEvent

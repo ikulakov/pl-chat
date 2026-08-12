@@ -33,7 +33,7 @@ function connectedWithSentMessage(): ChatRuntimeState {
 }
 
 function roomPatch(overrides: Partial<RoomSyncPatch> = {}): RoomSyncPatch {
-  return { timeline: [], readMarkers: [], prevBatch: null, ...overrides }
+  return { timeline: [], readMarkers: [], reactions: [], prevBatch: null, ...overrides }
 }
 
 // снимок «как при старте комнаты»: одно сообщение, активный оператор, курсор истории
@@ -463,6 +463,128 @@ describe('chatRuntimeReducer', () => {
   })
 })
 
+describe('chatRuntimeReducer — реакции', () => {
+  function connected(): ChatRuntimeState {
+    return chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
+      type: 'session.started',
+      identity: IDENTITY,
+      cursor: 's1',
+      room: initialPatch(),
+    })
+  }
+
+  it('reaction.added кладёт оптимистичную реакцию, reaction.confirmed проставляет ей серверный id', () => {
+    const added = chatRuntimeReducer(connected(), {
+      type: 'reaction.added',
+      targetEventId: '$m1',
+      entry: { eventId: 'optimistic:l1', sender: IDENTITY.userId, key: '👍' },
+    })
+
+    const confirmed = chatRuntimeReducer(added, {
+      type: 'reaction.confirmed',
+      targetEventId: '$m1',
+      localEventId: 'optimistic:l1',
+      eventId: '$r1',
+    })
+
+    expect(added.room.reactions['$m1']).toHaveLength(1)
+    expect(confirmed.room.reactions['$m1']).toEqual([
+      { eventId: '$r1', sender: IDENTITY.userId, key: '👍' },
+    ])
+  })
+
+  it('reaction.removed убирает реакцию — им же откатывается неудачная постановка', () => {
+    const added = chatRuntimeReducer(connected(), {
+      type: 'reaction.added',
+      targetEventId: '$m1',
+      entry: { eventId: 'optimistic:l1', sender: IDENTITY.userId, key: '👍' },
+    })
+
+    const removed = chatRuntimeReducer(added, {
+      type: 'reaction.removed',
+      targetEventId: '$m1',
+      eventId: 'optimistic:l1',
+    })
+
+    expect(removed.room.reactions).toEqual({})
+  })
+
+  it('эхо из sync схлопывается с оптимистичной реакцией, а не удваивает её', () => {
+    const added = chatRuntimeReducer(connected(), {
+      type: 'reaction.added',
+      targetEventId: '$m1',
+      entry: { eventId: 'optimistic:l1', sender: IDENTITY.userId, key: '👍' },
+    })
+
+    const synced = chatRuntimeReducer(added, {
+      type: 'sync.received',
+      cursor: 's2',
+      room: roomPatch({
+        reactions: [
+          {
+            op: 'add',
+            targetEventId: '$m1',
+            entry: { eventId: '$r1', sender: IDENTITY.userId, key: '👍' },
+          },
+        ],
+      }),
+    })
+
+    expect(synced.room.reactions['$m1']).toEqual([
+      { eventId: '$r1', sender: IDENTITY.userId, key: '👍' },
+    ])
+  })
+
+  it('редакция из sync снимает реакцию', () => {
+    const reacted = chatRuntimeReducer(connected(), {
+      type: 'sync.received',
+      cursor: 's2',
+      room: roomPatch({
+        reactions: [
+          {
+            op: 'add',
+            targetEventId: '$m1',
+            entry: { eventId: '$r1', sender: OPERATOR, key: '👍' },
+          },
+        ],
+      }),
+    })
+
+    const redacted = chatRuntimeReducer(reacted, {
+      type: 'sync.received',
+      cursor: 's3',
+      room: roomPatch({ reactions: [{ op: 'remove', eventId: '$r1' }] }),
+    })
+
+    expect(redacted.room.reactions).toEqual({})
+  })
+
+  it('реакция переживает приход своего сообщения: в истории она идёт раньше цели', () => {
+    const reactionFirst = chatRuntimeReducer(connected(), {
+      type: 'history.loaded',
+      items: [],
+      reactions: [
+        {
+          op: 'add',
+          targetEventId: '$old',
+          entry: { eventId: '$r1', sender: OPERATOR, key: '👍' },
+        },
+      ],
+      prevBatch: 'p2',
+    })
+
+    const withTarget = chatRuntimeReducer(reactionFirst, {
+      type: 'history.loaded',
+      items: [textItem({ localId: '$old', eventId: '$old', ts: 0 })],
+      reactions: [],
+      prevBatch: 'p3',
+    })
+
+    expect(withTarget.room.reactions['$old']).toHaveLength(1)
+    expect(withTarget.room.timeline[0]?.eventId).toBe('$old')
+  })
+})
+
 describe('chatRuntimeReducer — курсор истории', () => {
   function started(): ChatRuntimeState {
     return chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
@@ -493,6 +615,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
     const paginated = chatRuntimeReducer(started(), {
       type: 'history.loaded',
       items: [],
+      reactions: [],
       prevBatch: 'p2',
     })
 
@@ -511,6 +634,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
     const paginated = chatRuntimeReducer(started(), {
       type: 'history.loaded',
       items: [],
+      reactions: [],
       prevBatch: 'p2',
     })
 
@@ -558,6 +682,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
     const loaded = chatRuntimeReducer(loading, {
       type: 'history.loaded',
       items: [],
+      reactions: [],
       prevBatch: 'p2',
     })
     const settled = chatRuntimeReducer(loaded, { type: 'history.settled' })
@@ -570,6 +695,7 @@ describe('chatRuntimeReducer — курсор истории', () => {
     const loaded = chatRuntimeReducer(started(), {
       type: 'history.loaded',
       items: [textItem({ localId: '$old', eventId: '$old', body: 'старое', ts: 0 })],
+      reactions: [],
       prevBatch: null,
     })
 

@@ -1,4 +1,5 @@
 import { isOptimistic } from '../../../domain/optimistic'
+import type { ReactionSummary } from '../../../domain/reactions'
 import { replyText } from '../../../domain/reply'
 import { isMedia, type MessageTimelineItem } from '../../../domain/timeline'
 import { useChatActions } from '../../../hooks/useChatActions'
@@ -7,26 +8,38 @@ import { copyText } from '../../../shared/utils/clipboard'
 import { Dropdown, DropdownItem } from '../../../shared/ui/Dropdown'
 import { IconButton } from '../../../shared/ui/IconButton'
 import { CopyIcon, MoreIcon, ReplyIcon, RetryIcon } from '../../../shared/ui/icons'
+import { ReactionPicker } from './ReactionPicker'
 
 interface Props {
   message: MessageTimelineItem
   isOwn: boolean
+  reactions: ReactionSummary[]
 }
 
-export function MessageActions({ message, isOwn }: Props) {
-  const { resendMessage, replyTo } = useChatActions()
+export function MessageActions({ message, isOwn, reactions }: Props) {
+  const { resendMessage, replyTo, toggleReaction } = useChatActions()
 
   const reply = replyText(message)
 
   const uploadFailed = isMedia(message) && message.upload?.error
   const canRetry = isOwn && message.sendStatus === 'failed' && !uploadFailed
-  const canReply = !isOptimistic(message.eventId) && reply !== ''
+  // Реакция адресует событие на сервере — у черновика его ещё нет.
+  const canReact = !isOptimistic(message.eventId)
+  const canReply = canReact && reply !== ''
   const canCopy = message.content.body.trim() !== ''
 
-  const disabled = !(canRetry || canReply || canCopy)
+  const disabled = !(canRetry || canReply || canCopy || canReact)
 
   return (
     <Dropdown
+      above={
+        canReact ? (
+          <ReactionPicker
+            summaries={reactions}
+            onToggle={(key) => void toggleReaction(message.eventId, key)}
+          />
+        ) : undefined
+      }
       trigger={(triggerProps) => (
         <IconButton
           {...triggerProps}

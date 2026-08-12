@@ -1,6 +1,7 @@
 import { sleep } from '../../shared/utils/sleep'
 import type { RuntimeAction } from '../../store/state'
 import type { MatrixApi } from '../api/matrixApi'
+import { toReactionDelta } from '../mappers/reactions'
 import { timelineEventsToItems } from '../mappers/timeline'
 
 // Максимальное кол-во страниц для просмотра на случай если все события страницы будут не целевыми
@@ -121,11 +122,18 @@ export class MatrixHistoryLoader {
       if (isStale() || signal.aborted) return
 
       // dir=b отдаёт chunk newest-first — разворачиваем в хронологический порядок ленты.
-      const items = timelineEventsToItems([...chunk].reverse())
+      const events = [...chunk].reverse()
+      const items = timelineEventsToItems(events)
       // Пустой chunk — признак конца истории
       const nextBatch = chunk.length === 0 ? null : (end ?? null)
 
-      this.dispatch({ type: 'history.loaded', items, prevBatch: nextBatch })
+      // Реакции едут даже со страницы без видимых сообщений — она обычно из них и состоит.
+      this.dispatch({
+        type: 'history.loaded',
+        items,
+        reactions: toReactionDelta(events),
+        prevBatch: nextBatch,
+      })
 
       if (items.length > 0 || nextBatch === null) return
 

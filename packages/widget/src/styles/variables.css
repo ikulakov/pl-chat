@@ -13,6 +13,8 @@
   --c-surface-secondary: #f3f4f6;
   --c-surface-secondary-hover: #e8e9eb;
   --c-surface-tertiary: #f9f9fa;
+  /* Colorfull/Surface/Secondary/Standard/blue-normal — подложка своей реакции */
+  --c-surface-accent-soft: #edf6fd;
   --c-surface-contrast: #222;
   --c-surface-purple: #35165c;
 

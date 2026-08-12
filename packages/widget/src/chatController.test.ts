@@ -25,6 +25,7 @@ function makeMatrix(): MatrixService {
     cancelUpload: vi.fn(),
     resendMessage: vi.fn().mockResolvedValue(undefined),
     markRead: vi.fn().mockResolvedValue(undefined),
+    toggleReaction: vi.fn().mockResolvedValue(undefined),
     loadMoreHistory: vi.fn().mockResolvedValue(undefined),
     stopLoadingHistory: vi.fn(),
     loadPreview: vi.fn().mockResolvedValue(new Blob()),

@@ -1,4 +1,5 @@
 import type { ViewportMode } from '@bankchat/protocol'
+import type { ReactionIndex } from '../domain/reactions'
 import type { ReadReceipt } from '../domain/receipts'
 import { countUnread } from '../domain/receipts'
 import { t } from '../i18n'
@@ -55,6 +56,10 @@ export function selectTimeline(state: ChatStoreState): TimelineItem[] {
 
 export function selectReadReceipts(state: ChatStoreState): Record<string, ReadReceipt> {
   return state.room.readReceipts
+}
+
+export function selectReactions(state: ChatStoreState): ReactionIndex {
+  return state.room.reactions
 }
 
 export function selectReplyTarget(state: ChatStoreState): ReplyTarget | null {

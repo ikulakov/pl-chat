@@ -16,6 +16,7 @@ export interface ChatActions {
   replyTo: (target: ReplyTarget) => void
   cancelReply: () => void
   markRead: (eventId: string) => Promise<void>
+  toggleReaction: (targetEventId: string, key: string) => Promise<void>
   loadMoreHistory: () => Promise<void>
   stopLoadingHistory: () => void
   reconnect: () => void
@@ -53,6 +54,7 @@ export class ChatController {
       replyTo: this.replyTo,
       cancelReply: this.cancelReply,
       markRead: this.markRead,
+      toggleReaction: this.toggleReaction,
       loadMoreHistory: this.loadMoreHistory,
       stopLoadingHistory: this.stopLoadingHistory,
       reconnect: this.reconnect,
@@ -108,6 +110,9 @@ export class ChatController {
   resendMessage = (localId: string): Promise<void> => this.matrix.resendMessage(localId)
 
   markRead = (eventId: string): Promise<void> => this.matrix.markRead(eventId)
+
+  toggleReaction = (targetEventId: string, key: string): Promise<void> =>
+    this.matrix.toggleReaction(targetEventId, key)
 
   loadMoreHistory = (): Promise<void> => this.matrix.loadMoreHistory()
 

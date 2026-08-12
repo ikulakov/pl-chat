@@ -1,5 +1,7 @@
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
+import { aggregateReactions, type ReactionEntry } from '../../../domain/reactions'
 import type { MessageTimelineItem } from '../../../domain/timeline'
+import { useChatActions } from '../../../hooks/useChatActions'
 import { ITEM_ID_ATTR } from '../../../hooks/useLoadMoreHistory'
 import { RECEIPT_ID_ATTR } from '../../../hooks/useSendReadReceipts'
 import { cn } from '../../../shared/utils/cn'
@@ -10,6 +12,7 @@ import { ImageMessage } from './ImageMessage'
 import { MessageActions } from './MessageActions'
 import { MessageBubble, type BubblePosition } from './MessageBubble'
 import styles from './MessageRow.module.css'
+import { ReactionBar } from './ReactionBar'
 import { TextContent } from './TextContent'
 
 interface Props {
@@ -17,6 +20,7 @@ interface Props {
   userId: string
   position: BubblePosition
   readByOperator: boolean
+  reactions: ReactionEntry[] | undefined
   replyAuthor: string | undefined
   replyText: string | undefined
   replyTargetId: string | undefined
@@ -29,13 +33,18 @@ export const MessageRow = memo(
     message,
     position,
     readByOperator,
+    reactions,
     replyAuthor,
     replyText,
     replyTargetId,
     onReplyClick,
   }: Props) => {
+    const { toggleReaction } = useChatActions()
     const isOwn = message.sender === userId
     const isGroupStart = position === 'single' || position === 'first'
+
+    // Свёртка — новая коллекция на выходе, поэтому живёт здесь, а не в селекторе.
+    const summaries = useMemo(() => aggregateReactions(reactions, userId), [reactions, userId])
 
     const meta: BubbleMetaData = {
       ts: message.ts,
@@ -63,12 +72,21 @@ export const MessageRow = memo(
         <MessageActions
           message={message}
           isOwn={isOwn}
+          reactions={summaries}
         />
 
         <MessageBubble
           type={isOwn ? 'user' : 'operator'}
           position={position}
           reply={reply}
+          reactions={
+            summaries.length > 0 ? (
+              <ReactionBar
+                summaries={summaries}
+                onToggle={(key) => void toggleReaction(message.eventId, key)}
+              />
+            ) : undefined
+          }
         >
           {message.kind === 'image' ? (
             <ImageMessage

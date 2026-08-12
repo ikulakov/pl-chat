@@ -1,4 +1,5 @@
 import type { OperatorState } from '../domain/operator'
+import type { ReactionDelta, ReactionEntry, ReactionIndex } from '../domain/reactions'
 import type { ReadReceipt } from '../domain/receipts'
 import type { RoomSyncPatch } from '../domain/roomSync'
 import type { TimelineItem } from '../domain/timeline'
@@ -20,10 +21,18 @@ export type RuntimeAction =
   | { type: 'message.discarded'; localId: string }
   | { type: 'receipt.markedRead'; userId: string; eventId: string }
   | { type: 'receipt.sendFailed'; userId: string; eventId: string; rollbackTo: string | null }
+  | { type: 'reaction.added'; targetEventId: string; entry: ReactionEntry }
+  | { type: 'reaction.confirmed'; targetEventId: string; localEventId: string; eventId: string }
+  | { type: 'reaction.removed'; targetEventId: string; eventId: string }
   | { type: 'reply.targeted'; target: ReplyTarget }
   | { type: 'reply.cleared' }
   | { type: 'history.loading' }
-  | { type: 'history.loaded'; items: TimelineItem[]; prevBatch: string | null }
+  | {
+      type: 'history.loaded'
+      items: TimelineItem[]
+      reactions: ReactionDelta
+      prevBatch: string | null
+    }
   | { type: 'history.settled' }
 
 export interface ChatRuntimeState {
@@ -39,6 +48,8 @@ export interface RoomState {
   operator: OperatorState
   // m.read по юзерам: до какого события каждый дочитал
   readReceipts: Record<string, ReadReceipt>
+  // реакции по id сообщения; отдельно от ленты — приходят раньше своей цели и переживают merge
+  reactions: ReactionIndex
   // сообщение, на которое пользователь отвечает (превью в композере)
   replyTarget: ReplyTarget | null
   // курсор следующей страницы истории назад
