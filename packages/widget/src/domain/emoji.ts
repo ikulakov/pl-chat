@@ -1,12 +1,59 @@
 /**
- * Разбор текста сообщения на текст и эмодзи.
+ * Эмодзи: каталог для пикера и разбор текста для ленты.
  *
- * Протокол не размечает эмодзи (в отличие от Telegram с его `messageEntityCustomEmoji`): эмодзи
- * приезжают обычным юникодом в `body`, и клиент ищет их сам по каталогу сервера.
+ * Протокол сообщений это не меняет: эмодзи уезжает обычным юникодом в `body` текстового
+ * события, каталог нужен только чтобы нарисовать вместо символа анимацию.
  */
 
-/** Каталог пака: символ (без вариационного селектора) → канонический codepoint сервера. */
+export interface EmojiItem {
+  /** Канонический codepoint без VS16: `1f600`, `1f469-200d-2695`. Адрес байтов анимации. */
+  codepoint: string
+  /** Символ для вставки в текст. */
+  char: string
+  /** data:-URL силуэта; пока анимация не приехала, в сетке рисуется он. */
+  silhouette: string | null
+}
+
+export interface EmojiCategory {
+  id: string
+  title: string
+  /** Сколько позиций во вкладке. Известно до загрузки состава — сетка резервирует место. */
+  count: number
+  /** null — состав ещё не загружен. */
+  items: EmojiItem[] | null
+}
+
 export interface EmojiCatalog {
+  version: string
+  categories: EmojiCategory[]
+}
+
+export interface StickerItem {
+  id: string
+  /** Подпись стикера, она же alt. */
+  body: string
+  mediaId: string
+}
+
+export interface StickerPack {
+  id: string
+  title: string
+  stickers: StickerItem[]
+}
+
+/**
+ * Lottie-JSON анимации. Клиент его не разбирает — байты проходят от сети до плеера как есть,
+ * поэтому структура намеренно непрозрачна.
+ */
+export type EmojiAnimation = Record<string, unknown>
+
+/**
+ * Плоский индекс пака для рендера ленты: символ (без вариационного селектора) → codepoint.
+ *
+ * Отдельно от `EmojiCatalog`: пикеру нужны вкладки, счётчики и силуэты, и состав он догружает
+ * по мере пролистывания, — а рендеру текста нужен весь список символов сразу и как можно легче.
+ */
+export interface EmojiIndex {
   version: string
   codepointByChar: Map<string, string>
 }
@@ -15,7 +62,7 @@ export type EmojiSegment =
   | { kind: 'text'; text: string }
   | { kind: 'emoji'; char: string; codepoint: string }
 
-/** Размер отрисовки: `big` и `mid` — для сообщений из одних эмодзи, `inline` — размером со строку. */
+/** Размер отрисовки: `big` и `mid` — для сообщений из одних эмодзи, `inline` — со строку. */
 export type EmojiLayout = 'big' | 'mid' | 'inline'
 
 // Вариационный селектор VS16: в тексте ❤️ приезжает как 2764 fe0f, а в паке лежит как 2764.
@@ -30,20 +77,20 @@ const MAX_LARGE_EMOJI = 3
 
 let segmenter: Intl.Segmenter | null | undefined
 
-/** Ключ поиска в каталоге: тот же символ, но без вариационных селекторов. */
+/** Ключ поиска в индексе: тот же символ, но без вариационных селекторов. */
 export function normalizeEmojiKey(char: string): string {
   return char.replace(VARIATION_SELECTOR, '')
 }
 
 /**
- * Режет строку на сегменты, подставляя codepoint каталога вместо найденных эмодзи.
+ * Режет строку на сегменты, подставляя codepoint пака вместо найденных эмодзи.
  *
  * Границы ищет `Intl.Segmenter` по графемным кластерам — это снимает ручную работу с UTF-16,
  * суррогатными парами и ZWJ-цепочками: 👩‍⚕️ остаётся одним кластером и не разваливается на
- * 👩 и ⚕. Пока каталога нет, весь текст остаётся текстом и рисуется системным шрифтом.
+ * 👩 и ⚕. Пока индекса нет, весь текст остаётся текстом и рисуется системным шрифтом.
  */
-export function splitEmoji(text: string, catalog: EmojiCatalog | null): EmojiSegment[] {
-  if (!catalog || catalog.codepointByChar.size === 0 || !PICTOGRAPHIC.test(text)) {
+export function splitEmoji(text: string, index: EmojiIndex | null): EmojiSegment[] {
+  if (!index || index.codepointByChar.size === 0 || !PICTOGRAPHIC.test(text)) {
     return asText(text)
   }
 
@@ -54,7 +101,7 @@ export function splitEmoji(text: string, catalog: EmojiCatalog | null): EmojiSeg
   let pending = ''
 
   for (const { segment } of graphemes.segment(text)) {
-    const codepoint = catalog.codepointByChar.get(normalizeEmojiKey(segment))
+    const codepoint = index.codepointByChar.get(normalizeEmojiKey(segment))
 
     if (codepoint === undefined) {
       // Не эмодзи или эмодзи не из пака (тона кожи, флаги стран) — остаётся текстом.

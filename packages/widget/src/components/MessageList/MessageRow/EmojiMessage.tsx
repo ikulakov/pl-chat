@@ -6,6 +6,7 @@ import styles from './EmojiMessage.module.css'
 interface Props {
   segments: EmojiSegment[]
   layout: Exclude<EmojiLayout, 'inline'>
+  version: string
   meta: BubbleMetaData
 }
 
@@ -18,7 +19,7 @@ const SIZE_PX: Record<Props['layout'], number> = {
  * Сообщение из одних эмодзи: без плашки бабла, время — пилюлей поверх правого нижнего угла.
  * Так это нарисовано в макете, и так же ведут себя стикеры в мессенджерах.
  */
-export function EmojiMessage({ segments, layout, meta }: Props) {
+export function EmojiMessage({ segments, layout, version, meta }: Props) {
   const size = SIZE_PX[layout]
 
   return (
@@ -29,6 +30,7 @@ export function EmojiMessage({ segments, layout, meta }: Props) {
             key={index}
             char={segment.char}
             codepoint={segment.codepoint}
+            version={version}
             size={size}
           />
         ) : null,

@@ -1,13 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmojiCatalog } from '../../../domain/emoji'
-import { ensureEmojiCatalog, resetEmojiCatalog } from '../../../shared/emoji/emojiCatalogStore'
+import type { EmojiIndex } from '../../../domain/emoji'
+import { ensureEmojiIndex, resetEmojiIndex } from '../../../shared/emoji/emojiIndexStore'
 import { textItem } from '../../../shared/testUtils/matrixFixtures'
 import { MessageRow } from './MessageRow'
 
 const BUBBLE = '[data-role="message-bubble"]'
 
-const catalog: EmojiCatalog = {
+const index: EmojiIndex = {
   version: 'mock-1',
   codepointByChar: new Map([
     ['😀', '1f600'],
@@ -45,8 +45,8 @@ function renderRow(body: string, replyText?: string) {
 }
 
 beforeEach(() => {
-  resetEmojiCatalog()
-  ensureEmojiCatalog(() => Promise.resolve(catalog))
+  resetEmojiIndex()
+  ensureEmojiIndex(() => Promise.resolve(index))
 })
 
 describe('MessageRow: сообщение из одних эмодзи', () => {

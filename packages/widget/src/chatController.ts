@@ -1,20 +1,30 @@
 import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
-import type { EmojiCatalog } from './domain/emoji'
+import type { CardAction } from './domain/adaptiveCards'
+import type {
+  EmojiAnimation,
+  EmojiCatalog,
+  EmojiCategory,
+  EmojiIndex,
+  StickerPack,
+} from './domain/emoji'
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService, SendFileOptions } from './matrix/matrixController'
 import type { ThumbnailSize } from './matrix/api/matrixApi'
-import type { LottieJson } from './shared/lottie/types'
 import type { ReplyTarget } from './store/state'
 import { chatStore } from './store/store'
 
 export interface ChatActions {
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
   loadEmojiCatalog: () => Promise<EmojiCatalog>
-  loadEmojiAnimation: (codepoint: string) => Promise<LottieJson>
+  loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
+  loadEmojiIndex: () => Promise<EmojiIndex>
+  loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
+  loadStickerPacks: () => Promise<StickerPack[]>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   replyTo: (target: ReplyTarget) => void
@@ -50,10 +60,14 @@ export class ChatController {
     this.actions = {
       sendMessage: this.sendMessage,
       sendFile: this.sendFile,
+      sendCardAction: this.sendCardAction,
       loadPreview: this.loadPreview,
       downloadFile: this.downloadFile,
       loadEmojiCatalog: this.loadEmojiCatalog,
+      loadEmojiCategory: this.loadEmojiCategory,
+      loadEmojiIndex: this.loadEmojiIndex,
       loadEmojiAnimation: this.loadEmojiAnimation,
+      loadStickerPacks: this.loadStickerPacks,
       cancelUpload: this.cancelUpload,
       resendMessage: this.resendMessage,
       replyTo: this.replyTo,
@@ -104,6 +118,9 @@ export class ChatController {
   sendFile = (file: File, options?: SendFileOptions): Promise<void> =>
     this.matrix.sendFile(file, options)
 
+  sendCardAction = (cardEventId: string, action: CardAction): Promise<void> =>
+    this.matrix.sendCardAction(cardEventId, action)
+
   loadPreview = (mxcUrl: string, size: ThumbnailSize): Promise<Blob> =>
     this.matrix.loadPreview(mxcUrl, size)
 
@@ -111,8 +128,15 @@ export class ChatController {
 
   loadEmojiCatalog = (): Promise<EmojiCatalog> => this.matrix.loadEmojiCatalog()
 
-  loadEmojiAnimation = (codepoint: string): Promise<LottieJson> =>
-    this.matrix.loadEmojiAnimation(codepoint)
+  loadEmojiCategory = (categoryId: string): Promise<EmojiCategory> =>
+    this.matrix.loadEmojiCategory(categoryId)
+
+  loadEmojiIndex = (): Promise<EmojiIndex> => this.matrix.loadEmojiIndex()
+
+  loadEmojiAnimation = (codepoint: string, version: string): Promise<EmojiAnimation> =>
+    this.matrix.loadEmojiAnimation(codepoint, version)
+
+  loadStickerPacks = (): Promise<StickerPack[]> => this.matrix.loadStickerPacks()
 
   cancelUpload = (localId: string): void => this.matrix.cancelUpload(localId)
 

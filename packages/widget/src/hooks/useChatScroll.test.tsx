@@ -94,6 +94,35 @@ describe('useChatScroll', () => {
     expect(result.current.isNearBottom).toBe(true)
   })
 
+  it('преждевременный scrollend (инстант-снап до цели, см. SMOOTH_TAIL_PX) не размораживает isNearBottom, пока DOM реально не у низа — иначе на длинном прыжке (/card many) на кадр мигает кнопка «вниз»', () => {
+    const { rerender, container, result } = setup([message(OPERATOR)])
+    act(() => sentinel().trigger(true)) // пользователь у низа → следующее сообщение уйдёт smooth-скроллом
+
+    // smooth-путь: isAutoScrollingRef взводится, IO-обновления isNearBottom заморожены
+    act(() => rerender({ timeline: [message(OPERATOR), message(OPERATOR)] }))
+
+    Object.defineProperty(container, 'clientHeight', { value: 200, configurable: true })
+
+    // Инстант-снап scrollListTo остановился в 500px от цели (scrollHeight=1000) — ровно та
+    // геометрия, что оставляет после себя частичный джамп на длинном прыжке. Браузер может
+    // прислать 'scrollend' уже здесь, до того как smooth-хвост реально доехал.
+    container.scrollTop = 300
+    act(() => container.dispatchEvent(new Event('scrollend')))
+
+    // Премature scrollend должен быть проигнорирован: заморозка не снята, состояние не мигнуло.
+    expect(result.current.isNearBottom).toBe(true)
+
+    // Настоящий scrollend — smooth-хвост доехал, DOM реально у низа.
+    container.scrollTop = 800
+    act(() => container.dispatchEvent(new Event('scrollend')))
+
+    expect(result.current.isNearBottom).toBe(true)
+
+    // Разморозка подтверждена: IO снова управляет состоянием, а не игнорируется.
+    act(() => sentinel().trigger(false))
+    expect(result.current.isNearBottom).toBe(false)
+  })
+
   it('scrollToBottom scrolls the container smoothly', () => {
     const { result, scrollTo } = setup([message(OPERATOR)])
     scrollTo.mockClear()

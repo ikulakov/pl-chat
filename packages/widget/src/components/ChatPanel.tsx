@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
-import { ensureEmojiCatalog } from '../shared/emoji/emojiCatalogStore'
+import { ensureEmojiIndex } from '../shared/emoji/emojiIndexStore'
 import { Spinner } from '../shared/ui/Spinner'
 import {
   selectOperator,
@@ -27,12 +27,12 @@ export function ChatPanel() {
   const operatorName = useChatStore(selectOperatorName)
   const viewport = useChatStore(selectViewport)
 
-  const { reconnect, loadEmojiCatalog } = useChatActions()
+  const { reconnect, loadEmojiIndex } = useChatActions()
 
-  // Каталог тянем один раз на вкладку и отсюда: лента и цитаты его только читают.
+  // Индекс пака тянем один раз на вкладку и отсюда: лента и цитаты его только читают.
   useEffect(() => {
-    ensureEmojiCatalog(loadEmojiCatalog)
-  }, [loadEmojiCatalog])
+    ensureEmojiIndex(loadEmojiIndex)
+  }, [loadEmojiIndex])
 
   return (
     <div className={chatStyles.panel}>

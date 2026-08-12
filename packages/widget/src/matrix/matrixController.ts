@@ -1,15 +1,19 @@
-import type { EmojiCatalog } from '../domain/emoji'
+import type { CardAction } from '../domain/adaptiveCards'
+import type {
+  EmojiAnimation,
+  EmojiCatalog,
+  EmojiCategory,
+  EmojiIndex,
+  StickerPack,
+} from '../domain/emoji'
 import { MediaUnavailableError } from '../domain/mediaError'
 import { createOptimisticMediaMessage, createOptimisticTextMessage } from '../domain/optimistic'
 import { canMoveMarker } from '../domain/receipts'
-import {
-  isMedia,
-  isSystem,
-  type MediaTimelineItem,
-  type MessageTimelineItem,
-} from '../domain/timeline'
-import type { LottieJson } from '../shared/lottie/types'
+import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '../domain/timeline'
 import { isAbortError } from '../shared/utils/abort'
+// Оба кэша медиа считают записи, а не байты: вес записи в каждом ограничен сверху
+// (миниатюра — по построению, свой файл — лимитом композера), поэтому число записей и есть
+// предсказуемый потолок памяти.
 import { evictOldest } from '../shared/utils/evictOldest'
 import type { ImageDimensions } from '../shared/utils/imageDimensions'
 import { parseMxcUrl, type ParsedMxcUrl } from '../shared/utils/mxc'
@@ -25,9 +29,13 @@ import {
   type AuthErrorContext,
 } from './api/matrixError'
 import { MatrixHistoryLoader } from './history/historyLoader'
-import { toEmojiCatalog } from './mappers/emoji'
+import { toEmojiCatalog, toEmojiCategory, toEmojiIndex, toStickerPacks } from './mappers/emoji'
 import { classifyMediaError } from './mappers/mediaError'
-import { toOutgoingContent } from './mappers/outgoing'
+import {
+  toAdaptiveActionContent,
+  toMessageContent,
+  type OutgoingTimelineItem,
+} from './mappers/outgoing'
 import { toRoomSyncPatch } from './mappers/roomSync'
 import { classifyUploadError } from './mappers/uploadError'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
@@ -55,20 +63,19 @@ const MAX_CACHED_PREVIEWS = 40
 // сессии. Одновременно «в полёте» бывает один-два файла, поэтому запас минимальный.
 const MAX_LOCAL_ORIGINALS = 3
 
-// Сколько разобранных анимаций держим. Лимит намеренно скромный: распакованный Lottie весит
-// десятки-сотни килобайт в памяти, а повторное скачивание почти бесплатно — байты отдаются
-// с immutable на неделю, то есть лежат в HTTP-кэше браузера.
-const MAX_CACHED_EMOJI = 24
-
 export interface MatrixService {
   connect: () => Promise<void>
   disconnect: () => void
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
   loadEmojiCatalog: () => Promise<EmojiCatalog>
-  loadEmojiAnimation: (codepoint: string) => Promise<LottieJson>
+  loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
+  loadEmojiIndex: () => Promise<EmojiIndex>
+  loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
+  loadStickerPacks: () => Promise<StickerPack[]>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   markRead: (eventId: string) => Promise<void>
@@ -106,11 +113,10 @@ export class MatrixController implements MatrixService {
   // пропадала бы из ленты сразу после отправки. Отвечает и на превью, и на оригинал.
   private readonly localOriginals = new Map<string, Blob>()
 
-  // Каталог эмодзи и разобранные анимации. В отличие от медиа, это server-managed контент —
-  // один и тот же ответ для всех, поэтому смена сессии его не обесценивает и nextLifecycle()
-  // эти кэши не чистит. Хранится промис: он же дедуп параллельных запросов одного codepoint.
-  private emojiCatalog: Promise<EmojiCatalog> | null = null
-  private readonly emojiAnimations = new Map<string, Promise<LottieJson>>()
+  // Индекс пака. В отличие от медиа это server-managed справочник — один и тот же ответ для
+  // всех, поэтому смена сессии его не обесценивает и nextLifecycle() его не чистит. Хранится
+  // промис: он же дедуп параллельных запросов, пока первый ещё в полёте.
+  private emojiIndex: Promise<EmojiIndex> | null = null
 
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
@@ -188,6 +194,33 @@ export class MatrixController implements MatrixService {
     await this.dispatchSend(connection.identity.roomId, uploaded, 'sendFile')
   }
 
+  async sendCardAction(cardEventId: string, action: CardAction): Promise<void> {
+    const connection = this.requireConnection()
+    if (!connection) return
+
+    const existing = connection.room.cardAnswers[cardEventId]
+    if (existing?.status === 'sending' || existing?.status === 'sent') return
+
+    this.dispatch({ type: 'card.answering', cardEventId, actionId: action.id })
+    const lifecycleId = this.lifecycleId
+
+    try {
+      await this.api.sendMessage({
+        roomId: connection.identity.roomId,
+        txnId: crypto.randomUUID(),
+        content: toAdaptiveActionContent(cardEventId, action),
+      })
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      this.dispatch({ type: 'card.answered', cardEventId })
+    } catch (err) {
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      this.dispatch({ type: 'card.answerFailed', cardEventId })
+      this.handleAuthError(err, 'sendCardAction')
+    }
+  }
+
   private async uploadFile(
     draft: MediaTimelineItem,
     file: File,
@@ -240,37 +273,39 @@ export class MatrixController implements MatrixService {
     )
   }
 
-  loadEmojiCatalog(): Promise<EmojiCatalog> {
-    this.emojiCatalog ??= this.api
+  // Каталоги эмодзи и стикеров не проходят через стор и не сверяются с lifecycleId: это не
+  // состояние диалога, а справочник — он одинаков для любой сессии и переживает переподключение.
+  async loadEmojiCatalog(): Promise<EmojiCatalog> {
+    return toEmojiCatalog(await this.api.getEmojiCategories())
+  }
+
+  async loadEmojiCategory(categoryId: string): Promise<EmojiCategory> {
+    return toEmojiCategory(await this.api.getEmojiCategory(categoryId))
+  }
+
+  /**
+   * Индекс пака для ленты. В отличие от каталога вкладок, запрашивается один раз за жизнь
+   * вкладки: он нужен на каждое текстовое сообщение, а меняется только с версией пака.
+   */
+  loadEmojiIndex(): Promise<EmojiIndex> {
+    this.emojiIndex ??= this.api
       .getEmojiPacks()
-      .then(toEmojiCatalog)
+      .then(toEmojiIndex)
       .catch((err: unknown) => {
-        // Упавший каталог в кэше не держим: следующая попытка (переоткрытие панели) начнёт заново.
-        this.emojiCatalog = null
+        // Упавший запрос в кэше не держим: следующая попытка начнёт заново.
+        this.emojiIndex = null
         throw err
       })
 
-    return this.emojiCatalog
+    return this.emojiIndex
   }
 
-  loadEmojiAnimation(codepoint: string): Promise<LottieJson> {
-    const cached = this.emojiAnimations.get(codepoint)
-    if (cached) return cached
-
-    const request = this.fetchEmojiAnimation(codepoint).catch((err: unknown) => {
-      this.emojiAnimations.delete(codepoint)
-      throw err
-    })
-
-    this.emojiAnimations.set(codepoint, request)
-    evictOldest(this.emojiAnimations, MAX_CACHED_EMOJI)
-
-    return request
-  }
-
-  private async fetchEmojiAnimation(codepoint: string): Promise<LottieJson> {
-    const { version } = await this.loadEmojiCatalog()
+  loadEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
     return this.api.getEmojiAnimation(codepoint, version)
+  }
+
+  async loadStickerPacks(): Promise<StickerPack[]> {
+    return toStickerPacks(await this.api.getStickerPacks())
   }
 
   private async withLocalFallback(
@@ -370,7 +405,13 @@ export class MatrixController implements MatrixService {
     const { identity, room } = connection
     const message = room.timeline.find((m) => m.localId === localId)
 
-    if (!message || isSystem(message) || message.sendStatus !== 'failed' || !message.txnId) {
+    if (
+      !message ||
+      isSystem(message) ||
+      isAdaptiveCard(message) ||
+      message.sendStatus !== 'failed' ||
+      !message.txnId
+    ) {
       return
     }
 
@@ -444,7 +485,7 @@ export class MatrixController implements MatrixService {
 
   private async dispatchSend(
     roomId: string,
-    message: MessageTimelineItem,
+    message: OutgoingTimelineItem,
     context: AuthErrorContext,
   ): Promise<void> {
     const localId = message.localId
@@ -454,7 +495,7 @@ export class MatrixController implements MatrixService {
       const { event_id } = await this.api.sendMessage({
         roomId,
         txnId: message.txnId!,
-        content: toOutgoingContent(message),
+        content: toMessageContent(message),
       })
       if (!this.isCurrentLifecycle(lifecycleId)) return
 

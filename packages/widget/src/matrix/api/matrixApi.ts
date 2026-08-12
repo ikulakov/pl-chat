@@ -1,6 +1,5 @@
-import type { LottieJson } from '../../shared/lottie/types'
+import type { EmojiAnimation } from '../../domain/emoji'
 import type { ParsedMxcUrl } from '../../shared/utils/mxc'
-import type { EmojiPacksResponse } from '../wire/emoji'
 import type {
   MessagesResponse,
   OutgoingContent,
@@ -9,6 +8,12 @@ import type {
   SyncResponse,
   UploadResponse,
 } from '../wire/dto'
+import type {
+  EmojiCategoriesResponse,
+  EmojiCategoryWire,
+  EmojiPacksResponse,
+  StickerPacksResponse,
+} from '../wire/emoji'
 import { Endpoints } from './endpoints'
 import type { MatrixTransport, UploadOptions } from './matrixTransport'
 
@@ -97,17 +102,33 @@ export function createMatrixApi(transport: MatrixTransport) {
       })
     },
 
+    getEmojiCategories(): Promise<EmojiCategoriesResponse> {
+      return transport.request(Endpoints.EMOJI_CATEGORIES)
+    },
+
+    getEmojiCategory(categoryId: string): Promise<EmojiCategoryWire> {
+      return transport.request(Endpoints.EMOJI_CATEGORY({ categoryId }))
+    },
+
+    /** Весь пак разом: по нему лента строит индекс «символ → codepoint». */
     getEmojiPacks(): Promise<EmojiPacksResponse> {
       return transport.request(Endpoints.EMOJI_PACKS)
     },
 
-    getEmojiAnimation(codepoint: string, version: string): Promise<LottieJson> {
-      // Байты идут через transport, чтобы базовый URL резолвился в одном месте; лишний Bearer
-      // на permitAll-эндпоинте безвреден. Ответ приходит gzip'ом, браузер разжимает его сам.
-      // ?v — обязательный cache-buster: URL стабилен и кэшируется на неделю как immutable.
+    /**
+     * Байты анимации. `.tgs` — это gzip, и он отдаётся с `Content-Encoding: gzip`: браузер
+     * разжимает сам, на выходе готовый JSON. Распаковывать ничего не нужно.
+     * `v` — cache-buster: без него после переseed'а пака клиент неделю получал бы из
+     * immutable-кэша старую анимацию.
+     */
+    getEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
       return transport.request(Endpoints.EMOJI_LOTTIE({ codepoint }), {
         searchParams: { v: version },
       })
+    },
+
+    getStickerPacks(): Promise<StickerPacksResponse> {
+      return transport.request(Endpoints.STICKER_PACKS)
     },
 
     sendReadReceipt(roomId: string, eventId: string): Promise<Record<string, never>> {

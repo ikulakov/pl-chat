@@ -10,6 +10,7 @@ import { useAttachment } from '../Attachment/AttachmentContext'
 import { ReplyPreview } from '../ReplyPreview'
 import { AttachmentPreview } from './AttachmentPreview'
 import styles from './Composer.module.css'
+import { EmojiPickerButton } from './EmojiPicker/EmojiPickerButton'
 import { FilePickerButton } from './FilePickerButton'
 import { MessageTextarea } from './MessageTextarea'
 
@@ -32,6 +33,34 @@ export function Composer() {
   const canSend = !attachment.pending?.error && (trimmed.length > 0 || attachment.pending !== null)
   // файл прикреплён и прошёл валидацию — второй пока нельзя выбрать
   const hasValidAttachment = attachment.pending !== null && !attachment.pending.error
+
+  /**
+   * Вставка эмодзи по каретке, а не в конец: пользователь мог поставить курсор в середину
+   * набранного текста. Выделение при этом заменяется — как при обычном вводе.
+   */
+  function insertEmoji(char: string) {
+    const textarea = textareaRef.current
+
+    setText((prev) => {
+      const start = textarea?.selectionStart ?? prev.length
+      const end = textarea?.selectionEnd ?? prev.length
+      const next = prev.slice(0, start) + char + prev.slice(end)
+
+      if (textarea) {
+        // Позицию каретки браузер сам не сдвинет: значение приходит извне, а не из ввода.
+        // Ставим после микротаска, когда React уже применил новое value.
+        const caret = start + char.length
+        queueMicrotask(() => {
+          textarea.setSelectionRange(caret, caret)
+        })
+      }
+
+      return next
+    })
+
+    // Панель остаётся открытой — подряд набрать несколько эмодзи должно быть можно.
+    textarea?.focus()
+  }
 
   function submit() {
     if (!canSend) return
@@ -88,6 +117,9 @@ export function Composer() {
           />
         </div>
         <div className={styles.rightBtns}>
+          <div className={styles.slot}>
+            <EmojiPickerButton onSelectEmoji={insertEmoji} />
+          </div>
           <div className={styles.slot}>
             <IconButton
               variant="contrast"

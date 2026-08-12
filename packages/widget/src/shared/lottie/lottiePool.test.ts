@@ -1,91 +1,100 @@
-import type { AnimationItem } from 'lottie-web'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { playInPool, resetPool } from './lottiePool'
+import { describe, expect, it, vi } from 'vitest'
+import { createLottiePool, type PoolPlayer } from './lottiePool'
 
-// Кадр «через 100 мс» заведомо переживает троттлинг пула (~33 мс).
-const TICK_MS = 100
+/** Управляемый rAF: тесты сами решают, когда и с каким временем случится кадр. */
+function makeScheduler() {
+  let pending: ((time: number) => void) | null = null
 
-let frameCallback: FrameRequestCallback | null = null
-let cancelled: number[] = []
-
-function makePlayer(): AnimationItem {
   return {
-    totalFrames: 60,
-    frameRate: 60,
-    goToAndStop: vi.fn(),
-  } as unknown as AnimationItem
+    requestFrame: (callback: (time: number) => void) => {
+      pending = callback
+      return 1
+    },
+    cancelFrame: () => {
+      pending = null
+    },
+    tick: (time: number) => {
+      const callback = pending
+      pending = null
+      callback?.(time)
+    },
+    get scheduled() {
+      return pending !== null
+    },
+  }
 }
 
-function runFrame(timestamp: number): void {
-  const callback = frameCallback
-  frameCallback = null
-  callback?.(timestamp)
+function makePlayer(): PoolPlayer & { goToAndStop: ReturnType<typeof vi.fn> } {
+  return { totalFrames: 30, frameRate: 30, goToAndStop: vi.fn() }
 }
 
-function setReducedMotion(reduce: boolean): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({ matches: reduce })),
-  )
-}
+describe('lottiePool', () => {
+  it('крутит один общий цикл на все плееры', () => {
+    const scheduler = makeScheduler()
+    const pool = createLottiePool({ ...scheduler, prefersReducedMotion: () => false })
+    const a = makePlayer()
+    const b = makePlayer()
 
-beforeEach(() => {
-  frameCallback = null
-  cancelled = []
-  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
-    frameCallback = cb
-    return 1
+    pool.acquire(a)
+    pool.acquire(b)
+    scheduler.tick(100)
+
+    expect(a.goToAndStop).toHaveBeenCalledOnce()
+    expect(b.goToAndStop).toHaveBeenCalledOnce()
+    expect(pool.size).toBe(2)
   })
-  vi.stubGlobal('cancelAnimationFrame', (id: number) => cancelled.push(id))
-  setReducedMotion(false)
-})
 
-afterEach(() => {
-  resetPool()
-  vi.unstubAllGlobals()
-})
+  it('играет не больше потолка одновременно', () => {
+    const scheduler = makeScheduler()
+    const pool = createLottiePool({ ...scheduler, prefersReducedMotion: () => false })
+    const players = Array.from({ length: 30 }, makePlayer)
 
-describe('playInPool', () => {
-  it('крутит кадры зарегистрированного плеера', () => {
+    players.forEach((player) => pool.acquire(player))
+    scheduler.tick(100)
+
+    const played = players.filter((player) => player.goToAndStop.mock.calls.length > 0)
+    expect(played).toHaveLength(24)
+    expect(pool.playing).toBe(24)
+  })
+
+  it('снятый плеер больше не тикает, а пустой пул останавливает цикл', () => {
+    const scheduler = makeScheduler()
+    const pool = createLottiePool({ ...scheduler, prefersReducedMotion: () => false })
     const player = makePlayer()
 
-    playInPool(player)
-    runFrame(TICK_MS)
+    const release = pool.acquire(player)
+    release()
 
-    // Первый вызов — сброс на нулевой кадр при регистрации, второй — тик пула.
-    expect(player.goToAndStop).toHaveBeenCalledTimes(2)
-    expect(vi.mocked(player.goToAndStop).mock.calls[1]?.[1]).toBe(true)
+    expect(pool.size).toBe(0)
+    expect(scheduler.scheduled).toBe(false)
+
+    scheduler.tick(100)
+    expect(player.goToAndStop).not.toHaveBeenCalled()
   })
 
-  it('держит потолок одновременно играющих', () => {
-    const players = Array.from({ length: 15 }, () => makePlayer())
-    players.forEach((player) => playInPool(player))
-
-    runFrame(TICK_MS)
-
-    // Каждый получил сброс на нулевой кадр, но тик достался только первым двенадцати.
-    const advanced = players.filter((p) => vi.mocked(p.goToAndStop).mock.calls.length > 1)
-    expect(advanced).toHaveLength(12)
-  })
-
-  it('снятый плеер больше не тикает, а пустой пул останавливает rAF', () => {
-    const player = makePlayer()
-    const stop = playInPool(player)
-
-    stop()
-    expect(cancelled).toHaveLength(1)
-
-    runFrame(TICK_MS)
-    expect(player.goToAndStop).toHaveBeenCalledTimes(1)
-  })
-
-  it('при prefers-reduced-motion показывает первый кадр и не тикает', () => {
-    setReducedMotion(true)
+  it('пропускает кадр, если интервал ещё не набежал', () => {
+    const scheduler = makeScheduler()
+    const pool = createLottiePool({ ...scheduler, prefersReducedMotion: () => false })
     const player = makePlayer()
 
-    playInPool(player)
+    pool.acquire(player)
+    scheduler.tick(1000)
+    // 5 мс при цели в 30 fps (33 мс) — работать рано, но цикл должен продолжиться.
+    scheduler.tick(1005)
+
+    expect(player.goToAndStop).toHaveBeenCalledOnce()
+    expect(scheduler.scheduled).toBe(true)
+  })
+
+  it('при prefers-reduced-motion показывает первый кадр и не заводит цикл', () => {
+    const scheduler = makeScheduler()
+    const pool = createLottiePool({ ...scheduler, prefersReducedMotion: () => true })
+    const player = makePlayer()
+
+    pool.acquire(player)
 
     expect(player.goToAndStop).toHaveBeenCalledExactlyOnceWith(0, true)
-    expect(frameCallback).toBeNull()
+    expect(pool.size).toBe(0)
+    expect(scheduler.scheduled).toBe(false)
   })
 })

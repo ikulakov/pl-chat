@@ -7,11 +7,11 @@ interface Props {
 }
 
 /**
- * Текст сообщения, где известные каталогу эмодзи заменены картинками. Пока каталог не приехал
+ * Текст сообщения, где известные паку эмодзи заменены картинками. Пока индекс не приехал
  * (или сервер отдал пустой пак) — это ровно исходная строка.
  */
 export function EmojiText({ text }: Props) {
-  const { segments } = useEmojiSegments(text)
+  const { segments, version } = useEmojiSegments(text)
 
   return segments.map((segment, index) =>
     segment.kind === 'text' ? (
@@ -22,6 +22,7 @@ export function EmojiText({ text }: Props) {
         key={index}
         char={segment.char}
         codepoint={segment.codepoint}
+        version={version}
       />
     ),
   )

@@ -21,6 +21,7 @@ function makeMatrix(): MatrixService {
     disconnect: vi.fn(),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     sendFile: vi.fn().mockResolvedValue(undefined),
+    sendCardAction: vi.fn().mockResolvedValue(undefined),
     downloadFile: vi.fn().mockResolvedValue(new Blob()),
     cancelUpload: vi.fn(),
     resendMessage: vi.fn().mockResolvedValue(undefined),
@@ -28,8 +29,11 @@ function makeMatrix(): MatrixService {
     loadMoreHistory: vi.fn().mockResolvedValue(undefined),
     stopLoadingHistory: vi.fn(),
     loadPreview: vi.fn().mockResolvedValue(new Blob()),
-    loadEmojiCatalog: vi.fn().mockResolvedValue({ version: '', codepointByChar: new Map() }),
+    loadEmojiCatalog: vi.fn().mockResolvedValue({ version: '1', categories: [] }),
+    loadEmojiCategory: vi.fn().mockResolvedValue({ id: '', title: '', count: 0, items: [] }),
+    loadEmojiIndex: vi.fn().mockResolvedValue({ version: '1', codepointByChar: new Map() }),
     loadEmojiAnimation: vi.fn().mockResolvedValue({}),
+    loadStickerPacks: vi.fn().mockResolvedValue([]),
   }
 }
 
@@ -166,6 +170,16 @@ describe('ChatController — wiring', () => {
 
     expect(matrix.sendMessage).toHaveBeenCalledWith('hi', undefined)
     expect(matrix.connect).toHaveBeenCalledOnce()
+  })
+
+  it('sendCardAction delegates to the backend', () => {
+    const matrix = makeMatrix()
+    const controller = new ChatController(makeBridge(), matrix)
+    const action = { id: 'confirm', title: 'Подтвердить', data: { action: 'confirm' } }
+
+    void controller.sendCardAction('$card', action)
+
+    expect(matrix.sendCardAction).toHaveBeenCalledWith('$card', action)
   })
 
   // actions раздаётся как стабильная ссылка (не геттер, пересоздающий объект) —

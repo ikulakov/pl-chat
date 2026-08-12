@@ -1,12 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmojiCatalog } from '../../domain/emoji'
-import { ensureEmojiCatalog, resetEmojiCatalog } from '../../shared/emoji/emojiCatalogStore'
+import type { EmojiIndex } from '../../domain/emoji'
+import { ensureEmojiIndex, resetEmojiIndex } from '../../shared/emoji/emojiIndexStore'
 import { EmojiText } from './EmojiText'
 
 const BITMAP = 'data:image/png;base64,AAA'
 
-const catalog: EmojiCatalog = {
+const index: EmojiIndex = {
   version: 'mock-1',
   codepointByChar: new Map([['😀', '1f600']]),
 }
@@ -22,12 +22,12 @@ vi.mock('../../shared/lottie/emojiBitmap', () => ({
 }))
 
 beforeEach(() => {
-  resetEmojiCatalog()
+  resetEmojiIndex()
 })
 
 describe('EmojiText', () => {
-  it('подставляет картинку вместо символа из каталога', async () => {
-    ensureEmojiCatalog(() => Promise.resolve(catalog))
+  it('подставляет картинку вместо символа из пака', async () => {
+    ensureEmojiIndex(() => Promise.resolve(index))
 
     render(<EmojiText text="Привет 😀 как дела" />)
 
@@ -37,19 +37,19 @@ describe('EmojiText', () => {
     expect(screen.getByText(/Привет/)).toBeInTheDocument()
   })
 
-  it('без каталога отдаёт голый текст', () => {
+  it('без индекса отдаёт голый текст', () => {
     const { container } = render(<EmojiText text="Привет 😀" />)
 
     expect(container.querySelector('img')).toBeNull()
     expect(container).toHaveTextContent('Привет 😀')
   })
 
-  it('эмодзи не из каталога остаётся символом', async () => {
-    ensureEmojiCatalog(() => Promise.resolve(catalog))
+  it('эмодзи не из пака остаётся символом', async () => {
+    ensureEmojiIndex(() => Promise.resolve(index))
 
     render(<EmojiText text="🇷🇺" />)
 
-    // Ждём каталог, чтобы проверка «картинки нет» не сработала до его приезда.
+    // Ждём индекс, чтобы проверка «картинки нет» не сработала до его приезда.
     await screen.findByText('🇷🇺')
     expect(screen.queryByRole('img')).toBeNull()
   })

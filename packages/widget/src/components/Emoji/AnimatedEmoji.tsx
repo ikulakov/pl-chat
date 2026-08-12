@@ -1,35 +1,34 @@
-import type { AnimationItem } from 'lottie-web'
 import { useEffect, useRef, useState } from 'react'
-import { useEmojiBitmap } from '../../hooks/useEmojiBitmap'
 import { useChatActions } from '../../hooks/useChatActions'
+import { useEmojiBitmap } from '../../hooks/useEmojiBitmap'
 import { useIntersectionObserver } from '../../hooks/useIntersectionObserver'
-import { createEmojiPlayer } from '../../shared/lottie/emojiPlayer'
-import { playInPool } from '../../shared/lottie/lottiePool'
+import { getAnimationCache } from '../../shared/lottie/animationCache'
+import { createEmojiPlayer, loadLottiePlayer } from '../../shared/lottie/lottiePlayer'
+import { lottiePool } from '../../shared/lottie/lottiePool'
 import { cn } from '../../shared/utils/cn'
 import styles from './Emoji.module.css'
 
 interface Props {
   char: string
   codepoint: string
+  version: string
   /** Сторона в CSS-пикселях. */
   size: number
 }
 
-// Выше двух ретина уже не различает, а площадь canvas растёт квадратично.
-const MAX_DPR = 2
-
 /**
  * Крупное эмодзи: анимация, пока элемент виден. Вне вьюпорта плеер снимается с пула и
- * уничтожается — за экраном крутить нечего, а инстанс стоит памяти.
+ * уничтожается — за экраном крутить нечего, а инстанс стоит памяти. Разжатая анимация при
+ * этом остаётся в кэше, поэтому возврат в кадр сети не стоит.
  */
-export function AnimatedEmoji({ char, codepoint, size }: Props) {
+export function AnimatedEmoji({ char, codepoint, version, size }: Props) {
   const { loadEmojiAnimation } = useChatActions()
   const wrapRef = useRef<HTMLSpanElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLSpanElement>(null)
   const [isVisible, setVisible] = useState(false)
   const [isPlaying, setPlaying] = useState(false)
 
-  const bitmap = useEmojiBitmap(codepoint, size > 64 ? 128 : 64)
+  const bitmap = useEmojiBitmap(codepoint, version, size > 64 ? 128 : 64)
 
   useIntersectionObserver({
     triggerRef: wrapRef,
@@ -39,40 +38,32 @@ export function AnimatedEmoji({ char, codepoint, size }: Props) {
   useEffect(() => {
     if (!isVisible) return
 
-    let cancelled = false
-    let player: AnimationItem | null = null
-    let removeFromPool: (() => void) | null = null
+    const cache = getAnimationCache(loadEmojiAnimation)
+    let disposed = false
+    let release: (() => void) | null = null
+    let player: { destroy: () => void } | null = null
 
-    loadEmojiAnimation(codepoint)
-      .then((animation) => {
-        if (cancelled || !canvasRef.current) return null
-        return createEmojiPlayer(canvasRef.current, animation)
-      })
-      .then((created) => {
-        if (!created) return
-        // Пока грузился плеер, элемент мог уйти с экрана — тогда его сразу же и убираем.
-        if (cancelled) {
-          created.destroy()
-          return
-        }
+    void Promise.all([cache.get(codepoint, version), loadLottiePlayer()])
+      .then(([animationData, lottie]) => {
+        const container = containerRef.current
+        if (disposed || !container) return
 
-        player = created
-        removeFromPool = playInPool(created)
+        const instance = createEmojiPlayer(lottie, { container, animationData })
+        player = instance
+        release = lottiePool.acquire(instance)
         setPlaying(true)
       })
       .catch(() => {
-        // Анимации нет — остаётся первый кадр или символ шрифтом.
+        // Анимации нет — остаётся первый кадр или символ шрифтом. Это рабочее состояние.
       })
 
     return () => {
-      cancelled = true
-      removeFromPool?.()
+      disposed = true
+      release?.()
       player?.destroy()
       setPlaying(false)
     }
-  }, [isVisible, codepoint, loadEmojiAnimation])
-
-  const pixels = Math.round(size * Math.min(window.devicePixelRatio || 1, MAX_DPR))
+  }, [isVisible, codepoint, version, loadEmojiAnimation])
 
   return (
     <span
@@ -82,13 +73,6 @@ export function AnimatedEmoji({ char, codepoint, size }: Props) {
       role="img"
       aria-label={char}
     >
-      <canvas
-        ref={canvasRef}
-        className={cn(styles.layer, !isPlaying && styles.hidden)}
-        width={pixels}
-        height={pixels}
-      />
-
       {!isPlaying &&
         (bitmap ? (
           <img
@@ -99,6 +83,12 @@ export function AnimatedEmoji({ char, codepoint, size }: Props) {
         ) : (
           <span className={styles.layer}>{char}</span>
         ))}
+
+      <span
+        ref={containerRef}
+        className={cn(styles.layer, styles.canvas)}
+        aria-hidden
+      />
     </span>
   )
 }

@@ -1,0 +1,378 @@
+= Пикер эмодзи и стикеров — окно выбора и вставки
+:toc: macro
+:toclevels: 2
+:icons: font
+:status: done
+
+Клиентская часть xref:../../../matrixkc/docs/plans/task-88-animated-emoji.adoc[TASK-88].
+Контракт — `matrixkc/docs/client/client-protocol.adoc`, секции `[#emoji]` (строки 1333–1465)
+и `[#stickers]` (1307–1331).
+
+toc::[]
+
+== Контекст
+
+В композере есть «Прикрепить файл» и «Отправить», но нет способа вставить эмодзи или стикер.
+Задел под эту задачу уже лежит с обеих сторон и не используется:
+
+*Фронт*::
+`StickerIcon` (`shared/ui/icons.tsx:98`) экспортируется, но нигде не импортируется; ключ
+`input.stickers` («Смайлы и стикеры») есть в `ru.json`/`en.json:4` и не используется;
+`.rightBtns` в `Composer.module.css:36-51` свёрстан под *два* слота (`.slot { width: 40px }`,
+`&:last-child { width: 44px }`) — занят один.
+
+*Бэкенд matrixkc*::
+Модуль `matrixkc-emoji` (коммиты `564c383`, `bbdbf93`) отдаёт пак `tg-animated` — 580 анимаций
+Lottie/TGS, силуэты-плейсхолдеры и каталог по категориям. Модуль `matrixkc-stickers` отдаёт пак
+`otp-default` из 9 растровых стикеров. В плане TASK-88 клиентская часть прямо записана как
+«хвост» за репозиторием `front-pl-chat`.
+
+Итог итерации: кнопка-смайл в композере открывает панель с вкладками «Эмодзи» / «Стикеры»,
+эмодзи вставляется в поле ввода по позиции каретки. Сетка эмодзи анимированная, с обязательным
+набором приёмов производительности из контракта.
+
+== Границы задачи
+
+=== Входит
+
+* Кнопка-триггер в композере и панель над ним (макет — Figma `Chatbot`, node `1337-16605`).
+* Вкладка «Эмодзи»: каталог из matrixkc, силуэт-плейсхолдер → Lottie по видимости, вставка
+символа в текст по каретке.
+* Вкладка «Стикеры»: сетка каталога `otp-default` (картинки с публичного эндпоинта).
+* Эмодзи-эндпоинты в `tools/matrix-mock` (небольшой встроенный набор).
+
+=== Не входит — осознанно, отдельными задачами
+
+* *Отправка стикера.* Клик по стикеру пока ничего не отправляет. Это не «вставка», а полноценный
+`m.sticker`: параметризованный endpoint отправки, wire-DTO, маппер, оптимистичный элемент, ветка
+рендера в ленте (сейчас `m.sticker` из `/sync` молча отбрасывается в
+`matrix/mappers/timeline.ts:139`).
+* *Рендер анимированных эмодзи в ленте* и «большое эмодзи». Отсюда следует известное
+расхождение: в пикере эмодзи анимированные, а в отправленном сообщении — обычный юникод
+системным шрифтом. Разбор `body` (нормализация `fe0f`, longest-match по 26 ZWJ-цепочкам) нужен
+только там и здесь не делается.
+* Поиск по пикеру, «недавние», реакции.
+
+== Контракт бэкенда
+
+Сверено с исходниками matrixkc, не по памяти. Каталоги — *с Bearer*, байты — *без токена*
+(`SecurityConfiguration` permitAll на `/_matrix/emoji/**` и `/_matrix/sticker/**`).
+
+[cols="3,4", options="header"]
+|===
+| Эндпоинт | Ответ
+
+| `GET /_matrix/client/unstable/ru.otpbank.kc/emoji/v1/categories`
+| `{ version, categories: [{ id, display_name, count }] }` — вкладки со счётчиками, без состава.
+
+| `GET …/emoji/v1/categories/{categoryId}`
+| `{ id, display_name, count, emoji: [{ codepoint, e, p }] }`, где `p` — силуэт 32×32 grayscale
+PNG в base64 (~260 байт).
+
+| `GET /_matrix/emoji/{codepoint}?v={version}`
+| Lottie-JSON (`Content-Encoding: gzip`, браузер разжимает сам — `pako` не нужен).
+
+| `GET …/stickers/v1/packs`
+| `{ packs: [{ id, display_name, description, stickers: [{ id, body, info, url, media_id }] }] }`
+
+| `GET /_matrix/sticker/{mediaId}`
+| Байты стикера, без токена, `immutable` на неделю.
+|===
+
+[IMPORTANT]
+====
+`?v={version}` из `/categories` *обязателен*: URL байтов стабилен и отдаётся с
+`Cache-Control: public, max-age=604800, immutable`. Без cache-buster'а после переseed'а пака
+пользователи неделю будут видеть старые анимации.
+====
+
+Раскладка пака: `smileys` 162, `animals` 89, `people` 87, `objects` 74, `food` 49, `travel` 48,
+`symbols` 39, `activities` 27, `flags` 5 = *580*. Средний `.tgs` ≈ 30 КБ.
+
+[WARNING]
+====
+Поэтому `/_matrix/emoji/bundle/{categoryId}` *не используем*: одна вкладка `smileys` — это
+~4.8 МБ одним ответом. Тянем поштучно по видимости.
+====
+
+При выключенной фиче каталоги отдают пустые списки (не `403`) — панель просто прячет вкладку.
+
+== Реализация
+
+=== Зависимость
+
+`packages/widget/package.json` — `lottie-web`. Импортировать узкую сборку
+`lottie-web/build/player/lottie_light_canvas` (canvas-рендерер без выражений). Сейчас в
+зависимостях виджета только `react` + `zustand`, так что это единственное пополнение — и его
+стоит проговорить отдельно при ревью.
+
+=== Сеть
+
+`matrix/api/endpoints.ts` — добавить в существующий `createEndpoints`:
+
+[source,ts]
+----
+const KC_UNSTABLE = `${MATRIX_CLIENT}/unstable/ru.otpbank.kc`
+
+EMOJI_CATEGORIES: `${KC_UNSTABLE}/emoji/v1/categories`,
+EMOJI_CATEGORY:   `${KC_UNSTABLE}/emoji/v1/categories/{categoryId}`,
+EMOJI_LOTTIE:     `/_matrix/emoji/{codepoint}`,
+STICKER_PACKS:    `${KC_UNSTABLE}/stickers/v1/packs`,
+STICKER_BYTES:    `/_matrix/sticker/{mediaId}`,
+----
+
+* `matrix/wire/emoji.ts` — новые DTO (`EmojiCategoriesResponse`, `EmojiCategoryWire`,
+`EmojiWire`, `StickerPacksResponse`, `StickerPackWire`, `StickerWire`).
+* `matrix/mappers/emoji.ts` — wire → домен. Единственное место перевода; `domain/**` и `store/**`
+импортировать `matrix/**` не могут (правило в `eslint.config.mjs:42-58`).
+* `matrix/api/matrixApi.ts` — четыре тонкие обёртки поверх `transport.request` рядом с
+`downloadMedia`/`getThumbnail`. Байты Lottie тоже идут через `transport.request`: так базовый URL
+(`VITE_HOMESERVER_URL`) резолвится в одном месте, а лишний Bearer на permitAll-эндпоинте
+безвреден.
+* `matrix/matrixController.ts` (`MatrixService`) и `chatController.ts` (`ChatActions`) — четыре
+новых действия: `loadEmojiCategories`, `loadEmojiCategory`, `loadEmojiAnimation`,
+`loadStickerPacks`. Форма ровно как у `loadPreview`/`downloadFile` — возвращают данные, ничего не
+диспатчат.
+
+Каталог *не* кладём в стор: это не состояние диалога, оно не переживает `lifecycleId` и не
+участвует в редьюсере. Живёт в модуле-кэше и в локальном состоянии панели.
+
+=== Домен
+
+`domain/emoji.ts` — только типы: `EmojiItem { codepoint, char, silhouette }`,
+`EmojiCategory { id, title, count, items }`, `EmojiCatalog { version, categories }`,
+`StickerItem { id, body, mediaId }`.
+
+=== Рантайм анимаций — `shared/lottie/`
+
+Здесь живёт весь «перфоманс» из секции «Производительность пикера» контракта.
+
+`lottieCache.ts`::
+`Map<codepoint, Promise<LottieJson>>`. Промис в кэше *заодно дедуплицирует* параллельные запросы
+одного эмодзи — тот же приём, что уже применён для превью медиа (`matrixController.ts:93`,
+`previews`). LRU-потолок ~200 записей, вытеснение как `evictOldest` там же.
++
+[NOTE]
+====
+*IndexedDB не заводим.* Байты отдаются с `immutable` на неделю, то есть постоянный слой уже
+обеспечен HTTP-кэшем браузера, и IndexedDB его бы дублировал. Это сознательное отступление от
+буквы контракта; если профилирование покажет, что переразбор JSON дорог — добавить отдельно.
+====
+
+`lottiePool.ts`::
+Один `requestAnimationFrame` на всю сетку. Плееры создаются с `autoplay: false`, пул сам зовёт
+`goToAndStop(frame, true)`. Потолок одновременно играющих (`MAX_PLAYING ≈ 24`), приоритет —
+вошедшим во вьюпорт; вытесненные замирают на текущем кадре. Тик троттлится до ~30 fps.
+При `prefers-reduced-motion: reduce` пул не тикает вовсе — плеер рисует кадр 0 и остаётся
+статичным (контракт разрешает «силуэт или первый кадр»; первый кадр заметно лучше серого пятна).
+
+=== Макет
+
+Figma `Chatbot`, node `1337:16605`; панель — вложенный фрейм `Emodji` (`1337:26222`).
+Значения сняты из Figma, не на глаз.
+
+*Панель*::
+`264 × 284`, фиксированная. `background: var(--c-surface-primary)`,
+`border-radius: var(--radius-lg)`, `overflow: hidden`. Тень в макете
+`0 15px 56px rgba(0,0,0,0.2)` против токена `--shadow-popover` (`0 16px 56px`) — разница 1px,
+переиспользуем токен. Привязка: правый край панели = правый край слота кнопки-смайла,
+снизу *4px* до композера.
+
+*Табы* (`left: 12, top: 12`, `flex; gap: 8`)::
+Кнопка — `padding: 4px 8px`, `border-radius: 16px`, текст `Caption/1M` (Onest Medium 12/14,
+`letter-spacing: 0.1px`), цвет `var(--c-text-tertiary)`. Активная отличается *только фоном*
+`#e8eaed`; цвет текста у активной и неактивной одинаковый.
++
+[NOTE]
+====
+`#e8eaed` в `styles/variables.css` нет — ближайший `--c-surface-secondary-hover` это `#e8e9eb`,
+другой цвет. Нужен новый токен (в Figma — `Base/Surface/Tertiary/neutral-pressed`, он же
+`Base/Border/Standard/neutral-normal`, которым нарисован разделитель).
+====
+
+*Разделитель*:: линия 1px на `top: 46px` во всю ширину панели.
+
+*Сетка*::
+7 колонок, иконка *24×24*, шаг 36px по обеим осям (gap 12), левый отступ 12, первый ряд
+`top: 58`. В видимую часть попадает ~6.3 ряда. Хитбокс расширяем до 36×36 (`padding: 6px`) —
+24px мало для тача, а gap ровно эти 6px и даёт; визуально сетка не меняется.
+
+*Скроллбар*::
+Своя отрисовка, не нативная: дорожка `top: 46`, высота 220, прижата к правому краю,
+`padding: 28px 1px`; бегунок `6 × 94`, `border-radius: 4px`, цвет `#e2e4e6` — ровно
+существующий токен `--c-scrollbar`.
+
+*Композер*::
+Слот кнопки-смайла 40px, иконка 24×24 — ровно то, подо что уже свёрстан `.slot`
+(`Composer.module.css:41-51`). Инпут `height: 48px` / `radius 12` / border `--c-border`
+совпадает с текущим `.field`, править не нужно.
+
+=== UI — `components/Composer/EmojiPicker/`
+
+`PickerButton.tsx`::
+По образцу `FilePickerButton.tsx`: `IconButton variant="ghost" size="sm"` + `StickerIcon`,
+`aria-label={t('input.stickers')}`, `aria-expanded`. Встаёт вторым `.slot` в `.rightBtns`,
+*перед* слотом отправки (в макете смайл слева от самолётика).
+
+`EmojiPickerPanel.tsx`::
+Не портал: рендерится внутри `Composer`, у `.wrap` появляется `position: relative`, у панели —
+`position: absolute; bottom: 100%; right: 8px; z-index: var(--z-overlay)`. Панель разворачивается
+вверх поверх ленты и корректно обрезается внешним `.panel { overflow: hidden }`
+(`ChatPanel.module.css:7`).
++
+Портал (как в `Dropdown`) здесь *противопоказан*: `Dropdown` закрывается по любому `scroll` в
+фазе захвата (`Dropdown.tsx:89`), а у пикера собственная скроллящаяся сетка. Поведение
+открытия/закрытия — свои `pointerdown`-снаружи и `Escape`, переписанные с `Dropdown.tsx:65-96`
+(включая guard на `contains`, иначе клик по ячейке не долетит). Появление — анимация как у
+`DropZone.module.css:27-41` (растёт снизу от композера).
+
+`PickerTabs.tsx`::
+Первый в репозитории таб-контрол: `role="tablist"` / `role="tab"` / `aria-selected`, стрелки
+Left/Right + Home/End по образцу `Dropdown.handleMenuKeyDown`.
+
+`EmojiGrid.tsx`::
+Одна непрерывная прокрутка из 9 секций (в макете отдельной ленты категорий нет). Секция сразу
+резервирует `count` ячеек-заглушек — ровно то, для чего `count` отдаётся, — и подгружает состав
+через `useIntersectionObserver` (`hooks/useIntersectionObserver.ts`), когда подходит к вьюпорту.
+Виртуализация не нужна: 580 кнопок DOM держит, дорогие только canvas'ы, а их создают лишь видимые
+ячейки. Скроллбар — как у ленты (`MessageList.module.css` `.list`).
+
+`EmojiCell.tsx`::
+`<button>`; внутри `<img src="data:image/png;base64,\{p}">` как силуэт, поверх — canvas, когда
+анимация загружена. Вход/выход из вьюпорта — `IntersectionObserver`, снятие плеера с пула в
+cleanup эффекта (утечка плеера = баг, `.claude/rules/codestyle.md`).
+
+`StickerGrid.tsx`::
+Сетка `<img src={Endpoints.STICKER_BYTES({ mediaId })} loading="lazy">`. Токен не нужен. Клик в
+этой итерации не отправляет; кнопка помечена `aria-disabled`.
+
+CSS-модули рядом с компонентами, цвета/радиусы только из `styles/variables.css`
+(`--c-surface-primary`, `--radius-lg`, `--shadow-popover`).
+
+Состояние «панель открыта» — обычный `useState` в `Composer.tsx`, как `isOpen` внутри `Dropdown`.
+В стор не идёт: CLAUDE.md фиксирует, что вне редьюсера живут только `isOpen`/`viewport`.
+
+*Вставка.* `MessageTextarea` уже принимает `ref` пропом (`MessageTextarea.tsx:7`), поэтому
+`Composer` вставляет символ по `selectionStart`/`selectionEnd`, сдвигает каретку и возвращает
+фокус в поле. Панель при выборе не закрывается — подряд можно набрать несколько эмодзи.
+
+=== Мок — `tools/matrix-mock/server.mjs`
+
+Встроенный набор 12–16 эмодзи, разложенный по 2–3 категориям: `emoji/v1/categories`,
+`emoji/v1/categories/\{id}` (с силуэтами) и `/_matrix/emoji/\{codepoint}` с синтетическим
+Lottie-JSON (пульсирующая фигура — достаточно, чтобы видеть, что плеер живой). Каталог стикеров и
+байты уже есть (`server.mjs:783`, `:778`) — трогать не нужно.
+
+[NOTE]
+====
+Проверить сетку на реальных 580 позициях в моке не выйдет. Для этого — прогон против живого
+matrixkc (профиль `emoji-pack`) либо временный прокси `/_matrix/emoji` в `vite.config.ts`.
+====
+
+=== i18n
+
+Новые плоские ключи в `i18n/locale/ru.json` *и* `en.json` (пропуск в `en` ломает typecheck):
+`picker.tab.emoji` («Эмодзи»), `picker.tab.stickers` («Стикеры»), `picker.empty`,
+`picker.loadFailed`. Названия категорий берём с сервера (`display_name`). `input.stickers` уже
+есть — используем как `aria-label` триггера.
+
+=== Тесты
+
+[cols="2,3", options="header"]
+|===
+| Тест | Что проверяет
+
+| `lottieCache.test.ts`
+| Дедуп параллельных запросов одного codepoint, LRU-вытеснение.
+
+| `lottiePool.test.ts`
+| Потолок одновременно играющих, снятие плеера, `prefers-reduced-motion`.
+
+| `mappers/emoji.test.ts`
+| Wire → домен, пустой каталог при выключенной фиче.
+
+| `EmojiPickerPanel.test.tsx`
+| Открытие по кнопке, `aria-expanded`, закрытие по `Escape` и
+`fireEvent.pointerDown(document.body)`, переключение вкладок стрелками. Образец —
+`shared/ui/Dropdown/Dropdown.test.tsx`.
+
+| `EmojiGrid.test.tsx`
+| Ленивая подгрузка секции через `FakeIntersectionObserver.instances` (`test.setup.ts`), как в
+`useChatScroll.test.tsx`.
+
+| `Composer.test.tsx`
+| Дописать: вставка символа по каретке в середину текста, фокус вернулся, панель осталась
+открытой.
+|===
+
+`lottie-web` в юнит-тестах мокается (`vi.mock`) — canvas в jsdom не нужен.
+
+== Проверка
+
+[source,bash]
+----
+pnpm install
+pnpm dev            # host-demo :5173, widget :5174/widget, mock :3001
+pnpm test && pnpm typecheck && pnpm lint
+----
+
+Вручную на `http://localhost:5174/widget`:
+
+. Кнопка-смайл открывает панель над композером; лента под ней не скроллится «наружу».
+. Сетка отрисована силуэтами мгновенно; при попадании во вьюпорт ячейки оживают, при уходе —
+замирают. В Performance-профиле — один rAF-цикл, а не по одному на ячейку.
+. Клик по эмодзи вставляет символ в позицию каретки; Enter отправляет сообщение с эмодзи.
+. Вкладка «Стикеры» показывает 9 картинок из мока; клик ничего не отправляет.
+. `Escape` и клик вне панели закрывают её, фокус возвращается на кнопку.
+. С `prefers-reduced-motion: reduce` (DevTools → Rendering) анимации не крутятся.
+
+== Что разошлось с планом при реализации
+
+* *Свой скроллбар не рисовали.* В макете он нарисован отдельным слоем (бегунок 6×94), но
+нативный, оформленный через `scrollbar-width: thin` + `::-webkit-scrollbar` в том же цвете
+`--c-scrollbar`, визуально неотличим и не тянет за собой синхронизацию позиции бегунка.
+* *`evictOldest` вынесен* из `matrixController.ts` в `shared/utils/evictOldest.ts` — кэш
+анимаций вытесняет записи ровно так же, дублировать не стали.
+* *Тип анимации живёт в домене* (`EmojiAnimation` в `domain/emoji.ts`), а не в `wire/`:
+`shared/lottie/**` не должен зависеть от матричного слоя, а зависимость
+`matrix → domain` — правильного направления.
+* *Действие называется `loadEmojiCatalog`*, не `loadEmojiCategories`: оно отдаёт доменный
+`EmojiCatalog`, а не сырой список.
+* *`lottie-web` грузится динамическим `import()`* и уезжает отдельным чанком (204 КБ,
+55 КБ gzip). В основной бандл движок не попадает — за пикер платит только тот, кто его открыл.
+* *Сетка не резервирует ровно `count`* после загрузки состава: сервер не отдаёт позицию без
+байтов, поэтому `toEmojiCategory` пересчитывает `count` по фактическому составу — иначе в
+конце секции остались бы вечные пустые ячейки.
+* *Отдельного сентинела у секции нет* — догрузку запускает первая ячейка-заглушка. В плоской
+сетке сентинелу пришлось бы задавать нулевую высоту, чтобы он не занимал ячейку, а цель
+нулевой площади — пограничный случай `IntersectionObserver`, на который лучше не
+закладываться.
+
+[TIP]
+====
+*Грабли синтетической Lottie в моке.* Keyframes без кривых `i`/`o` ломают не только свою
+анимацию: lottie-web не может посчитать значение, трансформ *всего слоя* не применяется, и не
+рисуется ничего. Плюс эллипсу обязателен `d: 1`, а заливке — `r`. Проще всего повторять вывод
+Bodymovin вплоть до служебных полей. Диагностируется рендером в jsdom через SVG-рендерер
+(`lottie_light`): у сломанной анимации виден пустой `<path>` без `d` и без `fill`.
+====
+
+== Открытые вопросы
+
+* *Точные метрики макета* (ширина/высота панели, размер ячейки, число колонок, стиль табов,
+паддинги) взяты приблизительно со скриншота `doc/img.png`. Figma MCP в сессии не подключён — в
+конфиге зарегистрирован только `jetbrains`, поэтому node `1337-16605` прочитать нечем. Нужен либо
+экспорт кадра со спеками, либо `claude mcp add --transport http figma http://127.0.0.1:3845/mcp`
+при включённом Dev Mode MCP Server в десктопном Figma и перезапуск сессии.
+* Проверить `z-index` панели против `ScrollToBottomButton` в `MessageList.module.css`.
+* Гасить ли вкладку по фиче-флагу `ru.otpbank.kc.emoji` из `/_matrix/client/versions`, или
+достаточно пустого каталога (сервер и так отдаёт пустые списки при выключенной фиче).
+
+== См. также
+
+* `matrixkc/docs/client/client-protocol.adoc` — секции `[#emoji]`, `[#stickers]`.
+* `matrixkc/docs/plans/task-88-animated-emoji.adoc` — серверная часть.
+* `C:\Users\onyrk\Downloads\telegram_emoji_plan.md` — разбор подхода Telegram, откуда взяты
+приёмы производительности.
+
+
