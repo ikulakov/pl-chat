@@ -61,6 +61,12 @@
   "composer.upload.badType": "Формат файла не поддерживается",
   "composer.upload.tooLarge": "Файл слишком большой",
   "chat.upload.error": "Ошибка",
+  "picker.tab.emoji": "Эмодзи",
+  "picker.tab.stickers": "Стикеры",
+  "picker.list": "Выбор эмодзи и стикеров",
+  "picker.empty": "Пока ничего нет",
+  "picker.loadFailed": "Не удалось загрузить",
+  "picker.retry": "Повторить",
   "size.b": "Б",
   "size.kb": "КБ",
   "size.mb": "МБ"

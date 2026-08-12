@@ -13,6 +13,9 @@
   --c-surface-secondary: #f3f4f6;
   --c-surface-secondary-hover: #e8e9eb;
   --c-surface-tertiary: #f9f9fa;
+  /* Figma: Base/Surface/Tertiary/neutral-pressed — фон активной вкладки пикера.
+     Тот же цвет в Figma зовётся ещё Base/Border/Standard/neutral-normal (разделитель). */
+  --c-surface-tertiary-pressed: #e8eaed;
   --c-surface-contrast: #222;
   --c-surface-purple: #35165c;
 

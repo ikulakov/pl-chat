@@ -1,0 +1,174 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { FakeIntersectionObserver } from '../../../../test.setup'
+import { t } from '../../../i18n'
+import { EmojiPickerButton } from './EmojiPickerButton'
+
+const loadEmojiCatalog = vi.fn()
+const loadEmojiCategory = vi.fn()
+const loadEmojiAnimation = vi.fn()
+const loadStickerPacks = vi.fn()
+
+vi.mock('../../../hooks/useChatActions', () => ({
+  useChatActions: () => ({
+    loadEmojiCatalog,
+    loadEmojiCategory,
+    loadEmojiAnimation,
+    loadStickerPacks,
+  }),
+}))
+
+// lottie-web тянет canvas, которого в jsdom нет; здесь проверяется поведение панели,
+// а не сам плеер — у него свои тесты в shared/lottie.
+vi.mock('../../../shared/lottie/lottiePlayer', () => ({
+  loadLottiePlayer: () => Promise.resolve({}),
+  createEmojiPlayer: () => ({
+    totalFrames: 30,
+    frameRate: 30,
+    goToAndStop: vi.fn(),
+    destroy: vi.fn(),
+  }),
+}))
+
+function openPicker() {
+  fireEvent.click(screen.getByRole('button', { name: t('input.stickers') }))
+}
+
+/**
+ * Сетка грузит состав вкладки по пересечению сентинела — в jsdom его двигаем руками.
+ * Сентинел появляется только после ответа каталога, поэтому сначала ждём наблюдателей.
+ */
+async function scrollIntoView() {
+  await waitFor(() => expect(FakeIntersectionObserver.instances.length).toBeGreaterThan(0))
+  act(() => {
+    FakeIntersectionObserver.instances.forEach((observer) => observer.trigger(true))
+  })
+}
+
+describe('EmojiPickerButton', () => {
+  beforeEach(() => {
+    FakeIntersectionObserver.instances.length = 0
+    loadEmojiCatalog.mockResolvedValue({
+      version: 'v1',
+      categories: [{ id: 'smileys', title: 'Смайлы', count: 2, items: null }],
+    })
+    loadEmojiCategory.mockResolvedValue({
+      id: 'smileys',
+      title: 'Смайлы',
+      count: 1,
+      items: [{ codepoint: '1f600', char: '😀', silhouette: null }],
+    })
+    loadEmojiAnimation.mockResolvedValue({})
+    loadStickerPacks.mockResolvedValue([])
+  })
+
+  it('панель закрыта по умолчанию, кнопка сообщает об этом', () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: t('input.stickers') })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+  })
+
+  it('клик открывает панель с двумя вкладками', async () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+
+    openPicker()
+
+    expect(screen.getByRole('button', { name: t('input.stickers') })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    expect(await screen.findByRole('tab', { name: t('picker.tab.emoji') })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(screen.getByRole('tab', { name: t('picker.tab.stickers') })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    )
+  })
+
+  it('Escape закрывает панель и возвращает фокус на кнопку', async () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+    openPicker()
+    await screen.findByRole('tablist')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByRole('tablist')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: t('input.stickers') })).toHaveFocus()
+  })
+
+  it('клик снаружи закрывает панель, не отбирая фокус', async () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+    openPicker()
+    await screen.findByRole('tablist')
+
+    fireEvent.pointerDown(document.body)
+
+    await waitFor(() => expect(screen.queryByRole('tablist')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: t('input.stickers') })).not.toHaveFocus()
+  })
+
+  it('стрелка вправо переключает на вкладку стикеров', async () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+    openPicker()
+    const emojiTab = await screen.findByRole('tab', { name: t('picker.tab.emoji') })
+
+    fireEvent.keyDown(emojiTab, { key: 'ArrowRight' })
+
+    expect(screen.getByRole('tab', { name: t('picker.tab.stickers') })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+  })
+
+  it('состав вкладки грузится только когда секция подошла к вьюпорту', async () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+    openPicker()
+    await waitFor(() => expect(FakeIntersectionObserver.instances.length).toBeGreaterThan(0))
+
+    expect(loadEmojiCategory).not.toHaveBeenCalled()
+
+    await scrollIntoView()
+
+    await waitFor(() => expect(loadEmojiCategory).toHaveBeenCalledExactlyOnceWith('smileys'))
+  })
+
+  it('повторные пересечения не шлют повторных запросов состава', async () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+    openPicker()
+
+    await scrollIntoView()
+    await waitFor(() => expect(loadEmojiCategory).toHaveBeenCalledOnce())
+    await scrollIntoView()
+    await scrollIntoView()
+
+    expect(loadEmojiCategory).toHaveBeenCalledOnce()
+  })
+
+  it('выбор эмодзи отдаёт символ наружу и не закрывает панель', async () => {
+    const onSelectEmoji = vi.fn()
+    render(<EmojiPickerButton onSelectEmoji={onSelectEmoji} />)
+    openPicker()
+    await scrollIntoView()
+
+    fireEvent.click(await screen.findByRole('button', { name: '😀' }))
+
+    expect(onSelectEmoji).toHaveBeenCalledExactlyOnceWith('😀')
+    expect(screen.getByRole('tablist')).toBeInTheDocument()
+  })
+
+  it('сбой каталога показывает ошибку с повтором вместо пустой панели', async () => {
+    loadEmojiCatalog.mockRejectedValue(new Error('offline'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+
+    openPicker()
+
+    expect(await screen.findByRole('button', { name: t('picker.retry') })).toBeInTheDocument()
+  })
+})

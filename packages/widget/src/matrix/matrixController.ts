@@ -1,9 +1,14 @@
 import type { CardAction } from '../domain/adaptiveCards'
+import type { EmojiAnimation, EmojiCatalog, EmojiCategory, StickerPack } from '../domain/emoji'
 import { MediaUnavailableError } from '../domain/mediaError'
 import { createOptimisticMediaMessage, createOptimisticTextMessage } from '../domain/optimistic'
 import { canMoveMarker } from '../domain/receipts'
 import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '../domain/timeline'
 import { isAbortError } from '../shared/utils/abort'
+// Оба кэша медиа считают записи, а не байты: вес записи в каждом ограничен сверху
+// (миниатюра — по построению, свой файл — лимитом композера), поэтому число записей и есть
+// предсказуемый потолок памяти.
+import { evictOldest } from '../shared/utils/evictOldest'
 import type { ImageDimensions } from '../shared/utils/imageDimensions'
 import { parseMxcUrl, type ParsedMxcUrl } from '../shared/utils/mxc'
 import { sleep } from '../shared/utils/sleep'
@@ -18,6 +23,7 @@ import {
   type AuthErrorContext,
 } from './api/matrixError'
 import { MatrixHistoryLoader } from './history/historyLoader'
+import { toEmojiCatalog, toEmojiCategory, toStickerPacks } from './mappers/emoji'
 import { classifyMediaError } from './mappers/mediaError'
 import {
   toAdaptiveActionContent,
@@ -59,6 +65,10 @@ export interface MatrixService {
   sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
+  loadEmojiCatalog: () => Promise<EmojiCatalog>
+  loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
+  loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
+  loadStickerPacks: () => Promise<StickerPack[]>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   markRead: (eventId: string) => Promise<void>
@@ -249,6 +259,24 @@ export class MatrixController implements MatrixService {
     return this.withLocalFallback(mxcUrl, (parsed) =>
       this.fetchMediaBytes(() => this.api.downloadMedia(parsed)),
     )
+  }
+
+  // Каталоги эмодзи и стикеров не проходят через стор и не сверяются с lifecycleId: это не
+  // состояние диалога, а справочник — он одинаков для любой сессии и переживает переподключение.
+  async loadEmojiCatalog(): Promise<EmojiCatalog> {
+    return toEmojiCatalog(await this.api.getEmojiCategories())
+  }
+
+  async loadEmojiCategory(categoryId: string): Promise<EmojiCategory> {
+    return toEmojiCategory(await this.api.getEmojiCategory(categoryId))
+  }
+
+  loadEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
+    return this.api.getEmojiAnimation(codepoint, version)
+  }
+
+  async loadStickerPacks(): Promise<StickerPack[]> {
+    return toStickerPacks(await this.api.getStickerPacks())
   }
 
   private async withLocalFallback(
@@ -570,18 +598,5 @@ export class MatrixController implements MatrixService {
       return null
     }
     return { identity, room }
-  }
-}
-
-/**
- * Держит кэш в пределах `max` записей, выбрасывая самые давние. Оба кэша медиа считают записи,
- * а не байты: вес записи в каждом из них ограничен сверху (миниатюра — по построению,
- * свой файл — лимитом композера), поэтому число записей и есть предсказуемый потолок памяти.
- */
-function evictOldest<T>(entries: Map<string, T>, max: number): void {
-  // Map хранит порядок вставки — он же порядок вытеснения.
-  for (const oldest of entries.keys()) {
-    if (entries.size <= max) break
-    entries.delete(oldest)
   }
 }

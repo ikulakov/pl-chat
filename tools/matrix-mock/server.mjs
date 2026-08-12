@@ -6,7 +6,12 @@
 // Запуск:  pnpm dev          (слушает :3001 — vite проксирует /_matrix туда)
 //
 // Покрывает весь клиентский MVP: переписка, статусы, typing, ✓✓ (receipts),
-// история, медиа-заглушки, стикеры, Adaptive Cards, завершение чата.
+// история, медиа-заглушки, стикеры, эмодзи, Adaptive Cards, завершение чата.
+//
+// Эмодзи: встроенный набор на 22 позиции в 3 категориях (codepoint'ы — из реального пака
+// matrixkc). Силуэты и Lottie генерируются на лету, поэтому анимация в моке одинаковая
+// «пульсирующая клякса» — проверить сетку на настоящих 580 позициях можно только против
+// живого matrixkc с профилем emoji-pack.
 //
 // История: ~480 осмысленных реплик из scenario.json → historyTopics, растянутых на 10 дней
 // (работают date-разделители). Объём: MOCK_HISTORY_MESSAGES=1000 pnpm dev
@@ -51,6 +56,7 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { deflateSync } from "node:zlib";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const scenario = JSON.parse(readFileSync(join(__dirname, "scenario.json"), "utf8"));
@@ -75,6 +81,57 @@ const STICKERS = [
   media_id: s.id,
 }));
 const STICKER_EMOJI = Object.fromEntries(STICKERS.map((s) => [s.media_id, s.emoji]));
+
+// ── Каталог эмодзи (mock) ────────────────────────────────────────────────────
+// Настоящий пак — 580 анимаций на 17 МБ в matrixkc (профиль emoji-pack). Здесь встроенный
+// набор: codepoint'ы взяты из реального emoji.csv, поэтому переключение мока на живой
+// бэкенд ничего не ломает. Силуэты и анимации генерируются на лету (см. grayPng/mockLottie).
+const EMOJI_PACK_VERSION = "mock-1";
+const EMOJI_CATEGORIES = [
+  {
+    id: "smileys",
+    display_name: "Смайлы и эмоции",
+    emoji: [
+      ["1f600", "😀"],
+      ["1f602", "😂"],
+      ["1f60d", "😍"],
+      ["1f618", "😘"],
+      ["1f621", "😡"],
+      ["1f62d", "😭"],
+      ["1f643", "🙃"],
+      ["1f929", "🤩"],
+      ["1f92f", "🤯"],
+      ["1f973", "🥳"],
+      ["1f4a9", "💩"],
+      ["2764", "❤"],
+      ["1f47b", "👻"],
+      ["1f480", "💀"],
+    ],
+  },
+  {
+    id: "animals",
+    display_name: "Животные и природа",
+    emoji: [
+      ["1f331", "🌱"],
+      ["1f333", "🌳"],
+      ["1f337", "🌷"],
+      ["1f339", "🌹"],
+    ],
+  },
+  {
+    id: "food",
+    display_name: "Еда и напитки",
+    emoji: [
+      ["1f32d", "🌭"],
+      ["1f346", "🍆"],
+      ["1f353", "🍓"],
+      ["1f355", "🍕"],
+    ],
+  },
+];
+const EMOJI_BY_CODEPOINT = new Set(
+  EMOJI_CATEGORIES.flatMap((c) => c.emoji.map(([codepoint]) => codepoint)),
+);
 
 // ── In-memory состояние комнаты ──────────────────────────────────────────────
 let seq = 0;
@@ -587,6 +644,173 @@ function svgSticker(emoji) {
   );
 }
 
+// ── Генерация ассетов эмодзи ─────────────────────────────────────────────────
+// Силуэт обязан быть настоящим PNG: клиент подставляет его как data:image/png;base64,...
+// и SVG под этим mime браузер не покажет. Кодировщик минимальный (grayscale 8 бит), zlib
+// в node встроенный — зависимостей у мока по-прежнему нет.
+
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body));
+  return Buffer.concat([len, body, crc]);
+}
+
+/** Силуэт 32×32: круглое пятно, как альфа-маска настоящего эмодзи. */
+function grayPng(seed) {
+  const size = 32;
+  const radius = 12 + (seed % 4);
+  const raw = Buffer.alloc(size * (size + 1));
+
+  for (let y = 0; y < size; y++) {
+    raw[y * (size + 1)] = 0; // фильтр строки: None
+    for (let x = 0; x < size; x++) {
+      const dx = x - 15.5;
+      const dy = y - 15.5;
+      const inside = dx * dx + dy * dy <= radius * radius;
+      raw[y * (size + 1) + 1 + x] = inside ? 0xb0 : 0xff;
+    }
+  }
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8; // бит на канал
+  ihdr[9] = 0; // grayscale
+
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", deflateSync(raw)),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+/**
+ * Синтетическая Lottie-анимация: пульсирующий круг. Настоящие .tgs весят ~30 КБ каждая,
+ * тащить их в репозиторий фронта незачем — для проверки плеера, пула и пауз по видимости
+ * достаточно того, что что-то заметно движется. Цвет выводится из codepoint'а, чтобы
+ * соседние ячейки визуально различались.
+ *
+ * Структура повторяет вывод Bodymovin вплоть до служебных полей (`d` у эллипса, `r` у
+ * заливки, `ix`/`np`, `sk`/`sa` у трансформа). Это не украшательство: без `d` lottie-web
+ * строит пустой path, и вместо круга рисуется залитый прямоугольник во всю канву.
+ */
+function mockLottie(codepoint) {
+  const seed = [...codepoint].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  const hue = seed % 360;
+  const rgb = hslToRgb(hue / 360, 0.7, 0.55);
+
+  // Промежуточный keyframe обязан нести кривые i/o. Без них lottie-web не считает значение,
+  // трансформ слоя уходит в никуда и не рисуется вообще ничего.
+  const EASE = { i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } };
+  const scale = (t, s) => ({ ...EASE, t, s: [s, s, 100] });
+
+  return {
+    v: "5.7.4",
+    fr: 30,
+    ip: 0,
+    op: 30,
+    w: 512,
+    h: 512,
+    nm: `mock-${codepoint}`,
+    ddd: 0,
+    assets: [],
+    layers: [
+      {
+        ddd: 0,
+        ind: 1,
+        ty: 4,
+        nm: "blob",
+        sr: 1,
+        ao: 0,
+        ks: {
+          o: { a: 0, k: 100, ix: 11 },
+          r: {
+            a: 1,
+            k: [
+              { ...EASE, t: 0, s: [0] },
+              { t: 30, s: [360] },
+            ],
+            ix: 10,
+          },
+          p: { a: 0, k: [256, 256, 0], ix: 2 },
+          a: { a: 0, k: [0, 0, 0], ix: 1 },
+          s: { a: 1, k: [scale(0, 70), scale(15, 110), scale(30, 70)], ix: 6 },
+        },
+        shapes: [
+          {
+            ty: "gr",
+            it: [
+              {
+                d: 1,
+                ty: "el",
+                s: { a: 0, k: [300, 300], ix: 2 },
+                p: { a: 0, k: [0, 0], ix: 3 },
+                nm: "Ellipse Path 1",
+                hd: false,
+              },
+              {
+                ty: "fl",
+                c: { a: 0, k: [...rgb, 1], ix: 4 },
+                o: { a: 0, k: 100, ix: 5 },
+                r: 1,
+                bm: 0,
+                nm: "Fill 1",
+                hd: false,
+              },
+              {
+                ty: "tr",
+                p: { a: 0, k: [0, 0], ix: 2 },
+                a: { a: 0, k: [0, 0], ix: 1 },
+                s: { a: 0, k: [100, 100], ix: 3 },
+                r: { a: 0, k: 0, ix: 6 },
+                o: { a: 0, k: 100, ix: 7 },
+                sk: { a: 0, k: 0, ix: 4 },
+                sa: { a: 0, k: 0, ix: 5 },
+                nm: "Transform",
+              },
+            ],
+            nm: "Ellipse 1",
+            np: 3,
+            cix: 2,
+            bm: 0,
+            ix: 1,
+            hd: false,
+          },
+        ],
+        ip: 0,
+        op: 30,
+        st: 0,
+        bm: 0,
+      },
+    ],
+    markers: [],
+  };
+}
+
+function hslToRgb(h, s, l) {
+  const f = (n) => {
+    const k = (n + h * 12) % 12;
+    return l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  };
+  return [f(0), f(8), f(4)];
+}
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname;
@@ -782,6 +1006,47 @@ const server = createServer(async (req, res) => {
   // Каталог стикеров
   if (/stickers\/v1\/packs$/.test(path)) {
     return send(res, 200, { packs: [{ id: "otp", display_name: "OTP", stickers: STICKERS }] });
+  }
+  // Вкладки пикера эмодзи: счётчики без состава
+  if (/emoji\/v1\/categories$/.test(path)) {
+    return send(res, 200, {
+      version: EMOJI_PACK_VERSION,
+      categories: EMOJI_CATEGORIES.map((c) => ({
+        id: c.id,
+        display_name: c.display_name,
+        count: c.emoji.length,
+      })),
+    });
+  }
+  // Состав одной вкладки — вместе с силуэтами
+  const categoryMatch = path.match(/emoji\/v1\/categories\/([^/]+)$/);
+  if (categoryMatch) {
+    const category = EMOJI_CATEGORIES.find((c) => c.id === categoryMatch[1]);
+    if (!category) return send(res, 404, { errcode: "M_NOT_FOUND", error: "unknown category" });
+
+    return send(res, 200, {
+      id: category.id,
+      display_name: category.display_name,
+      count: category.emoji.length,
+      emoji: category.emoji.map(([codepoint, e], i) => ({
+        codepoint,
+        e,
+        p: grayPng(i).toString("base64"),
+      })),
+    });
+  }
+  // Байты анимации. Настоящий сервер отдаёт gzip'нутый .tgs как есть, но заголовок
+  // Content-Encoding ставит только под Accept-Encoding — здесь просто отдаём готовый JSON.
+  const emojiMatch = path.match(/^\/_matrix\/emoji\/([^/]+)$/);
+  if (emojiMatch) {
+    const codepoint = emojiMatch[1];
+    if (!/^[0-9a-f]{4,5}(-[0-9a-f]{4,5})*$/.test(codepoint)) {
+      return send(res, 400, { errcode: "M_INVALID_PARAM", error: "bad codepoint" });
+    }
+    if (!EMOJI_BY_CODEPOINT.has(codepoint)) {
+      return send(res, 404, { errcode: "M_NOT_FOUND", error: "no such emoji" });
+    }
+    return send(res, 200, mockLottie(codepoint));
   }
   // Web Push — требует реального браузерного push-сервиса
   if (/kc\/push\/webpush/.test(path)) {

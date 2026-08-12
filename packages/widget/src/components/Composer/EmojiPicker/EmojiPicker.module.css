@@ -1,0 +1,154 @@
+/* Метрики — из Figma (Chatbot, node 1337:26222 «Emodji»). */
+
+.trigger {
+  /* Иконка 24×24 в слоте 40px — размер уже задан .slot в Composer.module.css. */
+  color: var(--c-text-tertiary);
+}
+
+.panel {
+  position: absolute;
+  /* Панель раскрывается вверх поверх ленты; 4px до верхней кромки композера. */
+  bottom: calc(100% + 4px);
+  /* Правый край — по правому краю слота кнопки-смайла: 8px паддинга .wrap + 44px слота
+     отправки. Так панель «висит» под своим триггером, а не под краем окна. */
+  right: 52px;
+  z-index: var(--z-overlay);
+
+  display: flex;
+  flex-direction: column;
+  width: 264px;
+  height: 284px;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--c-surface-primary);
+  /* В макете 0 15px 56px — на пиксель ниже токена; заводить ради этого второй не стали. */
+  box-shadow: var(--shadow-popover);
+}
+
+.tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+  height: 46px;
+  padding: 12px;
+  border-bottom: 1px solid var(--c-surface-tertiary-pressed);
+}
+
+.tab {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  font-family: var(--font);
+  /* Figma Caption/1M */
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.1px;
+  color: var(--c-text-tertiary);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--c-surface-secondary);
+  }
+}
+
+.tabActive {
+  /* Активная вкладка отличается только фоном — цвет текста в макете тот же. */
+  background: var(--c-surface-tertiary-pressed);
+
+  &:hover {
+    background: var(--c-surface-tertiary-pressed);
+  }
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-scrollbar) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: var(--c-scrollbar);
+  }
+}
+
+.grid {
+  display: grid;
+  /* 7 колонок по 36px (иконка 24 + по 6px хитбокса) — доли, а не фиксированная ширина:
+     так сетка не разъезжается от того, забирает ли скроллбар место под себя. */
+  grid-template-columns: repeat(7, 1fr);
+  padding: 6px;
+}
+
+.cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--c-surface-secondary);
+  }
+}
+
+.silhouette,
+.canvas {
+  grid-area: 1 / 1;
+  width: 24px;
+  height: 24px;
+}
+
+.canvas {
+  display: block;
+
+  & canvas {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.stickerGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 12px;
+}
+
+.sticker {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+.message {
+  padding: 16px 12px;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+  color: var(--c-text-tertiary);
+}
+
+.retry {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: var(--c-text-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}

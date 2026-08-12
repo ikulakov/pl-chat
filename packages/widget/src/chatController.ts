@@ -1,6 +1,7 @@
 import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
 import type { CardAction } from './domain/adaptiveCards'
+import type { EmojiAnimation, EmojiCatalog, EmojiCategory, StickerPack } from './domain/emoji'
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService, SendFileOptions } from './matrix/matrixController'
 import type { ThumbnailSize } from './matrix/api/matrixApi'
@@ -13,6 +14,10 @@ export interface ChatActions {
   sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
+  loadEmojiCatalog: () => Promise<EmojiCatalog>
+  loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
+  loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
+  loadStickerPacks: () => Promise<StickerPack[]>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   replyTo: (target: ReplyTarget) => void
@@ -51,6 +56,10 @@ export class ChatController {
       sendCardAction: this.sendCardAction,
       loadPreview: this.loadPreview,
       downloadFile: this.downloadFile,
+      loadEmojiCatalog: this.loadEmojiCatalog,
+      loadEmojiCategory: this.loadEmojiCategory,
+      loadEmojiAnimation: this.loadEmojiAnimation,
+      loadStickerPacks: this.loadStickerPacks,
       cancelUpload: this.cancelUpload,
       resendMessage: this.resendMessage,
       replyTo: this.replyTo,
@@ -108,6 +117,16 @@ export class ChatController {
     this.matrix.loadPreview(mxcUrl, size)
 
   downloadFile = (mxcUrl: string): Promise<Blob> => this.matrix.downloadFile(mxcUrl)
+
+  loadEmojiCatalog = (): Promise<EmojiCatalog> => this.matrix.loadEmojiCatalog()
+
+  loadEmojiCategory = (categoryId: string): Promise<EmojiCategory> =>
+    this.matrix.loadEmojiCategory(categoryId)
+
+  loadEmojiAnimation = (codepoint: string, version: string): Promise<EmojiAnimation> =>
+    this.matrix.loadEmojiAnimation(codepoint, version)
+
+  loadStickerPacks = (): Promise<StickerPack[]> => this.matrix.loadStickerPacks()
 
   cancelUpload = (localId: string): void => this.matrix.cancelUpload(localId)
 

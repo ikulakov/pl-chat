@@ -287,6 +287,14 @@ export function makeMatrixApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
     downloadMedia: vi.fn<MatrixApi['downloadMedia']>().mockResolvedValue(new Blob(['bytes'])),
     getThumbnail: vi.fn<MatrixApi['getThumbnail']>().mockResolvedValue(new Blob(['thumb'])),
     sendReadReceipt: vi.fn<MatrixApi['sendReadReceipt']>().mockResolvedValue({}),
+    getEmojiCategories: vi
+      .fn<MatrixApi['getEmojiCategories']>()
+      .mockResolvedValue({ version: '2026-08-12', categories: [] }),
+    getEmojiCategory: vi
+      .fn<MatrixApi['getEmojiCategory']>()
+      .mockResolvedValue({ id: 'smileys', display_name: 'Смайлы', count: 0, emoji: [] }),
+    getEmojiAnimation: vi.fn<MatrixApi['getEmojiAnimation']>().mockResolvedValue({}),
+    getStickerPacks: vi.fn<MatrixApi['getStickerPacks']>().mockResolvedValue({ packs: [] }),
     ...overrides,
   }
 }

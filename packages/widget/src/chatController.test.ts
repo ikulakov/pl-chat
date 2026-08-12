@@ -29,6 +29,10 @@ function makeMatrix(): MatrixService {
     loadMoreHistory: vi.fn().mockResolvedValue(undefined),
     stopLoadingHistory: vi.fn(),
     loadPreview: vi.fn().mockResolvedValue(new Blob()),
+    loadEmojiCatalog: vi.fn().mockResolvedValue({ version: '1', categories: [] }),
+    loadEmojiCategory: vi.fn().mockResolvedValue({ id: '', title: '', count: 0, items: [] }),
+    loadEmojiAnimation: vi.fn().mockResolvedValue({}),
+    loadStickerPacks: vi.fn().mockResolvedValue([]),
   }
 }
 
