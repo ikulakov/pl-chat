@@ -1,8 +1,10 @@
 import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
+import type { EmojiCatalog } from './domain/emoji'
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService, SendFileOptions } from './matrix/matrixController'
 import type { ThumbnailSize } from './matrix/api/matrixApi'
+import type { LottieJson } from './shared/lottie/types'
 import type { ReplyTarget } from './store/state'
 import { chatStore } from './store/store'
 
@@ -11,6 +13,8 @@ export interface ChatActions {
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
+  loadEmojiCatalog: () => Promise<EmojiCatalog>
+  loadEmojiAnimation: (codepoint: string) => Promise<LottieJson>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   replyTo: (target: ReplyTarget) => void
@@ -48,6 +52,8 @@ export class ChatController {
       sendFile: this.sendFile,
       loadPreview: this.loadPreview,
       downloadFile: this.downloadFile,
+      loadEmojiCatalog: this.loadEmojiCatalog,
+      loadEmojiAnimation: this.loadEmojiAnimation,
       cancelUpload: this.cancelUpload,
       resendMessage: this.resendMessage,
       replyTo: this.replyTo,
@@ -102,6 +108,11 @@ export class ChatController {
     this.matrix.loadPreview(mxcUrl, size)
 
   downloadFile = (mxcUrl: string): Promise<Blob> => this.matrix.downloadFile(mxcUrl)
+
+  loadEmojiCatalog = (): Promise<EmojiCatalog> => this.matrix.loadEmojiCatalog()
+
+  loadEmojiAnimation = (codepoint: string): Promise<LottieJson> =>
+    this.matrix.loadEmojiAnimation(codepoint)
 
   cancelUpload = (localId: string): void => this.matrix.cancelUpload(localId)
 

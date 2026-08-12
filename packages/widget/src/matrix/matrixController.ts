@@ -1,3 +1,4 @@
+import type { EmojiCatalog } from '../domain/emoji'
 import { MediaUnavailableError } from '../domain/mediaError'
 import { createOptimisticMediaMessage, createOptimisticTextMessage } from '../domain/optimistic'
 import { canMoveMarker } from '../domain/receipts'
@@ -7,7 +8,9 @@ import {
   type MediaTimelineItem,
   type MessageTimelineItem,
 } from '../domain/timeline'
+import type { LottieJson } from '../shared/lottie/types'
 import { isAbortError } from '../shared/utils/abort'
+import { evictOldest } from '../shared/utils/evictOldest'
 import type { ImageDimensions } from '../shared/utils/imageDimensions'
 import { parseMxcUrl, type ParsedMxcUrl } from '../shared/utils/mxc'
 import { sleep } from '../shared/utils/sleep'
@@ -22,6 +25,7 @@ import {
   type AuthErrorContext,
 } from './api/matrixError'
 import { MatrixHistoryLoader } from './history/historyLoader'
+import { toEmojiCatalog } from './mappers/emoji'
 import { classifyMediaError } from './mappers/mediaError'
 import { toOutgoingContent } from './mappers/outgoing'
 import { toRoomSyncPatch } from './mappers/roomSync'
@@ -51,6 +55,11 @@ const MAX_CACHED_PREVIEWS = 40
 // сессии. Одновременно «в полёте» бывает один-два файла, поэтому запас минимальный.
 const MAX_LOCAL_ORIGINALS = 3
 
+// Сколько разобранных анимаций держим. Лимит намеренно скромный: распакованный Lottie весит
+// десятки-сотни килобайт в памяти, а повторное скачивание почти бесплатно — байты отдаются
+// с immutable на неделю, то есть лежат в HTTP-кэше браузера.
+const MAX_CACHED_EMOJI = 24
+
 export interface MatrixService {
   connect: () => Promise<void>
   disconnect: () => void
@@ -58,6 +67,8 @@ export interface MatrixService {
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
+  loadEmojiCatalog: () => Promise<EmojiCatalog>
+  loadEmojiAnimation: (codepoint: string) => Promise<LottieJson>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   markRead: (eventId: string) => Promise<void>
@@ -94,6 +105,12 @@ export class MatrixController implements MatrixService {
   // до вердикта CDR сервер отвечает на них 504, и без локальной копии своя же картинка
   // пропадала бы из ленты сразу после отправки. Отвечает и на превью, и на оригинал.
   private readonly localOriginals = new Map<string, Blob>()
+
+  // Каталог эмодзи и разобранные анимации. В отличие от медиа, это server-managed контент —
+  // один и тот же ответ для всех, поэтому смена сессии его не обесценивает и nextLifecycle()
+  // эти кэши не чистит. Хранится промис: он же дедуп параллельных запросов одного codepoint.
+  private emojiCatalog: Promise<EmojiCatalog> | null = null
+  private readonly emojiAnimations = new Map<string, Promise<LottieJson>>()
 
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
@@ -221,6 +238,39 @@ export class MatrixController implements MatrixService {
     return this.withLocalFallback(mxcUrl, (parsed) =>
       this.fetchMediaBytes(() => this.api.downloadMedia(parsed)),
     )
+  }
+
+  loadEmojiCatalog(): Promise<EmojiCatalog> {
+    this.emojiCatalog ??= this.api
+      .getEmojiPacks()
+      .then(toEmojiCatalog)
+      .catch((err: unknown) => {
+        // Упавший каталог в кэше не держим: следующая попытка (переоткрытие панели) начнёт заново.
+        this.emojiCatalog = null
+        throw err
+      })
+
+    return this.emojiCatalog
+  }
+
+  loadEmojiAnimation(codepoint: string): Promise<LottieJson> {
+    const cached = this.emojiAnimations.get(codepoint)
+    if (cached) return cached
+
+    const request = this.fetchEmojiAnimation(codepoint).catch((err: unknown) => {
+      this.emojiAnimations.delete(codepoint)
+      throw err
+    })
+
+    this.emojiAnimations.set(codepoint, request)
+    evictOldest(this.emojiAnimations, MAX_CACHED_EMOJI)
+
+    return request
+  }
+
+  private async fetchEmojiAnimation(codepoint: string): Promise<LottieJson> {
+    const { version } = await this.loadEmojiCatalog()
+    return this.api.getEmojiAnimation(codepoint, version)
   }
 
   private async withLocalFallback(
@@ -536,18 +586,5 @@ export class MatrixController implements MatrixService {
       return null
     }
     return { identity, room }
-  }
-}
-
-/**
- * Держит кэш в пределах `max` записей, выбрасывая самые давние. Оба кэша медиа считают записи,
- * а не байты: вес записи в каждом из них ограничен сверху (миниатюра — по построению,
- * свой файл — лимитом композера), поэтому число записей и есть предсказуемый потолок памяти.
- */
-function evictOldest<T>(entries: Map<string, T>, max: number): void {
-  // Map хранит порядок вставки — он же порядок вытеснения.
-  for (const oldest of entries.keys()) {
-    if (entries.size <= max) break
-    entries.delete(oldest)
   }
 }

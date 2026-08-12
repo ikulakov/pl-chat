@@ -26,6 +26,7 @@
 //   /reply      — оператор отвечает цитатой на последнее сообщение клиента
 //   /reply img  — то же картинкой, /reply file — файлом (входящая цитата на медиа)
 //   /sticker    — оператор присылает стикер
+//   /emoji      — три сообщения с эмодзи: большое, среднее и строчные внутри текста
 //   /fail       — следующая отправка клиента вернёт ошибку (проверка «Повторить»)
 //   /failupload — следующая загрузка файла вернёт ошибку (сеть/5xx — повтор осмыслен)
 //   /rejectupload — следующая загрузка отклоняется fileguard'ом (400): повтора нет
@@ -64,6 +65,140 @@ const STICKERS = [
   media_id: s.id,
 }));
 const STICKER_EMOJI = Object.fromEntries(STICKERS.map((s) => [s.media_id, s.emoji]));
+
+// ── Каталог эмодзи (mock) ────────────────────────────────────────────────────
+// Codepoint'ы канонические, как у matrixkc: hex через дефис, без вариационного селектора
+// fe0f. В наборе намеренно есть ❤ (в тексте приезжает с fe0f) и две ZWJ-цепочки — на них
+// проверяется нормализация и то, что клиент не разваливает кластер на части.
+const EMOJI_PACK = {
+  id: "tg-animated",
+  display_name: "Анимированные эмодзи",
+  version: "mock-1",
+  info: { mimetype: "application/json", w: 512, h: 512, is_animated: true },
+  categories: [
+    {
+      id: "smileys",
+      display_name: "Смайлы и эмоции",
+      emoji: [
+        { codepoint: "1f600", e: "😀" },
+        { codepoint: "1f60b", e: "😋" },
+        { codepoint: "1f602", e: "😂" },
+        { codepoint: "1f60d", e: "😍" },
+        { codepoint: "1f914", e: "🤔" },
+        { codepoint: "1f44b", e: "👋" },
+        { codepoint: "1f44d", e: "👍" },
+        { codepoint: "1f525", e: "🔥" },
+      ],
+    },
+    {
+      id: "symbols",
+      display_name: "Символы",
+      emoji: [
+        { codepoint: "2764", e: "❤" },
+        { codepoint: "2b50", e: "⭐" },
+        { codepoint: "2705", e: "✅" },
+        { codepoint: "26a1", e: "⚡" },
+      ],
+    },
+    {
+      id: "people",
+      display_name: "Люди",
+      emoji: [
+        { codepoint: "1f469-200d-2695", e: "👩‍⚕" },
+        { codepoint: "1f926-200d-2640", e: "🤦‍♀" },
+      ],
+    },
+  ].map((c) => ({ ...c, count: c.emoji.length })),
+};
+
+const EMOJI_CODEPOINTS = new Set(
+  EMOJI_PACK.categories.flatMap((c) => c.emoji.map((e) => e.codepoint)),
+);
+
+/**
+ * Синтетический Lottie вместо настоящей анимации из TGS: пульсирующий кружок.
+ * Реальные байты рисуют эмодзи, здесь важно другое — что плеер жив и кадры сменяются,
+ * поэтому анимируется размер: вращение симметричной фигуры на глаз неотличимо от статики.
+ * Цвет выводится из codepoint, чтобы разные эмодзи отличались друг от друга.
+ */
+function lottieEmoji(codepoint) {
+  const hash = [...codepoint].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) % 997, 7);
+  // Палитра, а не арифметика по хэшу: случайный цвет легко выходит белым на белом фоне.
+  const palette = [
+    [0.95, 0.61, 0.07],
+    [0.91, 0.3, 0.24],
+    [0.2, 0.6, 0.86],
+    [0.18, 0.8, 0.44],
+    [0.61, 0.35, 0.71],
+    [0.95, 0.77, 0.06],
+  ];
+  const color = [...palette[hash % palette.length], 1];
+
+  return {
+    v: "5.7.4",
+    fr: 30,
+    ip: 0,
+    op: 60,
+    w: 512,
+    h: 512,
+    nm: codepoint,
+    ddd: 0,
+    assets: [],
+    layers: [
+      {
+        ddd: 0,
+        ind: 1,
+        ty: 4,
+        nm: "orbit",
+        sr: 1,
+        ks: {
+          o: {
+            a: 1,
+            k: [
+              { t: 0, s: [100], i: { x: [0.5], y: [0.5] }, o: { x: [0.5], y: [0.5] } },
+              { t: 30, s: [35], i: { x: [0.5], y: [0.5] }, o: { x: [0.5], y: [0.5] } },
+              { t: 60, s: [100] },
+            ],
+          },
+          r: { a: 0, k: 0 },
+          p: { a: 0, k: [256, 256, 0] },
+          a: { a: 0, k: [0, 0, 0] },
+          s: {
+            a: 1,
+            k: [
+              { t: 0, s: [60, 60, 100], i: { x: [0.5], y: [0.5] }, o: { x: [0.5], y: [0.5] } },
+              { t: 30, s: [115, 115, 100], i: { x: [0.5], y: [0.5] }, o: { x: [0.5], y: [0.5] } },
+              { t: 60, s: [60, 60, 100] },
+            ],
+          },
+        },
+        ao: 0,
+        shapes: [
+          {
+            ty: "gr",
+            nm: "group",
+            it: [
+              { d: 1, ty: "el", s: { a: 0, k: [220, 220] }, p: { a: 0, k: [0, 0] }, nm: "dot" },
+              { ty: "fl", c: { a: 0, k: color }, o: { a: 0, k: 100 }, nm: "fill" },
+              {
+                ty: "tr",
+                p: { a: 0, k: [0, -110] },
+                a: { a: 0, k: [0, 0] },
+                s: { a: 0, k: [100, 100] },
+                r: { a: 0, k: 0 },
+                o: { a: 0, k: 100 },
+              },
+            ],
+          },
+        ],
+        ip: 0,
+        op: 60,
+        st: 0,
+        bm: 0,
+      },
+    ],
+  };
+}
 
 // ── In-memory состояние комнаты ──────────────────────────────────────────────
 let seq = 0;
@@ -452,6 +587,13 @@ function operatorRespond(text, ownEventId) {
     const s = STICKERS[0];
     return delay(700, () => push("m.sticker", OP, { body: s.body, info: s.info, url: s.url }));
   }
+  // Три размера рендера эмодзи одной командой: большое, среднее и строчные внутри текста.
+  if (t.startsWith("/emoji")) {
+    const bodies = ["😋", "😋😀❤️", "Держи 👋 и ещё 😂 в тексте"];
+    return bodies.forEach((body, i) =>
+      delay(400 + i * 300, () => push("m.room.message", OP, { msgtype: "m.text", body })),
+    );
+  }
   // Обычный путь: «печатает…» → ответ.
   delay(400, () => setTyping([OP]));
   delay(1700, () => {
@@ -669,6 +811,19 @@ const server = createServer(async (req, res) => {
   if (stickerMatch) {
     return send(res, 200, svgSticker(STICKER_EMOJI[stickerMatch[1]] || "🙂"), "image/svg+xml");
   }
+  // Каталог эмодзи (в реале — с Bearer, мок токен не проверяет)
+  if (/emoji\/v1\/packs$/.test(path)) {
+    return send(res, 200, { packs: [EMOJI_PACK] });
+  }
+  // Байты анимации эмодзи: публичные, ключ — канонический codepoint. ?v игнорируем —
+  // это cache-buster для браузера, серверу он ничего не меняет.
+  const emojiMatch = path.match(/^\/_matrix\/emoji\/([0-9a-f-]+)$/);
+  if (emojiMatch) {
+    if (!EMOJI_CODEPOINTS.has(emojiMatch[1])) {
+      return send(res, 404, { errcode: "M_NOT_FOUND", error: "нет в паке: " + emojiMatch[1] });
+    }
+    return send(res, 200, lottieEmoji(emojiMatch[1]));
+  }
   // Каталог стикеров
   if (/stickers\/v1\/packs$/.test(path)) {
     return send(res, 200, { packs: [{ id: "otp", display_name: "OTP", stickers: STICKERS }] });
@@ -692,7 +847,7 @@ server.on("error", (err) => {
 server.listen(PORT, () => {
   console.log(`BankChat mock-сервер: http://localhost:${PORT}`);
   console.log(`Откройте виджет:     http://localhost:5174`);
-  console.log(`Команды в чате: /card  /notice  /left  /join  /html  /img  /file  /sticker`);
+  console.log(`Команды в чате: /card  /notice  /left  /join  /html  /img  /file  /sticker  /emoji`);
   console.log(`                /reply [img|file]  /fail  /failupload  /rejectupload`);
   console.log(`                /failthumb  /pendingmedia  /rejectmedia`);
 });

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { t } from '../i18n'
 import { cn } from '../shared/utils/cn'
+import { EmojiText } from './Emoji/EmojiText'
 import styles from './ReplyPreview.module.css'
 
 interface Props {
@@ -14,7 +15,9 @@ export function ReplyPreview({ author, text, onClick }: Props) {
   const body: ReactNode = (
     <>
       {author && <span className={styles.author}>{author}</span>}
-      <span className={styles.text}>{text}</span>
+      <span className={styles.text}>
+        <EmojiText text={text} />
+      </span>
     </>
   )
 

@@ -13,4 +13,7 @@ export const Endpoints = createEndpoints({
   UPLOAD_MEDIA: `${MATRIX_MEDIA}/v3/upload`,
   DOWNLOAD_MEDIA: `${MATRIX_CLIENT}/v1/media/download/{serverName}/{mediaId}`,
   THUMBNAIL_MEDIA: `${MATRIX_CLIENT}/v1/media/thumbnail/{serverName}/{mediaId}`,
+  EMOJI_PACKS: `${MATRIX_CLIENT}/unstable/ru.otpbank.kc/emoji/v1/packs`,
+  // Байты анимации: server-managed каталог, один ответ на всех, отдаётся без токена.
+  EMOJI_LOTTIE: `/_matrix/emoji/{codepoint}`,
 } as const)

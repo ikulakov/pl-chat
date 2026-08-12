@@ -1,4 +1,6 @@
+import type { LottieJson } from '../../shared/lottie/types'
 import type { ParsedMxcUrl } from '../../shared/utils/mxc'
+import type { EmojiPacksResponse } from '../wire/emoji'
 import type {
   MessagesResponse,
   OutgoingContent,
@@ -92,6 +94,19 @@ export function createMatrixApi(transport: MatrixTransport) {
     ): Promise<Blob> {
       return transport.download(Endpoints.THUMBNAIL_MEDIA({ mediaId, serverName }), {
         searchParams: { width, height, method: 'scale' },
+      })
+    },
+
+    getEmojiPacks(): Promise<EmojiPacksResponse> {
+      return transport.request(Endpoints.EMOJI_PACKS)
+    },
+
+    getEmojiAnimation(codepoint: string, version: string): Promise<LottieJson> {
+      // Байты идут через transport, чтобы базовый URL резолвился в одном месте; лишний Bearer
+      // на permitAll-эндпоинте безвреден. Ответ приходит gzip'ом, браузер разжимает его сам.
+      // ?v — обязательный cache-buster: URL стабилен и кэшируется на неделю как immutable.
+      return transport.request(Endpoints.EMOJI_LOTTIE({ codepoint }), {
+        searchParams: { v: version },
       })
     },
 

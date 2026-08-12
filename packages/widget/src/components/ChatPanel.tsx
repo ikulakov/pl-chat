@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
+import { ensureEmojiCatalog } from '../shared/emoji/emojiCatalogStore'
 import { Spinner } from '../shared/ui/Spinner'
 import {
   selectOperator,
@@ -25,7 +27,12 @@ export function ChatPanel() {
   const operatorName = useChatStore(selectOperatorName)
   const viewport = useChatStore(selectViewport)
 
-  const { reconnect } = useChatActions()
+  const { reconnect, loadEmojiCatalog } = useChatActions()
+
+  // Каталог тянем один раз на вкладку и отсюда: лента и цитаты его только читают.
+  useEffect(() => {
+    ensureEmojiCatalog(loadEmojiCatalog)
+  }, [loadEmojiCatalog])
 
   return (
     <div className={chatStyles.panel}>
