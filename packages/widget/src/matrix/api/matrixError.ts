@@ -91,6 +91,7 @@ export type AuthErrorContext =
   | 'sendMessage'
   | 'resendMessage'
   | 'sendFile'
+  | 'sendCardAction'
   | 'markRead'
   | 'toggleReaction'
   | 'loadHistory'

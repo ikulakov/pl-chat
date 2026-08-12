@@ -1,11 +1,12 @@
 import { memo, useMemo } from 'react'
 import { aggregateReactions, type ReactionEntry } from '../../../domain/reactions'
-import type { MessageTimelineItem } from '../../../domain/timeline'
+import { type MessageTimelineItem } from '../../../domain/timeline'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { ITEM_ID_ATTR } from '../../../hooks/useLoadMoreHistory'
 import { RECEIPT_ID_ATTR } from '../../../hooks/useSendReadReceipts'
 import { cn } from '../../../shared/utils/cn'
 import { ReplyPreview } from '../../ReplyPreview'
+import { AdaptiveCardActions } from './AdaptiveCardActions'
 import type { BubbleMetaData } from './BubbleMeta'
 import { FileChip } from './FileChip'
 import { ImageMessage } from './ImageMessage'
@@ -75,36 +76,40 @@ export const MessageRow = memo(
           reactions={summaries}
         />
 
-        <MessageBubble
-          type={isOwn ? 'user' : 'operator'}
-          position={position}
-          reply={reply}
-          reactions={
-            summaries.length > 0 ? (
-              <ReactionBar
-                summaries={summaries}
-                onToggle={(key) => void toggleReaction(message.eventId, key)}
+        <div className={styles.content}>
+          <MessageBubble
+            type={isOwn ? 'user' : 'operator'}
+            position={position}
+            reply={reply}
+            reactions={
+              summaries.length > 0 ? (
+                <ReactionBar
+                  summaries={summaries}
+                  onToggle={(key) => void toggleReaction(message.eventId, key)}
+                />
+              ) : undefined
+            }
+          >
+            {message.kind === 'image' ? (
+              <ImageMessage
+                item={message}
+                meta={meta}
               />
-            ) : undefined
-          }
-        >
-          {message.kind === 'image' ? (
-            <ImageMessage
-              item={message}
-              meta={meta}
-            />
-          ) : message.kind === 'file' ? (
-            <FileChip
-              item={message}
-              meta={meta}
-            />
-          ) : (
-            <TextContent
-              text={message.content.body}
-              meta={meta}
-            />
-          )}
-        </MessageBubble>
+            ) : message.kind === 'file' ? (
+              <FileChip
+                item={message}
+                meta={meta}
+              />
+            ) : (
+              <TextContent
+                text={message.content.body}
+                meta={meta}
+              />
+            )}
+          </MessageBubble>
+
+          {message.kind === 'adaptiveCard' && <AdaptiveCardActions item={message} />}
+        </div>
       </div>
     )
   },

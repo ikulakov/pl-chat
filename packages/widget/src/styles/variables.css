@@ -6,7 +6,7 @@
   --c-text-placeholder: #909090;
   --c-text-invert: #fff;
   --c-text-invert-dim: rgba(255, 255, 255, 0.6);
-  --c-error: #EA2C45;
+  --c-error: #ea2c45;
 
   /* Surfaces */
   --c-surface-primary: #fff;
@@ -15,13 +15,16 @@
   --c-surface-tertiary: #f9f9fa;
   /* Colorfull/Surface/Secondary/Standard/blue-normal — подложка своей реакции */
   --c-surface-accent-soft: #edf6fd;
+  /* Figma: Base/Surface/Tertiary/neutral-pressed — фон активной вкладки пикера.
+     Тот же цвет в Figma зовётся ещё Base/Border/Standard/neutral-normal (разделитель). */
+  --c-surface-tertiary-pressed: #e8eaed;
   --c-surface-contrast: #222;
   --c-surface-purple: #35165c;
 
   /* Borders */
   --c-border: #f3f4f6;
-  --c-dashed-border: #dedfe1;
   --c-scrollbar: #e2e4e6;
+  --c-neutral: #dedfe1;
 
   /* Оттенок подложки иконки (адаптируется к currentColor) */
   --c-icon-tint: color-mix(in srgb, currentColor 12%, transparent);

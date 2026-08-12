@@ -1,5 +1,7 @@
 import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
+import type { CardAction } from './domain/adaptiveCards'
+import type { EmojiAnimation, EmojiCatalog, EmojiCategory, StickerPack } from './domain/emoji'
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService, SendFileOptions } from './matrix/matrixController'
 import type { ThumbnailSize } from './matrix/api/matrixApi'
@@ -9,8 +11,13 @@ import { chatStore } from './store/store'
 export interface ChatActions {
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
+  loadEmojiCatalog: () => Promise<EmojiCatalog>
+  loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
+  loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
+  loadStickerPacks: () => Promise<StickerPack[]>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   replyTo: (target: ReplyTarget) => void
@@ -47,8 +54,13 @@ export class ChatController {
     this.actions = {
       sendMessage: this.sendMessage,
       sendFile: this.sendFile,
+      sendCardAction: this.sendCardAction,
       loadPreview: this.loadPreview,
       downloadFile: this.downloadFile,
+      loadEmojiCatalog: this.loadEmojiCatalog,
+      loadEmojiCategory: this.loadEmojiCategory,
+      loadEmojiAnimation: this.loadEmojiAnimation,
+      loadStickerPacks: this.loadStickerPacks,
       cancelUpload: this.cancelUpload,
       resendMessage: this.resendMessage,
       replyTo: this.replyTo,
@@ -100,10 +112,23 @@ export class ChatController {
   sendFile = (file: File, options?: SendFileOptions): Promise<void> =>
     this.matrix.sendFile(file, options)
 
+  sendCardAction = (cardEventId: string, action: CardAction): Promise<void> =>
+    this.matrix.sendCardAction(cardEventId, action)
+
   loadPreview = (mxcUrl: string, size: ThumbnailSize): Promise<Blob> =>
     this.matrix.loadPreview(mxcUrl, size)
 
   downloadFile = (mxcUrl: string): Promise<Blob> => this.matrix.downloadFile(mxcUrl)
+
+  loadEmojiCatalog = (): Promise<EmojiCatalog> => this.matrix.loadEmojiCatalog()
+
+  loadEmojiCategory = (categoryId: string): Promise<EmojiCategory> =>
+    this.matrix.loadEmojiCategory(categoryId)
+
+  loadEmojiAnimation = (codepoint: string, version: string): Promise<EmojiAnimation> =>
+    this.matrix.loadEmojiAnimation(codepoint, version)
+
+  loadStickerPacks = (): Promise<StickerPack[]> => this.matrix.loadStickerPacks()
 
   cancelUpload = (localId: string): void => this.matrix.cancelUpload(localId)
 

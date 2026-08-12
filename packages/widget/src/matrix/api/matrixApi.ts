@@ -1,3 +1,4 @@
+import type { EmojiAnimation } from '../../domain/emoji'
 import type { ParsedMxcUrl } from '../../shared/utils/mxc'
 import { RelType } from '../wire/consts'
 import type {
@@ -10,6 +11,11 @@ import type {
   SyncResponse,
   UploadResponse,
 } from '../wire/dto'
+import type {
+  EmojiCategoriesResponse,
+  EmojiCategoryWire,
+  StickerPacksResponse,
+} from '../wire/emoji'
 import { Endpoints } from './endpoints'
 import type { MatrixTransport, UploadOptions } from './matrixTransport'
 
@@ -135,6 +141,30 @@ export function createMatrixApi(transport: MatrixTransport) {
       return transport.download(Endpoints.THUMBNAIL_MEDIA({ mediaId, serverName }), {
         searchParams: { width, height, method: 'scale' },
       })
+    },
+
+    getEmojiCategories(): Promise<EmojiCategoriesResponse> {
+      return transport.request(Endpoints.EMOJI_CATEGORIES)
+    },
+
+    getEmojiCategory(categoryId: string): Promise<EmojiCategoryWire> {
+      return transport.request(Endpoints.EMOJI_CATEGORY({ categoryId }))
+    },
+
+    /**
+     * Байты анимации. `.tgs` — это gzip, и он отдаётся с `Content-Encoding: gzip`: браузер
+     * разжимает сам, на выходе готовый JSON. Распаковывать ничего не нужно.
+     * `v` — cache-buster: без него после переseed'а пака клиент неделю получал бы из
+     * immutable-кэша старую анимацию.
+     */
+    getEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
+      return transport.request(Endpoints.EMOJI_LOTTIE({ codepoint }), {
+        searchParams: { v: version },
+      })
+    },
+
+    getStickerPacks(): Promise<StickerPacksResponse> {
+      return transport.request(Endpoints.STICKER_PACKS)
     },
 
     sendReadReceipt(roomId: string, eventId: string): Promise<Record<string, never>> {

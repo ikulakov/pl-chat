@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MediaUnavailableError } from '../../../domain/mediaError'
+import { chatStore } from '../../../store/store'
 import { useMediaSource } from './useMediaSource'
 
 const loadPreview = vi.fn(() => Promise.resolve(new Blob(['bytes'])))
@@ -16,6 +17,7 @@ describe('useMediaSource', () => {
     loadPreview.mockReset()
     loadPreview.mockResolvedValue(new Blob(['bytes']))
     vi.restoreAllMocks()
+    chatStore.getState().dispatch({ type: 'session.closed' })
   })
 
   // Байты переживают размонтирование в кэше контроллера, а object-URL — нет: его владелец
@@ -42,5 +44,49 @@ describe('useMediaSource', () => {
     loadPreview.mockRejectedValueOnce(new MediaUnavailableError('rejected'))
     const gone = renderHook(() => useMediaSource({ mxcUrl: 'mxc://bank.ru/other', size: SIZE }))
     await waitFor(() => expect(gone.result.current.status).toBe('rejected'))
+  })
+
+  it('kc.media.status rejected отдаёт отказ без обращения к сети', async () => {
+    chatStore.getState().dispatch({
+      type: 'sync.received',
+      cursor: 's1',
+      room: {
+        timeline: [],
+        readMarkers: [],
+        reactions: [],
+        cardAnswers: [],
+        mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'rejected' } }],
+        prevBatch: null,
+      },
+    })
+
+    const { result } = renderHook(() => useMediaSource({ mxcUrl: 'mxc://bank.ru/abc', size: SIZE }))
+
+    await waitFor(() => expect(result.current.status).toBe('rejected'))
+    expect(loadPreview).not.toHaveBeenCalled()
+  })
+
+  it('kc.media.status ready выводит из checking без действий пользователя', async () => {
+    loadPreview.mockRejectedValueOnce(new MediaUnavailableError('pending'))
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+
+    const { result } = renderHook(() => useMediaSource({ mxcUrl: 'mxc://bank.ru/abc', size: SIZE }))
+    await waitFor(() => expect(result.current.status).toBe('checking'))
+
+    chatStore.getState().dispatch({
+      type: 'sync.received',
+      cursor: 's1',
+      room: {
+        timeline: [],
+        readMarkers: [],
+        reactions: [],
+        cardAnswers: [],
+        mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'ready' } }],
+        prevBatch: null,
+      },
+    })
+
+    await waitFor(() => expect(result.current).toEqual({ status: 'ready', url: 'blob:preview' }))
   })
 })

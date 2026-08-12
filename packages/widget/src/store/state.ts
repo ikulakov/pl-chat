@@ -1,3 +1,5 @@
+import type { CardAnswer } from '../domain/adaptiveCards'
+import type { MediaVerdict, MediaVerdictEntry } from '../domain/mediaVerdict'
 import type { OperatorState } from '../domain/operator'
 import type { ReactionDelta, ReactionEntry, ReactionIndex } from '../domain/reactions'
 import type { ReadReceipt } from '../domain/receipts'
@@ -31,9 +33,14 @@ export type RuntimeAction =
       type: 'history.loaded'
       items: TimelineItem[]
       reactions: ReactionDelta
+      cardAnswers: CardAnswer[]
+      mediaVerdicts: MediaVerdictEntry[]
       prevBatch: string | null
     }
   | { type: 'history.settled' }
+  | { type: 'card.answering'; cardEventId: string; actionId: string }
+  | { type: 'card.answered'; cardEventId: string }
+  | { type: 'card.answerFailed'; cardEventId: string }
 
 export interface ChatRuntimeState {
   phase: ConnectionPhase
@@ -50,6 +57,12 @@ export interface RoomState {
   readReceipts: Record<string, ReadReceipt>
   // реакции по id сообщения; отдельно от ленты — приходят раньше своей цели и переживают merge
   reactions: ReactionIndex
+  // ответы на Adaptive Card по cardEventId — переживают merge ленты и перезагрузку,
+  // поэтому не элемент timeline (ответ клиента и не рисуется пузырём в ленте)
+  cardAnswers: Record<string, CardAnswer>
+  // результат проверки вложений (kc.media.status) по media_id:
+  // бэкенд шлёт один вердикт на файл, а не на каждое упоминание
+  mediaVerdicts: Record<string, MediaVerdict>
   // сообщение, на которое пользователь отвечает (превью в композере)
   replyTarget: ReplyTarget | null
   // курсор следующей страницы истории назад

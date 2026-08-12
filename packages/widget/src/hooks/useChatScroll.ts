@@ -29,7 +29,7 @@ function getScrollTopForTarget(list: HTMLElement, target: ScrollTarget): number 
 /**
  * Управляет скролл-логикой чата:
  * - Автоскролл при новых сообщениях
- *  - Прилипание к низу при изменении размера контейнера
+ * - Прилипание к низу при изменении размера контейнера
  * - `isNearBottom` (с допуском NEAR_BOTTOM_PX)
  * - `scrollToBottom` для кнопки «вниз»
  * - CSS-переменная --scrollbar-w (ширина скроллбара)
@@ -105,8 +105,16 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
     if (!list) return
 
     const handleScrollEnd = () => {
+      const atBottom = list.scrollHeight - list.clientHeight - list.scrollTop <= NEAR_BOTTOM_PX
+
+      // На длинных прыжках scrollListTo мгновенно перемещается почти к цели, а последние
+      // SMOOTH_TAIL_PX доезжает smooth-анимацией — 'scrollend' на этот прыжок приходит раньше,
+      // чем хвост доедет. Игнорируем такой преждевременный scrollend, ждём настоящий.
+      if (isAutoScrollingRef.current && !atBottom) return
+
+      isNearBottomRef.current = atBottom
       isAutoScrollingRef.current = false
-      setIsNearBottom(isNearBottomRef.current)
+      setIsNearBottom(atBottom)
     }
     list.addEventListener('scrollend', handleScrollEnd)
     return () => list.removeEventListener('scrollend', handleScrollEnd)

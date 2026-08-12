@@ -22,6 +22,8 @@ export const INITIAL_ROOM_STATE: RoomState = {
   },
   readReceipts: {},
   reactions: {},
+  cardAnswers: {},
+  mediaVerdicts: {},
   replyTarget: null,
   prevBatch: null,
   isLoadingHistory: false,

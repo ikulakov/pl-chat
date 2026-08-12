@@ -1,4 +1,6 @@
 import type { ViewportMode } from '@bankchat/protocol'
+import type { CardAnswer } from '../domain/adaptiveCards'
+import type { MediaVerdict } from '../domain/mediaVerdict'
 import type { ReactionIndex } from '../domain/reactions'
 import type { ReadReceipt } from '../domain/receipts'
 import { countUnread } from '../domain/receipts'
@@ -60,6 +62,14 @@ export function selectReadReceipts(state: ChatStoreState): Record<string, ReadRe
 
 export function selectReactions(state: ChatStoreState): ReactionIndex {
   return state.room.reactions
+}
+
+export function selectCardAnswers(state: ChatStoreState): Record<string, CardAnswer> {
+  return state.room.cardAnswers
+}
+
+export function selectMediaVerdicts(state: ChatStoreState): Record<string, MediaVerdict> {
+  return state.room.mediaVerdicts
 }
 
 export function selectReplyTarget(state: ChatStoreState): ReplyTarget | null {

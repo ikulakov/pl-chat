@@ -14,7 +14,21 @@ export interface OutgoingMediaContent extends WithRelation {
   info: MediaInfo
 }
 
-export type OutgoingContent = OutgoingTextContent | OutgoingMediaContent
+export interface OutgoingAdaptiveActionContent {
+  msgtype: typeof MsgType.AdaptiveAction
+  body: string
+  adaptive_action: {
+    action_id: string
+    source_event_id: string
+    data: Record<string, unknown>
+  }
+  'm.relates_to': { rel_type: 'm.reference'; event_id: string }
+}
+
+export type OutgoingContent =
+  | OutgoingTextContent
+  | OutgoingMediaContent
+  | OutgoingAdaptiveActionContent
 
 export interface OutgoingReactionContent {
   'm.relates_to': {

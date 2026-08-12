@@ -1,6 +1,8 @@
 import { sleep } from '../../shared/utils/sleep'
 import type { RuntimeAction } from '../../store/state'
 import type { MatrixApi } from '../api/matrixApi'
+import { collectCardAnswers } from '../mappers/adaptiveCard'
+import { collectMediaVerdicts } from '../mappers/mediaStatus'
 import { toReactionDelta } from '../mappers/reactions'
 import { timelineEventsToItems } from '../mappers/timeline'
 
@@ -122,16 +124,22 @@ export class MatrixHistoryLoader {
       if (isStale() || signal.aborted) return
 
       // dir=b отдаёт chunk newest-first — разворачиваем в хронологический порядок ленты.
-      const events = [...chunk].reverse()
-      const items = timelineEventsToItems(events)
+      const reversed = [...chunk].reverse()
+
+      const items = timelineEventsToItems(reversed)
+      const cardAnswers = collectCardAnswers(reversed)
+      const mediaVerdicts = collectMediaVerdicts(reversed)
+      // Реакции едут даже со страницы без видимых сообщений — она обычно из них и состоит.
+      const reactions = toReactionDelta(reversed)
       // Пустой chunk — признак конца истории
       const nextBatch = chunk.length === 0 ? null : (end ?? null)
 
-      // Реакции едут даже со страницы без видимых сообщений — она обычно из них и состоит.
       this.dispatch({
         type: 'history.loaded',
         items,
-        reactions: toReactionDelta(events),
+        cardAnswers,
+        mediaVerdicts,
+        reactions,
         prevBatch: nextBatch,
       })
 
