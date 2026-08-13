@@ -27,6 +27,13 @@ const HISTORY_PAGE_SIZE = 50
 // Окно long-poll: сервер держит /sync до этого времени, потом отвечает пустым батчем.
 const SYNC_TIMEOUT_MS = 25_000
 
+// Дедлайн запросов эмодзи. Обязателен, потому что их промисы мемоизируются в кэшах, живущих
+// всю сессию (lottieCache, emojiBitmap, защёлка emojiIndex): зависший запрос без отказа
+// оставил бы там мёртвый промис навсегда, и повтор возвращал бы его же — ровно то, ради чего
+// таймаут стоит в transport.download().
+const EMOJI_TIMEOUT_MS = 30_000
+const emojiDeadline = () => AbortSignal.timeout(EMOJI_TIMEOUT_MS)
+
 export interface ThumbnailSize {
   width: number
   height: number
@@ -145,16 +152,18 @@ export function createMatrixApi(transport: MatrixTransport) {
     },
 
     getEmojiCategories(): Promise<EmojiCategoriesResponse> {
-      return transport.request(Endpoints.EMOJI_CATEGORIES)
+      return transport.request(Endpoints.EMOJI_CATEGORIES, { signal: emojiDeadline() })
     },
 
     getEmojiCategory(categoryId: string): Promise<EmojiCategoryWire> {
-      return transport.request(Endpoints.EMOJI_CATEGORY({ categoryId }))
+      return transport.request(Endpoints.EMOJI_CATEGORY({ categoryId }), {
+        signal: emojiDeadline(),
+      })
     },
 
     /** Весь пак разом: по нему лента строит индекс «символ → codepoint». */
     getEmojiPacks(): Promise<EmojiPacksResponse> {
-      return transport.request(Endpoints.EMOJI_PACKS)
+      return transport.request(Endpoints.EMOJI_PACKS, { signal: emojiDeadline() })
     },
 
     /**
@@ -166,6 +175,7 @@ export function createMatrixApi(transport: MatrixTransport) {
     getEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
       return transport.request(Endpoints.EMOJI_LOTTIE({ codepoint }), {
         searchParams: { v: version },
+        signal: emojiDeadline(),
       })
     },
 

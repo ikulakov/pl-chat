@@ -36,6 +36,8 @@ export interface LottiePool {
 interface Entry {
   player: PoolPlayer
   frame: number
+  /** Когда запись играла в прошлый раз: при ротации она пропускает часть тиков. */
+  lastPlayedAt: number | null
 }
 
 function defaultPrefersReducedMotion(): boolean {
@@ -50,6 +52,10 @@ export function createLottiePool(deps: LottiePoolDeps = {}): LottiePool {
   const entries = new Set<Entry>()
   let handle: number | null = null
   let lastTime: number | null = null
+  // С какой позиции начинается обход на этом кадре. Без неё потолок всегда доставался бы
+  // одним и тем же первым записям Set'а (он обходится в порядке вставки), и всё, что добавлено
+  // после них, стояло бы на кадре 0 вечно — а не «ждало своей очереди».
+  let rotationStart = 0
 
   function tick(time: number): void {
     handle = null
@@ -61,18 +67,29 @@ export function createLottiePool(deps: LottiePoolDeps = {}): LottiePool {
     if (elapsed >= FRAME_INTERVAL_MS) {
       lastTime = time
 
+      const ordered = [...entries]
+      const size = ordered.length
       let played = 0
-      for (const entry of entries) {
-        if (played >= MAX_PLAYING) break
-        played++
+
+      for (let i = 0; i < size && played < MAX_PLAYING; i++) {
+        const entry = ordered[(rotationStart + i) % size]
+        if (!entry) continue
 
         const { player } = entry
+        // Вырожденную анимацию пропускаем до счётчика — иначе она занимала бы слот впустую.
         if (player.totalFrames <= 0) continue
+        played++
 
-        // Считаем по времени, а не «+1 кадр»: при пропущенных кадрах анимация не замедляется.
-        entry.frame = (entry.frame + (elapsed * player.frameRate) / 1000) % player.totalFrames
+        // Считаем от момента, когда эта запись игралась в прошлый раз, а не от общего кадра:
+        // при ротации запись пропускает часть тиков, и общий elapsed замедлял бы её.
+        const since = entry.lastPlayedAt === null ? elapsed : time - entry.lastPlayedAt
+        entry.lastPlayedAt = time
+
+        entry.frame = (entry.frame + (since * player.frameRate) / 1000) % player.totalFrames
         player.goToAndStop(entry.frame, true)
       }
+
+      rotationStart = size > 0 ? (rotationStart + played) % size : 0
     }
 
     handle = requestFrame(tick)
@@ -99,7 +116,7 @@ export function createLottiePool(deps: LottiePoolDeps = {}): LottiePool {
         return () => {}
       }
 
-      const entry: Entry = { player, frame: 0 }
+      const entry: Entry = { player, frame: 0, lastPlayedAt: null }
       entries.add(entry)
       start()
 

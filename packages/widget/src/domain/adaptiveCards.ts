@@ -29,16 +29,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isAdaptiveCardPayload(value: unknown): value is AdaptiveCardPayload {
-  return isRecord(value) && value.type === 'AdaptiveCard'
+  if (!isRecord(value) || value.type !== 'AdaptiveCard') return false
+
+  // body/actions объявлены массивами в типе, но приезжают из непроверенного wire-объекта
+  // (adaptive_card: unknown), а сервер валидирует только длину body. Без этой проверки
+  // не-массив доходил бы до toSubmitActions и падал TypeError'ом прямо в фазе рендера,
+  // унося всю ленту через корневой ErrorBoundary вместо деградации в текстовый фолбэк.
+  return (
+    (value.body === undefined || Array.isArray(value.body)) &&
+    (value.actions === undefined || Array.isArray(value.actions))
+  )
 }
 
-function hasInputElement(body: unknown[] | undefined): boolean {
-  if (!body) return false
+// Потолок вложенности: карточка приходит из сети, и глубина Container'ов ничем не ограничена.
+const MAX_SCAN_DEPTH = 10
 
-  return body.some(
-    (element) =>
-      isRecord(element) && typeof element.type === 'string' && element.type.startsWith('Input.'),
-  )
+function hasInputElement(body: unknown, depth = 0): boolean {
+  if (!Array.isArray(body) || depth > MAX_SCAN_DEPTH) return false
+
+  return body.some((element) => {
+    if (!isRecord(element)) return false
+    if (typeof element.type === 'string' && element.type.startsWith('Input.')) return true
+
+    // Input.* штатно заворачивают в Container.items и ColumnSet.columns[].items. Без спуска
+    // вглубь такая карточка рисуется кнопками без самого поля, и Submit уходит без значений,
+    // которые она запрашивала, — бот ветвится по неполным данным.
+    return hasInputElement(element.items, depth + 1) || hasInputElement(element.columns, depth + 1)
+  })
 }
 
 function isValidSubmit(
@@ -60,7 +77,10 @@ function isValidSubmit(
 export function toSubmitActions(card: AdaptiveCardPayload): CardAction[] | null {
   if (hasInputElement(card.body)) return null
 
-  const validSubmits = (card.actions ?? []).filter(isValidSubmit).slice(0, MAX_BUTTONS)
+  // Array.isArray, а не `?? []`: функция экспортируется, и вызвать её могут с payload'ом,
+  // не прошедшим isAdaptiveCardPayload.
+  const rawActions = Array.isArray(card.actions) ? card.actions : []
+  const validSubmits = rawActions.filter(isValidSubmit).slice(0, MAX_BUTTONS)
   const seenIds = new Set<string>()
   const actions: CardAction[] = []
 

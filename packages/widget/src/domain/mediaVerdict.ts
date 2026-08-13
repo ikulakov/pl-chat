@@ -19,7 +19,10 @@ export function applyMediaVerdicts(
   let result = existing
 
   for (const { mediaId, verdict } of incoming) {
-    if (existing[mediaId]) continue
+    // Проверяем аккумулятор, а не исходную карту: в одном батче (таймлайн /sync, страница
+    // истории) может прийти два вердикта по одному media_id, и при проверке `existing`
+    // побеждал бы последний — rejected молча превращался бы в ready.
+    if (result[mediaId]) continue
 
     if (result === existing) result = { ...existing }
     result[mediaId] = verdict

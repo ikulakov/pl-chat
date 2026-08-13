@@ -9,6 +9,8 @@ interface Props {
   categories: EmojiCategory[]
   version: string
   cache: LottieCache
+  /** Скроллящийся контейнер панели — он же root наблюдателей, см. PickerPanel. */
+  scrollRef: React.RefObject<HTMLDivElement | null>
   onLoadCategory: (categoryId: string) => void
   onSelect: (char: string) => void
 }
@@ -18,7 +20,14 @@ interface Props {
  * Виртуализации нет намеренно: 580 кнопок DOM держит спокойно, дорог только canvas,
  * а его заводят лишь видимые ячейки.
  */
-export function EmojiGrid({ categories, version, cache, onLoadCategory, onSelect }: Props) {
+export function EmojiGrid({
+  categories,
+  version,
+  cache,
+  scrollRef,
+  onLoadCategory,
+  onSelect,
+}: Props) {
   return (
     <div className={styles.grid}>
       {categories.map((category) => (
@@ -27,6 +36,7 @@ export function EmojiGrid({ categories, version, cache, onLoadCategory, onSelect
           category={category}
           version={version}
           cache={cache}
+          scrollRef={scrollRef}
           onLoadCategory={onLoadCategory}
           onSelect={onSelect}
         />
@@ -39,15 +49,24 @@ interface SectionProps {
   category: EmojiCategory
   version: string
   cache: LottieCache
+  scrollRef: React.RefObject<HTMLDivElement | null>
   onLoadCategory: (categoryId: string) => void
   onSelect: (char: string) => void
 }
 
-function CategorySection({ category, version, cache, onLoadCategory, onSelect }: SectionProps) {
+function CategorySection({
+  category,
+  version,
+  cache,
+  scrollRef,
+  onLoadCategory,
+  onSelect,
+}: SectionProps) {
   if (category.items === null) {
     return (
       <PendingSection
         category={category}
+        scrollRef={scrollRef}
         onLoadCategory={onLoadCategory}
       />
     )
@@ -59,6 +78,7 @@ function CategorySection({ category, version, cache, onLoadCategory, onSelect }:
       item={item}
       version={version}
       cache={cache}
+      scrollRef={scrollRef}
       onSelect={onSelect}
     />
   ))
@@ -75,14 +95,19 @@ function CategorySection({ category, version, cache, onLoadCategory, onSelect }:
  */
 function PendingSection({
   category,
+  scrollRef,
   onLoadCategory,
 }: {
   category: EmojiCategory
+  scrollRef: React.RefObject<HTMLDivElement | null>
   onLoadCategory: (categoryId: string) => void
 }) {
   const firstCellRef = useRef<HTMLDivElement>(null)
 
   useIntersectionObserver({
+    // root — контейнер прокрутки, а не вьюпорт: иначе rootMargin ниже не даёт упреждения,
+    // потому что цели обрезаны этим контейнером раньше, чем дойдут до вьюпорта.
+    root: scrollRef,
     triggerRef: firstCellRef,
     callback: (entry) => {
       if (entry.isIntersecting) onLoadCategory(category.id)

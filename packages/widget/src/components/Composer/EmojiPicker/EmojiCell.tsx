@@ -10,6 +10,8 @@ interface Props {
   item: EmojiItem
   version: string
   cache: LottieCache
+  /** Скроллящийся контейнер панели — он же root наблюдателя, см. PickerPanel. */
+  scrollRef: React.RefObject<HTMLDivElement | null>
   onSelect: (char: string) => void
 }
 
@@ -21,13 +23,16 @@ interface Props {
  * бессмысленно. Разжатый JSON при этом остаётся в кэше, поэтому возврат ячейки в кадр
  * сети не стоит.
  */
-export function EmojiCell({ item, version, cache, onSelect }: Props) {
+export function EmojiCell({ item, version, cache, scrollRef, onSelect }: Props) {
   const buttonRef = useRef<HTMLButtonElement>(null)
   const canvasRef = useRef<HTMLSpanElement>(null)
   const [visible, setVisible] = useState(false)
   const [animated, setAnimated] = useState(false)
 
   useIntersectionObserver({
+    // root — контейнер прокрутки: с вьюпортом по умолчанию rootMargin ниже был бы бесполезен,
+    // ячейки обрезает этот контейнер.
+    root: scrollRef,
     triggerRef: buttonRef,
     callback: (entry) => setVisible(entry.isIntersecting),
     // Небольшой запас: анимация успевает приехать до того, как ячейка реально видна.

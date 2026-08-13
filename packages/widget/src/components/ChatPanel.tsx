@@ -30,9 +30,15 @@ export function ChatPanel() {
   const { reconnect, loadEmojiIndex } = useChatActions()
 
   // Индекс пака тянем один раз на вкладку и отсюда: лента и цитаты его только читают.
+  // Ждём userId: каталог отдаётся под токеном (permitAll только у /_matrix/emoji/** и
+  // /_matrix/sticker/**), а mount-эффект иначе гонится с регистрацией гостя и получает 401 —
+  // без refresh-токена его нечем починить, и вся отрисовка эмодзи молча оставалась бы
+  // выключенной до перезагрузки страницы.
   useEffect(() => {
+    if (userId === null) return
+
     ensureEmojiIndex(loadEmojiIndex)
-  }, [loadEmojiIndex])
+  }, [loadEmojiIndex, userId])
 
   return (
     <div className={chatStyles.panel}>

@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { t } from '../../../i18n'
 import { getAnimationCache } from '../../../shared/lottie/animationCache'
@@ -24,6 +24,12 @@ export function PickerPanel({ ref, onSelectEmoji }: Props) {
   const tabId = (name: PickerTab) => `${id}-tab-${name}`
   const panelId = (name: PickerTab) => `${id}-panel-${name}`
 
+  // Скроллящийся контейнер сетки. Он же root для IntersectionObserver: `rootMargin` расширяет
+  // только прямоугольник root'а и никак не влияет на промежуточный прямоугольник обрезки,
+  // поэтому с root по умолчанию (вьюпорт) упреждающая загрузка не работала бы вовсе — цели
+  // обрезаны этим контейнером раньше, чем попадут во вьюпорт.
+  const scrollRef = useRef<HTMLDivElement>(null)
+
   return (
     <div
       ref={ref}
@@ -38,6 +44,7 @@ export function PickerPanel({ ref, onSelectEmoji }: Props) {
       />
 
       <div
+        ref={scrollRef}
         role="tabpanel"
         id={panelId(tab)}
         aria-labelledby={tabId(tab)}
@@ -49,6 +56,7 @@ export function PickerPanel({ ref, onSelectEmoji }: Props) {
           <EmojiContent
             state={state}
             cache={cache}
+            scrollRef={scrollRef}
             onLoadCategory={loadCategory}
             onSelect={onSelectEmoji}
             onRetry={retry}
@@ -62,12 +70,20 @@ export function PickerPanel({ ref, onSelectEmoji }: Props) {
 interface EmojiContentProps {
   state: ReturnType<typeof useEmojiCatalog>['state']
   cache: ReturnType<typeof getAnimationCache>
+  scrollRef: React.RefObject<HTMLDivElement | null>
   onLoadCategory: (categoryId: string) => void
   onSelect: (char: string) => void
   onRetry: () => void
 }
 
-function EmojiContent({ state, cache, onLoadCategory, onSelect, onRetry }: EmojiContentProps) {
+function EmojiContent({
+  state,
+  cache,
+  scrollRef,
+  onLoadCategory,
+  onSelect,
+  onRetry,
+}: EmojiContentProps) {
   if (state.status === 'loading') return <p className={styles.message}>{t('status.loading')}</p>
 
   if (state.status === 'error') {
@@ -96,6 +112,7 @@ function EmojiContent({ state, cache, onLoadCategory, onSelect, onRetry }: Emoji
       categories={state.catalog.categories}
       version={state.catalog.version}
       cache={cache}
+      scrollRef={scrollRef}
       onLoadCategory={onLoadCategory}
       onSelect={onSelect}
     />

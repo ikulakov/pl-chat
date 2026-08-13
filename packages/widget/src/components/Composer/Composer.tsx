@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { replyAuthorLabel } from '../../domain/reply'
 import { useChatActions } from '../../hooks/useChatActions'
 import { useChatStore } from '../../hooks/useChatStore'
@@ -23,6 +23,16 @@ export function Composer() {
   const userId = useChatStore(selectUserId)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const pendingCaretRef = useRef<number | null>(null)
+
+  // Каретку ставим после коммита нового value — только тогда позиция считается от новой строки.
+  useLayoutEffect(() => {
+    const caret = pendingCaretRef.current
+    if (caret === null) return
+
+    pendingCaretRef.current = null
+    textareaRef.current?.setSelectionRange(caret, caret)
+  }, [text])
 
   // фокус в поле ввода при выборе "Ответить" в ленте
   useEffect(() => {
@@ -40,23 +50,16 @@ export function Composer() {
    */
   function insertEmoji(char: string) {
     const textarea = textareaRef.current
+    const start = textarea?.selectionStart ?? text.length
+    const end = textarea?.selectionEnd ?? text.length
 
-    setText((prev) => {
-      const start = textarea?.selectionStart ?? prev.length
-      const end = textarea?.selectionEnd ?? prev.length
-      const next = prev.slice(0, start) + char + prev.slice(end)
-
-      if (textarea) {
-        // Позицию каретки браузер сам не сдвинет: значение приходит извне, а не из ввода.
-        // Ставим после микротаска, когда React уже применил новое value.
-        const caret = start + char.length
-        queueMicrotask(() => {
-          textarea.setSelectionRange(caret, caret)
-        })
-      }
-
-      return next
-    })
+    // Позицию каретки браузер сам не сдвинет: значение приходит извне, а не из ввода.
+    // Восстанавливаем её в layout-эффекте ниже, а не микротаском: React 19 выполняет
+    // апдейтер сразу, в момент dispatchSetState, и планирует свой коммит уже после — так что
+    // микротаск успел бы отработать на ещё старом value, а последующее присваивание
+    // node.value по спецификации HTML унесло бы курсор в конец.
+    pendingCaretRef.current = start + char.length
+    setText((prev) => prev.slice(0, start) + char + prev.slice(end))
 
     // Панель остаётся открытой — подряд набрать несколько эмодзи должно быть можно.
     textarea?.focus()

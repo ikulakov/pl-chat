@@ -12,7 +12,8 @@ interface Props {
   trigger: (props: DropdownTriggerProps) => ReactNode
   /** Своя всплывашка над меню (панель реакций): живёт в том же слое и закрывается вместе с ним. */
   above?: ReactNode
-  children: ReactNode
+  /** Пунктов может не быть вовсе — тогда слой состоит из одной надстройки `above`. */
+  children?: ReactNode
 }
 
 export function Dropdown({ trigger, above, children }: Props) {
@@ -22,6 +23,7 @@ export function Dropdown({ trigger, above, children }: Props) {
   const [container, setContainer] = useState<Element | ShadowRoot | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const prevOpenRef = useRef(false)
   const skipRestoreRef = useRef(false)
 
@@ -147,7 +149,13 @@ export function Dropdown({ trigger, above, children }: Props) {
               // выбор пункта мышью (detail>0) — фокус вернём в body, а не на триггер:
               // иначе :focus-within оставит кнопку действий видимой после закрытия.
               // клавиатурный выбор (Enter/Space → click c detail=0) — фокус возвращаем на триггер.
-              if (event.detail > 0) skipRestoreRef.current = true
+              //
+              // Только клики по самому меню: `above` (панель реакций) слой не закрывает, и
+              // взведённый им флаг дожил бы до следующего закрытия по Escape, отобрав возврат
+              // фокуса на триггер у совершенно другого взаимодействия.
+              if (event.detail > 0 && menuRef.current?.contains(event.target as Node)) {
+                skipRestoreRef.current = true
+              }
             }}
             style={{
               top: position?.top ?? 0,
@@ -157,14 +165,17 @@ export function Dropdown({ trigger, above, children }: Props) {
           >
             {above}
 
-            <div
-              role="menu"
-              aria-label={t('chat.action.menu')}
-              className={styles.dropdown}
-              onKeyDown={handleMenuKeyDown}
-            >
-              <DropdownContext value={contextValue}>{children}</DropdownContext>
-            </div>
+            {children !== undefined && (
+              <div
+                ref={menuRef}
+                role="menu"
+                aria-label={t('chat.action.menu')}
+                className={styles.dropdown}
+                onKeyDown={handleMenuKeyDown}
+              >
+                <DropdownContext value={contextValue}>{children}</DropdownContext>
+              </div>
+            )}
           </div>,
           container,
         )}

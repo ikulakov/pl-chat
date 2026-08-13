@@ -124,6 +124,11 @@ export class MatrixController implements MatrixService {
   // промис: он же дедуп параллельных запросов, пока первый ещё в полёте.
   private emojiIndex: Promise<EmojiIndex> | null = null
 
+  // txnId незавершённых ответов на карточки, по `${cardEventId}#${actionId}`. Нужен, чтобы
+  // повтор после сетевого сбоя ушёл с тем же ключом идемпотентности; чистится при смене
+  // сессии — в новой комнате прежние event_id уже ничего не адресуют.
+  private readonly cardActionTxnIds = new Map<string, string>()
+
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
     this.syncLoop = new MatrixSyncLoop(deps.api)
@@ -210,14 +215,23 @@ export class MatrixController implements MatrixService {
     this.dispatch({ type: 'card.answering', cardEventId, actionId: action.id })
     const lifecycleId = this.lifecycleId
 
+    // txnId переживает неудачную попытку: это ключ идемпотентности PUT /send. Если ответ
+    // потерялся уже после записи события (обрыв, 502 от прокси), повтор с тем же ключом
+    // вернёт тот же event_id, а не создаст второе kc.adaptive.action — иначе бот ветвился бы
+    // по одной карточке дважды.
+    const txnKey = `${cardEventId}#${action.id}`
+    const txnId = this.cardActionTxnIds.get(txnKey) ?? crypto.randomUUID()
+    this.cardActionTxnIds.set(txnKey, txnId)
+
     try {
       await this.api.sendMessage({
         roomId: connection.identity.roomId,
-        txnId: crypto.randomUUID(),
+        txnId,
         content: toAdaptiveActionContent(cardEventId, action),
       })
       if (!this.isCurrentLifecycle(lifecycleId)) return
 
+      this.cardActionTxnIds.delete(txnKey)
       this.dispatch({ type: 'card.answered', cardEventId })
     } catch (err) {
       if (!this.isCurrentLifecycle(lifecycleId)) return
@@ -688,6 +702,8 @@ export class MatrixController implements MatrixService {
     // Смена сессии — смена прав на медиа: чужие байты в кэше держать нельзя.
     this.previews.clear()
     this.localOriginals.clear()
+    // Ключи идемпотентности привязаны к событиям прежней комнаты и в новой сессии бессмысленны.
+    this.cardActionTxnIds.clear()
     return this.lifecycleId
   }
 

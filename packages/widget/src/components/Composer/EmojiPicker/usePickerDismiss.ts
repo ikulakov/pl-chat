@@ -31,18 +31,22 @@ export function usePickerDismiss({ isOpen, panelRef, triggerRef, onDismiss }: Pa
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
 
-      // Composer вешает свой Escape на textarea (отмена цитаты) — не даём ему сработать
-      // заодно с закрытием панели.
+      // Фаза захвата на document: React 19 вешает делегированные слушатели на корневой
+      // контейнер, который является потомком document, поэтому обработчик всплытия отработал
+      // бы уже ПОСЛЕ onKeyDown у textarea — и Escape при открытом пикере успевал бы отменить
+      // цитату. Перехватываем событие до React и гасим его совсем: пока пикер открыт,
+      // Escape принадлежит ему.
       event.stopPropagation()
+      event.preventDefault()
       onDismiss(true)
     }
 
     document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keydown', onKeyDown, true)
 
     return () => {
       document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keydown', onKeyDown, true)
     }
   }, [isOpen, panelRef, triggerRef, onDismiss])
 }

@@ -12,9 +12,15 @@ let playerPromise: Promise<LottiePlayer> | null = null
  * десятков анимаций создаёт тысячи DOM-узлов, а выражения паку эмодзи не нужны.
  */
 export function loadLottiePlayer(): Promise<LottiePlayer> {
-  playerPromise ??= import('lottie-web/build/player/lottie_light_canvas').then(
-    (module) => module.default,
-  )
+  playerPromise ??= import('lottie-web/build/player/lottie_light_canvas')
+    .then((module) => module.default)
+    .catch((err: unknown) => {
+      // Упавший импорт в кэше не держим — как и остальные кэши промисов в проекте. Иначе один
+      // сетевой сбой (или деплой, поменявший хешированные имена ассетов посреди сессии)
+      // навсегда отравил бы промис: до перезагрузки страницы все эмодзи остались бы глифами.
+      playerPromise = null
+      throw err
+    })
 
   return playerPromise
 }
