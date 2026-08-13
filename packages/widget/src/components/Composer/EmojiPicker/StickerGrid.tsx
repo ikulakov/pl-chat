@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react'
-import type { StickerPack } from '../../../domain/emoji'
+import type { StickerItem, StickerPack } from '../../../domain/emoji'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { t } from '../../../i18n'
-import { Endpoints } from '../../../matrix/api/endpoints'
+import { StickerView } from '../../Sticker/StickerView'
 import styles from './EmojiPicker.module.css'
 
+interface Props {
+  /** Контейнер прокрутки панели — он же root наблюдателей, см. PickerPanel. */
+  scrollRef: React.RefObject<HTMLDivElement | null>
+}
+
 /**
- * Каталог стикеров. Отправки в этой итерации нет: клик по стикеру — это `m.sticker`, а не
- * вставка в текст, и он тянет за собой отправку, оптимистичный элемент и ветку рендера
- * в ленте. Пока вкладка только показывает набор.
+ * Каталог стикеров: одна непрерывная лента с заголовками паков — как и вкладка эмодзи, где
+ * категории идут секциями. Отдельной догрузки состава здесь нет: каталог приезжает одним
+ * ответом вместе с силуэтами, догружать нечего.
  */
-export function StickerGrid() {
-  const { loadStickerPacks } = useChatActions()
+export function StickerGrid({ scrollRef }: Props) {
+  const { loadStickerPacks, sendSticker } = useChatActions()
   const [packs, setPacks] = useState<StickerPack[] | null>(null)
   const [failed, setFailed] = useState(false)
 
@@ -35,23 +40,53 @@ export function StickerGrid() {
   if (failed) return <p className={styles.message}>{t('picker.loadFailed')}</p>
   if (packs === null) return <p className={styles.message}>{t('status.loading')}</p>
 
-  const stickers = packs.flatMap((pack) => pack.stickers)
-  if (stickers.length === 0) return <p className={styles.message}>{t('picker.empty')}</p>
+  // Пустой список — выключенная на бэкенде фича: сервер отдаёт `{"packs": []}`, а не 403.
+  if (packs.length === 0) return <p className={styles.message}>{t('picker.empty')}</p>
 
   return (
-    <div className={styles.stickerGrid}>
-      {stickers.map((sticker) => (
-        <img
-          key={sticker.id}
-          className={styles.sticker}
-          // Публичный эндпоинт: байты стикеров отдаются без токена и кешируются на неделю,
-          // поэтому обычный <img> вместо fetch→blob, как у пользовательских медиа.
-          src={Endpoints.STICKER_BYTES({ mediaId: sticker.mediaId })}
-          alt={sticker.body}
-          title={sticker.body}
-          loading="lazy"
-        />
+    <div className={styles.stickerPacks}>
+      {packs.map((pack) => (
+        <section key={pack.id}>
+          <h3 className={styles.packTitle}>{pack.title}</h3>
+
+          <div className={styles.stickerGrid}>
+            {pack.stickers.map((sticker) => (
+              <StickerButton
+                key={sticker.id}
+                sticker={sticker}
+                scrollRef={scrollRef}
+                onSelect={() => void sendSticker(sticker)}
+              />
+            ))}
+          </div>
+        </section>
       ))}
     </div>
+  )
+}
+
+function StickerButton({
+  sticker,
+  scrollRef,
+  onSelect,
+}: {
+  sticker: StickerItem
+  scrollRef: React.RefObject<HTMLDivElement | null>
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={styles.stickerCell}
+      aria-label={sticker.body}
+      title={sticker.body}
+      onClick={onSelect}
+    >
+      <StickerView
+        sticker={sticker}
+        size={72}
+        root={scrollRef}
+      />
+    </button>
   )
 }

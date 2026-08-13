@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { MediaTimelineItem, MessageTimelineItem } from '../../domain/timeline'
-import { fileItem, imageItem, textItem } from '../../shared/testUtils/matrixFixtures'
-import { toMessageContent } from './outgoing'
+import { fileItem, imageItem, stickerItem, textItem } from '../../shared/testUtils/matrixFixtures'
+import { outgoingEventType, toMessageContent } from './outgoing'
 
 // Сборка тела события — единственное место перевода домена в wire на исходящем направлении.
 // Раньше это проверялось сквозь фальшивый транспорт в matrixApi.test.ts.
@@ -27,8 +27,32 @@ describe('toMessageContent', () => {
   })
 
   it('kind домена превращается в msgtype провода', () => {
-    expect(toMessageContent(imageItem()).msgtype).toBe('m.image')
-    expect(toMessageContent(fileItem()).msgtype).toBe('m.file')
+    expect(toMessageContent(imageItem())).toMatchObject({ msgtype: 'm.image' })
+    expect(toMessageContent(fileItem())).toMatchObject({ msgtype: 'm.file' })
+  })
+
+  it('стикер уходит как {body, info, url} — без msgtype', () => {
+    const content = toMessageContent(stickerItem())
+
+    expect(content).toEqual({
+      body: '🩷',
+      url: 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+      info: { mimetype: 'image/webp', size: 4096, w: 512, h: 512 },
+    })
+  })
+
+  it('у стикера не бывает цитаты: связь не прикрепляется даже при relation в элементе', () => {
+    // Поля `m.relates_to` нет в RoomStickerContentDto, а FAIL_ON_UNKNOWN_PROPERTIES выключен —
+    // сервер молча выбросил бы связь. Не отправляем её вовсе, чтобы расхождение не пряталось.
+    const withReply = stickerItem({ relation: { type: 'reply', eventId: '$parent:bank' } })
+
+    expect(toMessageContent(withReply)).not.toHaveProperty('m.relates_to')
+  })
+
+  it('тип события считается из элемента: стикер — m.sticker, остальное — m.room.message', () => {
+    expect(outgoingEventType(stickerItem())).toBe('m.sticker')
+    expect(outgoingEventType(textItem())).toBe('m.room.message')
+    expect(outgoingEventType(imageItem())).toBe('m.room.message')
   })
 
   it('без подписи body на проводе падает на filename (MSC2530)', () => {

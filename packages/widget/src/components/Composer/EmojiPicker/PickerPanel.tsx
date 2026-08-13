@@ -16,7 +16,7 @@ interface Props {
 export function PickerPanel({ ref, onSelectEmoji }: Props) {
   const [tab, setTab] = useState<PickerTab>('emoji')
   const { loadEmojiAnimation } = useChatActions()
-  const cache = useMemo(() => getAnimationCache(loadEmojiAnimation), [loadEmojiAnimation])
+  const cache = useMemo(() => getAnimationCache('emoji', loadEmojiAnimation), [loadEmojiAnimation])
 
   const { state, loadCategory, retry } = useEmojiCatalog()
 
@@ -51,7 +51,7 @@ export function PickerPanel({ ref, onSelectEmoji }: Props) {
         className={styles.scroll}
       >
         {tab === 'stickers' ? (
-          <StickerGrid />
+          <StickerGrid scrollRef={scrollRef} />
         ) : (
           <EmojiContent
             state={state}

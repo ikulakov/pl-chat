@@ -6,6 +6,7 @@ import type {
   EmojiCatalog,
   EmojiCategory,
   EmojiIndex,
+  StickerItem,
   StickerPack,
 } from './domain/emoji'
 import { createMatrixService } from './matrix/createMatrixService'
@@ -17,6 +18,7 @@ import { chatStore } from './store/store'
 export interface ChatActions {
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  sendSticker: (sticker: StickerItem) => Promise<void>
   sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
@@ -25,6 +27,7 @@ export interface ChatActions {
   loadEmojiIndex: () => Promise<EmojiIndex>
   loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
   loadStickerPacks: () => Promise<StickerPack[]>
+  loadStickerAnimation: (mediaId: string) => Promise<EmojiAnimation>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   replyTo: (target: ReplyTarget) => void
@@ -61,6 +64,7 @@ export class ChatController {
     this.actions = {
       sendMessage: this.sendMessage,
       sendFile: this.sendFile,
+      sendSticker: this.sendSticker,
       sendCardAction: this.sendCardAction,
       loadPreview: this.loadPreview,
       downloadFile: this.downloadFile,
@@ -69,6 +73,7 @@ export class ChatController {
       loadEmojiIndex: this.loadEmojiIndex,
       loadEmojiAnimation: this.loadEmojiAnimation,
       loadStickerPacks: this.loadStickerPacks,
+      loadStickerAnimation: this.loadStickerAnimation,
       cancelUpload: this.cancelUpload,
       resendMessage: this.resendMessage,
       replyTo: this.replyTo,
@@ -120,6 +125,8 @@ export class ChatController {
   sendFile = (file: File, options?: SendFileOptions): Promise<void> =>
     this.matrix.sendFile(file, options)
 
+  sendSticker = (sticker: StickerItem): Promise<void> => this.matrix.sendSticker(sticker)
+
   sendCardAction = (cardEventId: string, action: CardAction): Promise<void> =>
     this.matrix.sendCardAction(cardEventId, action)
 
@@ -139,6 +146,9 @@ export class ChatController {
     this.matrix.loadEmojiAnimation(codepoint, version)
 
   loadStickerPacks = (): Promise<StickerPack[]> => this.matrix.loadStickerPacks()
+
+  loadStickerAnimation = (mediaId: string): Promise<EmojiAnimation> =>
+    this.matrix.loadStickerAnimation(mediaId)
 
   cancelUpload = (localId: string): void => this.matrix.cancelUpload(localId)
 

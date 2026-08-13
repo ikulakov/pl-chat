@@ -294,6 +294,34 @@ describe('MatrixController (orchestrator)', () => {
     })
   })
 
+  it('sendSticker уходит на m.sticker с content из каталога и без цитаты', async () => {
+    const api = makeMatrixApi()
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.sendSticker({
+      id: '01_1fa77',
+      body: '🩷',
+      mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
+      url: 'mxc://otpbank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+      info: { mimetype: 'video/webm', w: 512, h: 512, size: 43488 },
+      silhouette: null,
+      format: 'video',
+    })
+
+    expect(api.sendMessage).toHaveBeenCalledExactlyOnceWith({
+      roomId: IDENTITY.roomId,
+      txnId: expect.any(String),
+      eventType: 'm.sticker',
+      content: {
+        body: '🩷',
+        url: 'mxc://otpbank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+        info: { mimetype: 'video/webm', w: 512, h: 512, size: 43488 },
+      },
+    })
+    expect(applied[0]!.type).toBe('message.optimisticAdded')
+    expect(applied.at(-1)).toMatchObject({ type: 'message.sent', eventId: '$real' })
+  })
+
   it('sendMessage without identity does nothing', async () => {
     const { controller, dispatch } = harness()
 
@@ -686,7 +714,9 @@ describe('MatrixController (orchestrator)', () => {
 
     // текстовая отправка выше свой PUT сделала (им и уронили сессию) — важно, что медиа
     // своего не сделала
-    const msgtypes = vi.mocked(api.sendMessage).mock.calls.map(([{ content }]) => content.msgtype)
+    const msgtypes = vi
+      .mocked(api.sendMessage)
+      .mock.calls.map(([{ content }]) => ('msgtype' in content ? content.msgtype : undefined))
     expect(msgtypes).not.toContain('m.file')
     controller.disconnect()
   })
@@ -882,7 +912,9 @@ describe('MatrixController (orchestrator)', () => {
     await controller.resendMessage('local-1')
 
     const [{ content }] = vi.mocked(api.sendMessage).mock.calls[0]!
-    expect(content['m.relates_to']).toEqual({ 'm.in_reply_to': { event_id: '$parent' } })
+    expect(content).toMatchObject({
+      'm.relates_to': { 'm.in_reply_to': { event_id: '$parent' } },
+    })
   })
 
   it('resendMessage does nothing when the failed message has no txnId', async () => {
@@ -1152,6 +1184,7 @@ describe('MatrixController — sendCardAction (kc.adaptive.action)', () => {
     expect(api.sendMessage).toHaveBeenCalledWith({
       roomId: IDENTITY.roomId,
       txnId: expect.any(String),
+      eventType: 'm.room.message',
       content: {
         msgtype: 'kc.adaptive.action',
         body: expect.any(String),

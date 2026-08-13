@@ -1,7 +1,7 @@
 import { isAdaptiveCardPayload } from '../../domain/adaptiveCards'
 import type { SystemLabel, TimelineItem, TimelineRelation } from '../../domain/timeline'
 import { MsgType } from '../wire/consts'
-import { isOperatorJoined, isOperatorLeft, isRoomMessage } from '../wire/guards'
+import { isOperatorJoined, isOperatorLeft, isRoomMessage, isStickerEvent } from '../wire/guards'
 import type * as Matrix from '../wire/types'
 
 function operatorJoinedLabel(content: Matrix.OperatorJoinedEvent['content']): SystemLabel {
@@ -40,7 +40,10 @@ function createPlaqueItem(
   }
 }
 
-function messageBaseFields(event: Matrix.RoomMessageEvent, content: Matrix.WithRelation) {
+function messageBaseFields(
+  event: Matrix.RoomMessageEvent | Matrix.StickerEvent,
+  content: Matrix.WithRelation,
+) {
   const relation = toRelation(content)
 
   return {
@@ -136,9 +139,36 @@ function roomMessageToItem(event: Matrix.RoomMessageEvent): TimelineItem | undef
   }
 }
 
+/**
+ * Стикер. `messageBaseFields` здесь важен не меньше содержимого: он поднимает
+ * `unsigned.transaction_id` в `txnId`, без которого `mergeTimeline` не схлопнет свой черновик
+ * и отправленный стикер задвоится, когда придёт эхо из `/sync`.
+ */
+function createStickerItem(event: Matrix.StickerEvent): TimelineItem {
+  const { body, url, info } = event.content
+
+  return {
+    kind: 'sticker',
+    ...messageBaseFields(event, {}),
+    content: {
+      body,
+      url,
+      info: {
+        mimetype: info?.mimetype ?? 'application/octet-stream',
+        size: info?.size ?? 0,
+        ...(info?.w !== undefined ? { w: info.w } : {}),
+        ...(info?.h !== undefined ? { h: info.h } : {}),
+      },
+    },
+  }
+}
+
 function eventToItem(event: Matrix.ClientEvent): TimelineItem | undefined {
   if (isRoomMessage(event)) {
     return roomMessageToItem(event)
+  }
+  if (isStickerEvent(event)) {
+    return createStickerItem(event)
   }
   if (isOperatorJoined(event)) {
     return createPlaqueItem('system', event, operatorJoinedLabel(event.content))

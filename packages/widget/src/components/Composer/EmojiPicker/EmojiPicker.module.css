@@ -122,17 +122,43 @@
   }
 }
 
+.stickerPacks {
+  padding: 12px;
+}
+
+.packTitle {
+  margin: 0 0 8px;
+  padding: 0;
+  /* Figma Caption/1M — тот же стиль, что у табов панели. */
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.1px;
+  color: var(--c-text-tertiary);
+}
+
+.stickerPacks section + section {
+  margin-top: 16px;
+}
+
 .stickerGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  padding: 12px;
 }
 
-.sticker {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: contain;
+.stickerCell {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--c-surface-secondary);
+  }
 }
 
 .message {

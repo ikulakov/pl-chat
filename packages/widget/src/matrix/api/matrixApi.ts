@@ -42,6 +42,8 @@ export interface ThumbnailSize {
 interface SendMessageParams {
   roomId: string
   txnId: string
+  /** `m.room.message` для текста и медиа, `m.sticker` для стикера. */
+  eventType: string
   content: OutgoingContent
 }
 
@@ -98,8 +100,13 @@ export function createMatrixApi(transport: MatrixTransport) {
       })
     },
 
-    sendMessage({ roomId, txnId, content }: SendMessageParams): Promise<SendEventResponse> {
-      return transport.request(Endpoints.SEND_MESSAGE({ roomId, txnId }), {
+    sendMessage({
+      roomId,
+      txnId,
+      eventType,
+      content,
+    }: SendMessageParams): Promise<SendEventResponse> {
+      return transport.request(Endpoints.SEND_EVENT({ roomId, eventType, txnId }), {
         method: 'PUT',
         body: content,
       })
@@ -180,7 +187,16 @@ export function createMatrixApi(transport: MatrixTransport) {
     },
 
     getStickerPacks(): Promise<StickerPacksResponse> {
-      return transport.request(Endpoints.STICKER_PACKS)
+      return transport.request(Endpoints.STICKER_PACKS, { signal: emojiDeadline() })
+    },
+
+    /**
+     * Байты Lottie-стикера. Тот же публичный маршрут, что и у растровых: `.tgs` отдаётся с
+     * `Content-Encoding: gzip`, браузер разжимает сам. Дедлайн обязателен — промис оседает
+     * в кэше на всю сессию.
+     */
+    getStickerAnimation(mediaId: string): Promise<EmojiAnimation> {
+      return transport.request(Endpoints.STICKER_BYTES({ mediaId }), { signal: emojiDeadline() })
     },
 
     sendReadReceipt(roomId: string, eventId: string): Promise<Record<string, never>> {

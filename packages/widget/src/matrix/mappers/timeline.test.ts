@@ -203,6 +203,60 @@ describe('timelineEventsToItems — варианты контента', () => {
     expect(items).toEqual([])
   })
 
+  describe('m.sticker', () => {
+    const stickerEvent = (unsigned?: { transaction_id?: string }) =>
+      ({
+        type: MatrixEventType.Sticker,
+        event_id: '$st',
+        sender: OPERATOR_ID,
+        origin_server_ts: 7,
+        content: {
+          body: '🩷',
+          url: 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+          info: { mimetype: 'video/webm', size: 43488, w: 512, h: 512 },
+        },
+        ...(unsigned ? { unsigned } : {}),
+      }) as unknown as ClientEvent
+
+    it('разбирается в элемент ленты со своим kind', () => {
+      const [item] = timelineEventsToItems([stickerEvent()])
+
+      expect(item).toEqual({
+        kind: 'sticker',
+        localId: '$st',
+        eventId: '$st',
+        sender: OPERATOR_ID,
+        ts: 7,
+        sendStatus: 'sent',
+        content: {
+          body: '🩷',
+          url: 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+          info: { mimetype: 'video/webm', size: 43488, w: 512, h: 512 },
+        },
+      })
+    })
+
+    it('поднимает transaction_id — без него свой стикер задвоится после эха', () => {
+      const [item] = timelineEventsToItems([stickerEvent({ transaction_id: 'txn-7' })])
+
+      expect(item).toMatchObject({ txnId: 'txn-7' })
+    })
+
+    it('без info не падает: mimetype уходит в octet-stream, формат деградирует в картинку', () => {
+      const bare = {
+        type: MatrixEventType.Sticker,
+        event_id: '$bare',
+        sender: OPERATOR_ID,
+        origin_server_ts: 8,
+        content: { body: '🩷', url: 'mxc://bank.ru/x' },
+      } as unknown as ClientEvent
+
+      expect(timelineEventsToItems([bare])[0]).toMatchObject({
+        content: { info: { mimetype: 'application/octet-stream', size: 0 } },
+      })
+    })
+  })
+
   it('неподдерживаемый контент молча выпадает, не роняя соседнее валидное сообщение', () => {
     // m.audio ещё не реализован (только text/image/file), m.reaction виджет не рендерит —
     // оба события должны отброситься, но НЕ сорвать маппинг текста между ними

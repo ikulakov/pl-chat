@@ -28,11 +28,44 @@ export interface EmojiCatalog {
   categories: EmojiCategory[]
 }
 
+/**
+ * Рендиция стикера. Пак целиком однороден по формату, но ветвиться всё равно нужно на позиции:
+ * каталог отдаёт паки вперемешку, и единственный признак — `info.mimetype`.
+ */
+export type StickerFormat = 'lottie' | 'video' | 'image'
+
+/**
+ * Рендиция по mimetype. По префиксу, а не по точному равенству: `image/webp` сегодня,
+ * `image/avif` завтра — обе ветки рисуются одним `<img>`, и неизвестный растр деградирует
+ * в картинку, а не в пустоту.
+ */
+export function toStickerFormat(mimetype: string): StickerFormat {
+  if (mimetype === 'application/json') return 'lottie'
+  if (mimetype.startsWith('video/')) return 'video'
+
+  return 'image'
+}
+
+/** `info` из каталога уезжает в `content` события `m.sticker` без изменений. */
+export interface StickerInfo {
+  mimetype: string
+  w?: number
+  h?: number
+  size?: number
+  is_animated?: boolean
+}
+
 export interface StickerItem {
   id: string
-  /** Подпись стикера, она же alt. */
+  /** Эмодзи-подпись стикера, она же alt и текст цитаты. */
   body: string
   mediaId: string
+  /** mxc://… — уезжает в content при отправке. */
+  url: string
+  info: StickerInfo
+  /** data:-URL силуэта; рисуется, пока сам стикер не готов. */
+  silhouette: string | null
+  format: StickerFormat
 }
 
 export interface StickerPack {

@@ -38,7 +38,7 @@ export function AnimatedEmoji({ char, codepoint, version, size }: Props) {
   useEffect(() => {
     if (!isVisible) return
 
-    const cache = getAnimationCache(loadEmojiAnimation)
+    const cache = getAnimationCache('emoji', loadEmojiAnimation)
     let disposed = false
     let release: (() => void) | null = null
     let player: { destroy: () => void } | null = null

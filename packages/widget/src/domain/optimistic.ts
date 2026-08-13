@@ -1,9 +1,11 @@
 import { isPreviewableImage, resolveMimeType } from '../shared/utils/fileValidation'
 import type { ImageDimensions } from '../shared/utils/imageDimensions'
+import type { StickerItem } from './emoji'
 import type {
   MediaTimelineItem,
   MediaUpload,
   MessageTimelineItem,
+  StickerTimelineItem,
   TextTimelineItem,
 } from './timeline'
 
@@ -56,6 +58,34 @@ export function createOptimisticTextMessage({
     sender,
     replyToEventId,
     fields: { kind: 'text', content: { body: text } },
+  })
+}
+
+interface CreateOptimisticStickerMessageParams {
+  sender: string
+  sticker: StickerItem
+}
+
+/**
+ * Стикер уже лежит на сервере, поэтому загрузки нет и черновик сразу «полный».
+ * `replyToEventId` не принимается сознательно: `m.sticker` не переносит связь ответа —
+ * бэкенд её отбрасывает (см. RoomStickerContentDto).
+ */
+export function createOptimisticStickerMessage({
+  sender,
+  sticker,
+}: CreateOptimisticStickerMessageParams): Outgoing<StickerTimelineItem> {
+  return createOptimistic<StickerTimelineItem>({
+    sender,
+    replyToEventId: undefined,
+    fields: {
+      kind: 'sticker',
+      content: {
+        body: sticker.body,
+        url: sticker.url,
+        info: { ...sticker.info, size: sticker.info.size ?? 0 },
+      },
+    },
   })
 }
 

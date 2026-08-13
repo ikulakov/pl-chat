@@ -43,10 +43,13 @@ export interface EmojiPacksResponse {
 }
 
 export interface StickerInfoWire {
+  /** Единственный признак рендиции: расширения в `url` нет. */
   mimetype?: string
   w?: number
   h?: number
   size?: number
+  /** У статичных паков ключа нет вовсе — сервер не шлёт `false`. */
+  is_animated?: boolean
 }
 
 export interface StickerWire {
@@ -55,6 +58,8 @@ export interface StickerWire {
   info: StickerInfoWire
   url: string
   media_id: string
+  /** Силуэт-плейсхолдер: 32×32 grayscale PNG в base64, без `data:`-префикса. */
+  p?: string
 }
 
 export interface StickerPackWire {

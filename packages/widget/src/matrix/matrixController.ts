@@ -4,11 +4,13 @@ import type {
   EmojiCatalog,
   EmojiCategory,
   EmojiIndex,
+  StickerItem,
   StickerPack,
 } from '../domain/emoji'
 import { MediaUnavailableError } from '../domain/mediaError'
 import {
   createOptimisticMediaMessage,
+  createOptimisticStickerMessage,
   createOptimisticTextMessage,
   isOptimistic,
 } from '../domain/optimistic'
@@ -37,6 +39,7 @@ import { MatrixHistoryLoader } from './history/historyLoader'
 import { toEmojiCatalog, toEmojiCategory, toEmojiIndex, toStickerPacks } from './mappers/emoji'
 import { classifyMediaError } from './mappers/mediaError'
 import {
+  outgoingEventType,
   toAdaptiveActionContent,
   toMessageContent,
   type OutgoingTimelineItem,
@@ -45,6 +48,7 @@ import { toRoomSyncPatch } from './mappers/roomSync'
 import { classifyUploadError } from './mappers/uploadError'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
+import { MatrixEventType } from './wire/consts'
 
 export const CONNECTION_FAILED_ERROR = 'Не удалось подключиться'
 
@@ -73,6 +77,7 @@ export interface MatrixService {
   disconnect: () => void
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  sendSticker: (sticker: StickerItem) => Promise<void>
   sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
@@ -81,6 +86,7 @@ export interface MatrixService {
   loadEmojiIndex: () => Promise<EmojiIndex>
   loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
   loadStickerPacks: () => Promise<StickerPack[]>
+  loadStickerAnimation: (mediaId: string) => Promise<EmojiAnimation>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   markRead: (eventId: string) => Promise<void>
@@ -205,6 +211,25 @@ export class MatrixController implements MatrixService {
     await this.dispatchSend(connection.identity.roomId, uploaded, 'sendFile')
   }
 
+  /**
+   * Стикер уже лежит на сервере — ни загрузки, ни ожидания mxc. Цитату не переносим: её поля
+   * нет в `RoomStickerContentDto`, и связь была бы молча потеряна. Баннер ответа при этом
+   * снимаем, как на всех остальных путях отправки.
+   */
+  async sendSticker(sticker: StickerItem): Promise<void> {
+    const connection = this.requireConnection()
+    if (!connection) return
+
+    const message = createOptimisticStickerMessage({
+      sender: connection.identity.userId,
+      sticker,
+    })
+    this.dispatch({ type: 'message.optimisticAdded', message })
+    this.dispatch({ type: 'reply.cleared' })
+
+    await this.dispatchSend(connection.identity.roomId, message, 'sendSticker')
+  }
+
   async sendCardAction(cardEventId: string, action: CardAction): Promise<void> {
     const connection = this.requireConnection()
     if (!connection) return
@@ -227,6 +252,7 @@ export class MatrixController implements MatrixService {
       await this.api.sendMessage({
         roomId: connection.identity.roomId,
         txnId,
+        eventType: MatrixEventType.RoomMessage,
         content: toAdaptiveActionContent(cardEventId, action),
       })
       if (!this.isCurrentLifecycle(lifecycleId)) return
@@ -326,6 +352,10 @@ export class MatrixController implements MatrixService {
 
   async loadStickerPacks(): Promise<StickerPack[]> {
     return toStickerPacks(await this.api.getStickerPacks())
+  }
+
+  loadStickerAnimation(mediaId: string): Promise<EmojiAnimation> {
+    return this.api.getStickerAnimation(mediaId)
   }
 
   private async withLocalFallback(
@@ -587,6 +617,9 @@ export class MatrixController implements MatrixService {
       const { event_id } = await this.api.sendMessage({
         roomId,
         txnId: message.txnId!,
+        // Тип события считаем из элемента, а не из места вызова: так и повтор упавшего
+        // стикера уходит на m.sticker, а не на m.room.message.
+        eventType: outgoingEventType(message),
         content: toMessageContent(message),
       })
       if (!this.isCurrentLifecycle(lifecycleId)) return

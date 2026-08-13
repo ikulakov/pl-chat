@@ -11,7 +11,9 @@ export const Endpoints = createEndpoints({
   REFRESH: `${MATRIX_CLIENT}/v3/refresh`,
   SYNC: `${MATRIX_CLIENT}/v3/sync`,
   LOAD_HISTORY: `${MATRIX_CLIENT}/v3/rooms/{roomId}/messages`,
-  SEND_MESSAGE: `${MATRIX_CLIENT}/v3/rooms/{roomId}/send/m.room.message/{txnId}`,
+  // Тип события параметром: кроме m.room.message тем же маршрутом уходит m.sticker.
+  // createEndpoints кодирует параметры через encodeURIComponent, точка не экранируется.
+  SEND_EVENT: `${MATRIX_CLIENT}/v3/rooms/{roomId}/send/{eventType}/{txnId}`,
   SEND_REACTION: `${MATRIX_CLIENT}/v3/rooms/{roomId}/send/m.reaction/{txnId}`,
   SEND_REDACTION: `${MATRIX_CLIENT}/v3/rooms/{roomId}/send/m.room.redaction/{txnId}`,
   MARK_READ: `${MATRIX_CLIENT}/v3/rooms/{roomId}/receipt/m.read/{eventId}`,

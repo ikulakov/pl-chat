@@ -1,9 +1,10 @@
-import { normalizeEmojiKey } from '../../domain/emoji'
+import { normalizeEmojiKey, toStickerFormat } from '../../domain/emoji'
 import type {
   EmojiCatalog,
   EmojiCategory,
   EmojiIndex,
   EmojiItem,
+  StickerItem,
   StickerPack,
 } from '../../domain/emoji'
 import type {
@@ -12,6 +13,7 @@ import type {
   EmojiPacksResponse,
   EmojiWire,
   StickerPacksResponse,
+  StickerWire,
 } from '../wire/emoji'
 
 /**
@@ -61,20 +63,30 @@ export function toEmojiIndex(wire: EmojiPacksResponse): EmojiIndex {
 }
 
 /**
- * Паки стикеров. `url`/`info` из каталога здесь не сохраняем: пикеру нужен только `media_id`
- * для публичного адреса байтов, а готовый `content` для `m.sticker` понадобится вместе с
- * отправкой — её в этой итерации нет.
+ * Паки стикеров. `url` и `info` сохраняем целиком: `info.mimetype` — единственный признак
+ * рендиции (расширения в `url` нет), а пара `{body, info, url}` уезжает в `content` события
+ * `m.sticker` дословно, собирать её самому не нужно.
  */
 export function toStickerPacks(wire: StickerPacksResponse): StickerPack[] {
   return (wire.packs ?? []).map((pack) => ({
     id: pack.id,
     title: pack.display_name,
-    stickers: (pack.stickers ?? []).map((sticker) => ({
-      id: sticker.id,
-      body: sticker.body,
-      mediaId: sticker.media_id,
-    })),
+    stickers: (pack.stickers ?? []).map(toStickerItem),
   }))
+}
+
+function toStickerItem(wire: StickerWire): StickerItem {
+  const mimetype = wire.info?.mimetype ?? ''
+
+  return {
+    id: wire.id,
+    body: wire.body,
+    mediaId: wire.media_id,
+    url: wire.url,
+    info: { ...wire.info, mimetype },
+    silhouette: wire.p ? `data:image/png;base64,${wire.p}` : null,
+    format: toStickerFormat(mimetype),
+  }
 }
 
 function toEmptyCategory(wire: EmojiCategoryWire): EmojiCategory {

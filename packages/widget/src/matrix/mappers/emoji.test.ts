@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { StickerWire } from '../wire/emoji'
 import { toEmojiCatalog, toEmojiCategory, toStickerPacks } from './emoji'
 
 describe('toEmojiCatalog', () => {
@@ -58,33 +59,59 @@ describe('toEmojiCategory', () => {
   })
 })
 
+function stickerPacks(...stickers: StickerWire[]) {
+  return toStickerPacks({
+    packs: [{ id: 'rubi_otp', display_name: 'Rubi OTP', stickers }],
+  })
+}
+
+function stickerWire(overrides: Partial<StickerWire> = {}): StickerWire {
+  return {
+    id: '01_1fa77',
+    body: '🩷',
+    info: { mimetype: 'image/webp', w: 512, h: 512, size: 4096 },
+    url: 'mxc://otpbank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+    media_id: 'AbCdEfGhIjKlMnOpQrStUvWx',
+    ...overrides,
+  }
+}
+
 describe('toStickerPacks', () => {
-  it('оставляет media_id для публичного адреса байтов', () => {
-    const packs = toStickerPacks({
-      packs: [
+  it('сохраняет url и info: из них собирается content события m.sticker', () => {
+    const [pack] = stickerPacks(stickerWire({ p: 'iVBORw0KG' }))
+
+    expect(pack).toEqual({
+      id: 'rubi_otp',
+      title: 'Rubi OTP',
+      stickers: [
         {
-          id: 'otp-default',
-          display_name: 'OTP Bank',
-          stickers: [
-            {
-              id: 'hello',
-              body: 'Привет',
-              info: { mimetype: 'image/png', w: 256, h: 256 },
-              url: 'mxc://otpbank.ru/AbCd',
-              media_id: 'AbCd',
-            },
-          ],
+          id: '01_1fa77',
+          body: '🩷',
+          mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
+          url: 'mxc://otpbank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+          info: { mimetype: 'image/webp', w: 512, h: 512, size: 4096 },
+          silhouette: 'data:image/png;base64,iVBORw0KG',
+          format: 'image',
         },
       ],
     })
+  })
 
-    expect(packs).toEqual([
-      {
-        id: 'otp-default',
-        title: 'OTP Bank',
-        stickers: [{ id: 'hello', body: 'Привет', mediaId: 'AbCd' }],
-      },
-    ])
+  it('формат выводится из mimetype, а не из адреса — расширения в url нет', () => {
+    const formats = [
+      'application/json',
+      'video/webm',
+      'image/webp',
+      'image/avif',
+      'application/octet-stream',
+    ].map((mimetype) => stickerPacks(stickerWire({ info: { mimetype } }))[0]?.stickers[0]?.format)
+
+    // неизвестный растр деградирует в <img>, а не в пустоту
+    expect(formats).toEqual(['lottie', 'video', 'image', 'image', 'image'])
+  })
+
+  it('позиция без силуэта остаётся без него, а не с битым data-URL', () => {
+    expect(stickerPacks(stickerWire())[0]?.stickers[0]?.silhouette).toBeNull()
   })
 
   it('выключенная фича — пустой список', () => {

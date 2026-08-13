@@ -21,7 +21,7 @@ export function useEmojiBitmap(
 
   useEffect(() => {
     // Байты берём из общего с пикером кэша: одно эмодзи качается один раз на всё приложение.
-    const cache = getAnimationCache(loadEmojiAnimation)
+    const cache = getAnimationCache('emoji', loadEmojiAnimation)
     let cancelled = false
 
     getEmojiBitmap(codepoint, version, size, cache.get)

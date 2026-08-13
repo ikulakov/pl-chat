@@ -10,6 +10,7 @@ import { ReplyPreview } from '../../ReplyPreview'
 import { AdaptiveCardActions } from './AdaptiveCardActions'
 import type { BubbleMetaData } from './BubbleMeta'
 import { EmojiMessage } from './EmojiMessage'
+import { StickerMessage } from './StickerMessage'
 import { FileChip } from './FileChip'
 import { ImageMessage } from './ImageMessage'
 import { MessageActions } from './MessageActions'
@@ -87,7 +88,22 @@ export const MessageRow = memo(
           reactions={summaries}
         />
 
-        {emojiOnlyLayout ? (
+        {/* Стикер — до пузыря: тернарник внутри него заканчивается catch-all'ом TextContent,
+            и без этой ветки стикер отрисовался бы своей эмодзи-подписью вместо картинки. */}
+        {message.kind === 'sticker' ? (
+          <StickerMessage
+            item={message}
+            meta={meta}
+            reactions={
+              summaries.length > 0 ? (
+                <ReactionBar
+                  summaries={summaries}
+                  onToggle={(key) => void toggleReaction(message.eventId, key)}
+                />
+              ) : undefined
+            }
+          />
+        ) : emojiOnlyLayout ? (
           <EmojiMessage
             segments={segments}
             layout={emojiOnlyLayout}

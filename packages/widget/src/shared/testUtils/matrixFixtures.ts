@@ -5,6 +5,7 @@ import type {
   FileTimelineItem,
   ImageTimelineItem,
   MediaContent,
+  StickerTimelineItem,
   SystemTimelineItem,
   TextTimelineItem,
 } from '../../domain/timeline'
@@ -39,6 +40,29 @@ export function textItem(
     sendStatus: 'sent',
     ...rest,
     content: { body: body ?? 'hello' },
+  }
+}
+
+export function stickerItem(
+  overrides: Partial<Omit<StickerTimelineItem, 'kind' | 'content'>> & {
+    body?: string
+    mimetype?: string
+  } = {},
+): StickerTimelineItem {
+  const { body, mimetype, ...rest } = overrides
+  return {
+    kind: 'sticker',
+    localId: 'st1',
+    eventId: '$st1',
+    sender: OPERATOR_ID,
+    ts: 0,
+    sendStatus: 'sent',
+    ...rest,
+    content: {
+      body: body ?? '🩷',
+      url: 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+      info: { mimetype: mimetype ?? 'image/webp', size: 4096, w: 512, h: 512 },
+    },
   }
 }
 
@@ -298,6 +322,7 @@ export function makeMatrixApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
     getEmojiPacks: vi.fn<MatrixApi['getEmojiPacks']>().mockResolvedValue({ packs: [] }),
     getEmojiAnimation: vi.fn<MatrixApi['getEmojiAnimation']>().mockResolvedValue({}),
     getStickerPacks: vi.fn<MatrixApi['getStickerPacks']>().mockResolvedValue({ packs: [] }),
+    getStickerAnimation: vi.fn<MatrixApi['getStickerAnimation']>().mockResolvedValue({}),
     ...overrides,
   }
 }

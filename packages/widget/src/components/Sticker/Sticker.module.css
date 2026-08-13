@@ -1,0 +1,23 @@
+.sticker {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Все рендиции и силуэт лежат друг на друге: подмена силуэта на готовый стикер не двигает
+   layout, поэтому сетка не «прыгает». */
+.layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.canvas {
+  & canvas {
+    width: 100%;
+    height: 100%;
+  }
+}

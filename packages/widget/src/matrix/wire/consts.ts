@@ -1,5 +1,7 @@
 export const MatrixEventType = {
   RoomMessage: 'm.room.message',
+  // Отдельный тип события, а не msgtype: у m.sticker своего msgtype нет.
+  Sticker: 'm.sticker',
   Reaction: 'm.reaction',
   Redaction: 'm.room.redaction',
   OperatorCurrent: 'kc.operator.current',

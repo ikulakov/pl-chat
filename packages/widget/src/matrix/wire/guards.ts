@@ -5,6 +5,10 @@ export function isRoomMessage(event: Matrix.ClientEvent): event is Matrix.RoomMe
   return event.type === MatrixEventType.RoomMessage
 }
 
+export function isStickerEvent(event: Matrix.ClientEvent): event is Matrix.StickerEvent {
+  return event.type === MatrixEventType.Sticker
+}
+
 export function isReaction(event: Matrix.ClientEvent): event is Matrix.ReactionEvent {
   return event.type === MatrixEventType.Reaction
 }

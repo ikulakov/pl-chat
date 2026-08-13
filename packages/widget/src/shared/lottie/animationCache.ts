@@ -1,7 +1,13 @@
 import type { AnimationLoader, LottieCache } from './lottieCache'
 import { createLottieCache } from './lottieCache'
 
-let cache: LottieCache | null = null
+/**
+ * Пространство имён кэша. Эмодзи адресуются codepoint'ом, стикеры — mediaId, и загрузчики у них
+ * разные: без разделения id стикера ушёл бы в загрузчик эмодзи.
+ */
+export type AnimationNamespace = 'emoji' | 'sticker'
+
+const caches = new Map<AnimationNamespace, LottieCache>()
 
 /**
  * Кэш анимаций на всё приложение, а не на монтирование панели: иначе каждое закрытие пикера
@@ -10,14 +16,22 @@ let cache: LottieCache | null = null
  *
  * Загрузчик приходит параметром, чтобы модуль не тянул `chatController` — но фактически он
  * всегда один и тот же: `actions` собираются в конструкторе контроллера-синглтона и не
- * пересоздаются.
+ * пересоздаются. Запоминается загрузчик первого вызова в своём пространстве имён.
  */
-export function getAnimationCache(load: AnimationLoader): LottieCache {
-  cache ??= createLottieCache(load)
+export function getAnimationCache(
+  namespace: AnimationNamespace,
+  load: AnimationLoader,
+): LottieCache {
+  const existing = caches.get(namespace)
+  if (existing) return existing
+
+  const cache = createLottieCache(load)
+  caches.set(namespace, cache)
+
   return cache
 }
 
-/** Нужен тестам: кэш — модульный синглтон. */
+/** Нужен тестам: кэши — модульные синглтоны. */
 export function resetAnimationCache(): void {
-  cache = null
+  caches.clear()
 }

@@ -142,6 +142,21 @@ export interface MediaStatusEvent extends BaseClientEvent {
   }
 }
 
+/**
+ * Стикер из server-managed каталога. Отдельный тип события со своим `content` — msgtype у него
+ * нет. Связи ответа тоже нет: сервер её не хранит и в эхо не возвращает.
+ */
+export interface StickerMessageContent {
+  body: string
+  url: string
+  info?: Partial<MediaInfo>
+}
+
+export interface StickerEvent extends BaseClientEvent {
+  type: typeof MatrixEventType.Sticker
+  content: StickerMessageContent
+}
+
 export interface GenericClientEvent extends BaseClientEvent {
   type: string
   content: Record<string, unknown>
@@ -149,6 +164,7 @@ export interface GenericClientEvent extends BaseClientEvent {
 
 export type ClientEvent =
   | RoomMessageEvent
+  | StickerEvent
   | ReactionEvent
   | RedactionEvent
   | OperatorCurrentEvent

@@ -8,6 +8,10 @@
 // Покрывает весь клиентский MVP: переписка, статусы, typing, ✓✓ (receipts),
 // история, медиа-заглушки, стикеры, эмодзи, Adaptive Cards, завершение чата.
 //
+// Стикеры: 5 паков по 3 позиции — структура ответа боевая (силуэты, 24-символьные media_id,
+// три рендиции). Байты: Lottie синтезируется, вместо webp отдаётся PNG, а видео — один
+// настоящий webm из пака Rubi OTP в assets/.
+//
 // Эмодзи: встроенный набор на 22 позиции в 3 категориях (codepoint'ы — из реального пака
 // matrixkc). Силуэты и Lottie генерируются на лету, поэтому анимация в моке одинаковая
 // «пульсирующая клякса» — проверить сетку на настоящих 580 позициях можно только против
@@ -70,20 +74,65 @@ const OP = scenario.operatorId;
 const GUEST = scenario.guest.user_id;
 
 // ── Каталог стикеров (mock) ──────────────────────────────────────────────────
-const STICKERS = [
-  { id: "s1", body: "Палец вверх", emoji: "👍" },
-  { id: "s2", body: "Сердце", emoji: "❤️" },
-  { id: "s3", body: "Огонь", emoji: "🔥" },
-  { id: "s4", body: "Аплодисменты", emoji: "👏" },
-].map((s) => ({
-  id: s.id,
-  body: s.body,
-  emoji: s.emoji,
-  info: { mimetype: "image/svg+xml", w: 120, h: 120, size: 600 },
-  url: `mxc://bank.ru/${s.id}`,
-  media_id: s.id,
-}));
-const STICKER_EMOJI = Object.fromEntries(STICKERS.map((s) => [s.media_id, s.emoji]));
+// Настоящий каталог — 5 паков и 150 стикеров в трёх рендициях. Здесь по три позиции на пак,
+// но структура ответа повторяет боевую вплоть до силуэтов и 24-символьных media_id: именно по
+// ним клиент строит публичный адрес байтов и ветвится по info.mimetype.
+//
+// Байты: Lottie генерируется тем же mockLottie(), что и у эмодзи; вместо webp отдаётся PNG
+// (синтезировать webp нечем, а ветка выбирается по префиксу image/), а для видео положен один
+// настоящий webm из пака Rubi OTP — VP9 с альфой не синтезируешь, а без него ветка видео
+// локально непроверяема вовсе.
+const STICKER_PACKS = [
+  { id: "rubi_otp", display_name: "Rubi OTP", description: "Фирменный пак ОТП Банка",
+    mimetype: "video/webm", animated: true, bodies: ["🩷", "😎", "🎉"] },
+  { id: "utya", display_name: "Утя", description: "Анимированный утёнок",
+    mimetype: "application/json", animated: true, bodies: ["🐥", "😴", "🥳"] },
+  { id: "hands_for_friends", display_name: "Руки", description: "Анимированные жесты",
+    mimetype: "application/json", animated: true, bodies: ["👍", "👏", "🤝"] },
+  { id: "gentle_rabbit", display_name: "Кролик", description: "Мягкий кролик",
+    mimetype: "image/webp", animated: false, bodies: ["🐰", "❤️", "😢"] },
+  { id: "panda_chan", display_name: "Панда", description: "Панда-тян",
+    mimetype: "image/webp", animated: false, bodies: ["🐼", "🍜", "😆"] },
+];
+
+// media_id боевого сервера — ровно 24 символа [A-Za-z0-9]; клиент на это закладывается.
+const mockMediaId = (packId, index) =>
+  (packId.replace(/[^a-z]/g, "") + "Sticker" + index).padEnd(24, "0").slice(0, 24);
+
+// Индекс байтов заполняется сразу — он нужен маршруту отдачи и не требует генерации PNG.
+const STICKERS_BY_MEDIA_ID = new Map(
+  STICKER_PACKS.flatMap((pack) =>
+    pack.bodies.map((_, i) => [mockMediaId(pack.id, i), { mimetype: pack.mimetype, index: i }]),
+  ),
+);
+
+// Сам каталог — лениво: силуэты строит grayPng(), а тот опирается на таблицу CRC, объявленную
+// ниже по файлу. Собирать его на этапе инициализации модуля значило бы обратиться к ней из TDZ.
+let stickerCatalog = null;
+function getStickerCatalog() {
+  stickerCatalog ??= STICKER_PACKS.map((pack) => ({
+    id: pack.id,
+    display_name: pack.display_name,
+    description: pack.description,
+    stickers: pack.bodies.map((body, i) => ({
+      id: `${String(i + 1).padStart(2, "0")}_${pack.id}`,
+      body,
+      info: {
+        mimetype: pack.mimetype,
+        w: 512,
+        h: 512,
+        size: 4096,
+        // У статичных паков боевой сервер ключ вовсе не шлёт, а не шлёт false.
+        ...(pack.animated ? { is_animated: true } : {}),
+      },
+      url: `mxc://bank.ru/${mockMediaId(pack.id, i)}`,
+      media_id: mockMediaId(pack.id, i),
+      p: grayPng(i).toString("base64"),
+    })),
+  }));
+
+  return stickerCatalog;
+}
 
 // ── Каталог эмодзи (mock) ────────────────────────────────────────────────────
 // Настоящий пак — 580 анимаций на 17 МБ в matrixkc (профиль emoji-pack). Здесь встроенный
@@ -624,7 +673,7 @@ function operatorRespond(text, ownEventId) {
     );
   }
   if (t.startsWith("/sticker")) {
-    const s = STICKERS[0];
+    const s = getStickerCatalog()[0].stickers[0];
     return delay(700, () => push("m.sticker", OP, { body: s.body, info: s.info, url: s.url }));
   }
   // Три размера рендера эмодзи одной командой: большое, среднее и строчные внутри текста.
@@ -684,11 +733,12 @@ function svgImage(w, h, label) {
     `text-anchor="middle" dominant-baseline="middle">${label}</text></svg>`
   );
 }
-function svgSticker(emoji) {
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">` +
-    `<text x="50%" y="54%" font-size="84" text-anchor="middle" dominant-baseline="middle">${emoji}</text></svg>`
-  );
+// Один настоящий webm из пака Rubi OTP: VP9 с альфой не синтезируешь, а без файла ветку видео
+// локально не проверить. Читается лениво и один раз — на все позиции пака он один и тот же.
+let stickerWebm = null;
+function loadStickerWebm() {
+  stickerWebm ??= readFileSync(join(__dirname, "assets", "sticker.webm"));
+  return stickerWebm;
 }
 
 // ── Генерация ассетов эмодзи ─────────────────────────────────────────────────
@@ -1045,14 +1095,26 @@ const server = createServer(async (req, res) => {
     const label = isThumbnail ? `thumbnail ${w}×${h}` : `original ${w}×${h}`;
     return send(res, 200, svgImage(w, h, label), "image/svg+xml");
   }
-  // Публичные байты стикеров
+  // Публичные байты стикеров: один маршрут на все три рендиции, как на боевом сервере
   const stickerMatch = path.match(/\/_matrix\/sticker\/([^/]+)/);
   if (stickerMatch) {
-    return send(res, 200, svgSticker(STICKER_EMOJI[stickerMatch[1]] || "🙂"), "image/svg+xml");
+    const entry = STICKERS_BY_MEDIA_ID.get(stickerMatch[1]);
+    if (!entry) return send(res, 404, { errcode: "M_NOT_FOUND", error: "no such sticker" });
+
+    res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+
+    if (entry.mimetype === "application/json") {
+      return send(res, 200, mockLottie(`sticker-${stickerMatch[1]}`));
+    }
+    if (entry.mimetype === "video/webm") {
+      return send(res, 200, loadStickerWebm(), "video/webm");
+    }
+    // Вместо webp — PNG: клиент ветвится по префиксу image/, путь тот же.
+    return send(res, 200, grayPng(entry.index), "image/png");
   }
   // Каталог стикеров
   if (/stickers\/v1\/packs$/.test(path)) {
-    return send(res, 200, { packs: [{ id: "otp", display_name: "OTP", stickers: STICKERS }] });
+    return send(res, 200, { packs: getStickerCatalog() });
   }
   // Вкладки пикера эмодзи: счётчики без состава
   if (/emoji\/v1\/categories$/.test(path)) {
