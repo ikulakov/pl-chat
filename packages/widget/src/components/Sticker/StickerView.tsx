@@ -7,6 +7,7 @@ import { getAnimationCache } from '../../shared/lottie/animationCache'
 import { createEmojiPlayer, loadLottiePlayer } from '../../shared/lottie/lottiePlayer'
 import { lottiePool } from '../../shared/lottie/lottiePool'
 import { cn } from '../../shared/utils/cn'
+import { Silhouette } from '../Silhouette/Silhouette'
 import styles from './Sticker.module.css'
 
 export interface StickerViewData {
@@ -127,7 +128,12 @@ function LottieSticker({
       ref={wrapRef}
       className={styles.layer}
     >
-      {!isPlaying && <Silhouette src={sticker.silhouette ?? null} />}
+      {!isPlaying && sticker.silhouette && (
+        <Silhouette
+          className={styles.layer}
+          src={sticker.silhouette}
+        />
+      )}
       <span
         ref={containerRef}
         className={cn(styles.layer, styles.canvas)}
@@ -141,6 +147,12 @@ function LottieSticker({
  * Видео: VP9 с альфой. `muted` и `playsInline` обязательны — без них iOS не запускает
  * автовоспроизведение. Играем только пока видно: пул кадров сюда не распространяется, декодирует
  * браузер, и двадцать одновременных декодеров — это отдельный бюджет.
+ *
+ * `preload="none"` — по той же причине: в пикере полтораста стикеров, и `metadata` означала бы
+ * полтораста запросов сразу при открытии вкладки. Байты тянет уже `play()` по видимости.
+ *
+ * До первого кадра элемент прячем: пустое `<video>` браузер заливает чёрным, и на белом фоне
+ * это чёрный квадрат поверх силуэта.
  *
  * Safari не поддерживает альфу в VP9, поэтому там фон стикера будет чёрным. Надёжного способа
  * распознать именно поддержку альфы нет, а подмена на серый силуэт хуже самого дефекта.
@@ -172,30 +184,22 @@ function VideoSticker({
 
   return (
     <>
-      {!isReady && <Silhouette src={silhouette} />}
+      {!isReady && silhouette && (
+        <Silhouette
+          className={styles.layer}
+          src={silhouette}
+        />
+      )}
       <video
         ref={videoRef}
-        className={styles.layer}
+        className={cn(styles.layer, !isReady && styles.hidden)}
         src={src}
         loop
         muted
         playsInline
-        preload="metadata"
+        preload="none"
         onCanPlay={() => setReady(true)}
       />
     </>
-  )
-}
-
-function Silhouette({ src }: { src: string | null }) {
-  if (!src) return null
-
-  return (
-    <img
-      className={styles.layer}
-      src={src}
-      alt=""
-      draggable={false}
-    />
   )
 }

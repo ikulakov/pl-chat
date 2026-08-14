@@ -1,6 +1,6 @@
 import { isOptimistic } from '../../../domain/optimistic'
 import type { ReactionSummary } from '../../../domain/reactions'
-import { replyText } from '../../../domain/reply'
+import { replyStickerOf, replyText } from '../../../domain/reply'
 import { isMedia, type MessageTimelineItem } from '../../../domain/timeline'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { t } from '../../../i18n'
@@ -20,6 +20,7 @@ export function MessageActions({ message, isOwn, reactions }: Props) {
   const { resendMessage, replyTo, toggleReaction } = useChatActions()
 
   const reply = replyText(message)
+  const replySticker = replyStickerOf(message)
 
   const uploadFailed = isMedia(message) && message.upload?.error
   const canRetry = isOwn && message.sendStatus === 'failed' && !uploadFailed
@@ -54,6 +55,7 @@ export function MessageActions({ message, isOwn, reactions }: Props) {
               eventId: message.eventId,
               sender: message.sender,
               body: reply,
+              ...(replySticker ? { sticker: replySticker } : {}),
             })
           }
         >

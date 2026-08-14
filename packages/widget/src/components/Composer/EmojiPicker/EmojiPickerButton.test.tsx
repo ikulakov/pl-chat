@@ -8,6 +8,7 @@ const loadEmojiCatalog = vi.fn()
 const loadEmojiCategory = vi.fn()
 const loadEmojiAnimation = vi.fn()
 const loadStickerPacks = vi.fn()
+const sendSticker = vi.fn()
 
 vi.mock('../../../hooks/useChatActions', () => ({
   useChatActions: () => ({
@@ -15,6 +16,7 @@ vi.mock('../../../hooks/useChatActions', () => ({
     loadEmojiCategory,
     loadEmojiAnimation,
     loadStickerPacks,
+    sendSticker,
   }),
 }))
 
@@ -60,7 +62,28 @@ describe('EmojiPickerButton', () => {
     })
     loadEmojiAnimation.mockResolvedValue({})
     loadStickerPacks.mockResolvedValue([])
+    sendSticker.mockResolvedValue(undefined)
   })
+
+  /** Пак с одним растровым стикером: ветка `<img>` не тянет ни плеер, ни видео. */
+  function withSticker() {
+    loadStickerPacks.mockResolvedValue([
+      {
+        id: 'utya',
+        title: 'Утя',
+        stickers: [
+          {
+            id: '01_utya',
+            body: '🐥',
+            mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
+            url: 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+            info: { mimetype: 'image/webp' },
+            silhouette: null,
+          },
+        ],
+      },
+    ])
+  }
 
   it('панель закрыта по умолчанию, кнопка сообщает об этом', () => {
     render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
@@ -160,6 +183,53 @@ describe('EmojiPickerButton', () => {
 
     expect(onSelectEmoji).toHaveBeenCalledExactlyOnceWith('😀')
     expect(screen.getByRole('tablist')).toBeInTheDocument()
+  })
+
+  it('категории идут секциями со своими заголовками', async () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+
+    openPicker()
+
+    expect(await screen.findByRole('heading', { name: 'Смайлы' })).toBeInTheDocument()
+  })
+
+  it('одну категорию полоска быстрого перехода не показывает — перематывать некуда', async () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+    openPicker()
+    await screen.findByRole('tablist')
+
+    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+  })
+
+  it('полоска категорий помечает выбранную текущей', async () => {
+    loadEmojiCatalog.mockResolvedValue({
+      version: 'v1',
+      categories: [
+        { id: 'smileys', title: 'Смайлы', count: 2, items: null },
+        { id: 'flags', title: 'Флаги', count: 3, items: null },
+      ],
+    })
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+    openPicker()
+
+    const flags = await screen.findByRole('button', { name: 'Флаги' })
+    fireEvent.click(flags)
+
+    expect(flags).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByRole('button', { name: 'Смайлы' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('выбор стикера отправляет его и закрывает панель — в отличие от эмодзи', async () => {
+    withSticker()
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+    openPicker()
+    fireEvent.click(await screen.findByRole('tab', { name: t('picker.tab.stickers') }))
+
+    fireEvent.click(await screen.findByRole('button', { name: '🐥' }))
+
+    expect(sendSticker).toHaveBeenCalledOnce()
+    await waitFor(() => expect(screen.queryByRole('tablist')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: t('input.stickers') })).toHaveFocus()
   })
 
   it('сбой каталога показывает ошибку с повтором вместо пустой панели', async () => {

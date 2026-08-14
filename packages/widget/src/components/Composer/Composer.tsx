@@ -91,6 +91,7 @@ export function Composer() {
             <ReplyPreview
               author={replyAuthorLabel(replyTarget.sender, userId)}
               text={replyTarget.body}
+              sticker={replyTarget.sticker}
             />
           </div>
           <IconButton

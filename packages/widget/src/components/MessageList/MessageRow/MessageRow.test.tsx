@@ -39,6 +39,7 @@ function renderRow(body: string, replyText?: string) {
       reactions={undefined}
       replyAuthor={replyText ? 'Оля' : undefined}
       replyText={replyText}
+      replySticker={undefined}
       replyTargetId={undefined}
       onReplyClick={vi.fn()}
     />,

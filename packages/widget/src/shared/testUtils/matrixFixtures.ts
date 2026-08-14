@@ -47,9 +47,11 @@ export function stickerItem(
   overrides: Partial<Omit<StickerTimelineItem, 'kind' | 'content'>> & {
     body?: string
     mimetype?: string
+    /** Пустая строка — черновик, у которого байтов ещё нет. */
+    url?: string
   } = {},
 ): StickerTimelineItem {
-  const { body, mimetype, ...rest } = overrides
+  const { body, mimetype, url, ...rest } = overrides
   return {
     kind: 'sticker',
     localId: 'st1',
@@ -60,7 +62,7 @@ export function stickerItem(
     ...rest,
     content: {
       body: body ?? '🩷',
-      url: 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+      url: url ?? 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
       info: { mimetype: mimetype ?? 'image/webp', size: 4096, w: 512, h: 512 },
     },
   }

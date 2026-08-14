@@ -17,4 +17,7 @@
   padding: 2px 6px;
   border-radius: var(--radius-md);
   background: var(--c-surface-secondary);
+  /* Пилюля лежит на фоне ленты, а не на тёмном пузыре — время и галочки своего сообщения
+     здесь такие же серые, как у чужого. */
+  --meta-own-color: var(--c-text-disabled);
 }

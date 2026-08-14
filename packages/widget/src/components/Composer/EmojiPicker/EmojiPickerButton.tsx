@@ -46,6 +46,10 @@ export function EmojiPickerButton({ onSelectEmoji }: Props) {
         <PickerPanel
           ref={panelRef}
           onSelectEmoji={onSelectEmoji}
+          // Эмодзи набирают пачками, поэтому панель остаётся открытой; стикер — законченное
+          // сообщение, после него ей висеть незачем. Фокус возвращаем на триггер: узел
+          // нажатой кнопки исчезает вместе с панелью, и без этого фокус уехал бы в body.
+          onStickerSent={() => dismiss(true)}
         />
       )}
     </>

@@ -4,15 +4,22 @@ import { clearEmojiBitmaps, getEmojiBitmap } from './emojiBitmap'
 
 const destroy = vi.fn()
 const goToAndStop = vi.fn()
-const resize = vi.fn()
 
+// Плеер рисует кадр в контейнер: подкладываем туда пустой <svg>, из которого берётся разметка.
 vi.mock('./lottiePlayer', () => ({
-  loadLottiePlayer: () =>
-    Promise.resolve({ loadAnimation: () => ({ goToAndStop, destroy, resize }) }),
+  loadLottiePlayer: () => Promise.resolve({}),
+  createEmojiPlayer: (_lottie: unknown, { container }: { container: HTMLElement }) => {
+    container.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
+    return { goToAndStop, destroy }
+  },
 }))
 
-// jsdom не рисует — canvas заглушен в test.setup.ts, оттуда же и этот data-URL.
+// jsdom не грузит ресурсы в <img>, поэтому растеризация подменена целиком — см. rasterizeSvg.
 const DATA_URL = 'data:image/png;base64,test'
+vi.mock('./rasterizeSvg', () => ({
+  rasterizeSvg: () => Promise.resolve(DATA_URL),
+}))
+
 const VERSION = 'mock-1'
 
 beforeEach(() => {
@@ -30,11 +37,17 @@ describe('getEmojiBitmap', () => {
 
     await expect(getEmojiBitmap('1f600', VERSION, 64, load)).resolves.toBe(DATA_URL)
 
-    // Размер задаётся явно — иначе плеер обнулит холст вне документа.
-    expect(resize).toHaveBeenCalledWith(64, 64)
     expect(goToAndStop).toHaveBeenCalledWith(0, true)
     // Плеер живёт одну отрисовку.
     expect(destroy).toHaveBeenCalledTimes(1)
+  })
+
+  it('не оставляет за собой контейнер отрисовки', async () => {
+    const before = document.body.childElementCount
+
+    await getEmojiBitmap('1f600', VERSION, 64, makeLoader())
+
+    expect(document.body.childElementCount).toBe(before)
   })
 
   it('дедуплицирует параллельные запросы одного эмодзи', async () => {

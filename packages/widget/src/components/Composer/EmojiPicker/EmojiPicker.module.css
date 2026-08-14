@@ -68,6 +68,9 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Явный `hidden` по горизонтали: при `visible` браузер поднимает ось до `auto` вслед за
+     вертикальной, и лишний пиксель ширины вылезал полосой прокрутки вдоль нижней кромки. */
+  overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--c-scrollbar) transparent;
@@ -82,12 +85,66 @@
   }
 }
 
+/* Полоска быстрого перехода. Не прокручивается вместе с лентой: она — навигация по ней. */
+.categoryBar {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--c-surface-tertiary-pressed);
+  /* Категорий может быть больше, чем влезает: полоска едет вбок, а не переносится. */
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.categoryButton {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  /* Значок — системный глиф: полоска не должна ждать сеть, чтобы стать кликабельной. */
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--c-surface-secondary);
+  }
+}
+
+.categoryActive {
+  background: var(--c-surface-tertiary-pressed);
+
+  &:hover {
+    background: var(--c-surface-tertiary-pressed);
+  }
+}
+
+.sections {
+  padding: 12px 8px;
+}
+
+.sections section + section {
+  margin-top: 16px;
+}
+
 .grid {
   display: grid;
-  /* 7 колонок по 36px (иконка 24 + по 6px хитбокса) — доли, а не фиксированная ширина:
-     так сетка не разъезжается от того, забирает ли скроллбар место под себя. */
-  grid-template-columns: repeat(7, 1fr);
-  padding: 6px;
+  /* Доли, а не фиксированная ширина: сетка не разъезжается от того, забирает ли скроллбар
+     место под себя. Нижняя граница трека — 0, а не `auto`: иначе ячейка шире доли распирала
+     бы сетку, и панель получала бы горизонтальную прокрутку. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .cell {
@@ -109,24 +166,25 @@
 .silhouette,
 .canvas {
   grid-area: 1 / 1;
-  width: 24px;
-  height: 24px;
+  /* 24px из макета — потолок, а не жёсткий размер: на узкой панели ячейка ужимается, и
+     значок обязан ужаться вместе с ней, иначе он вылезает за сетку. */
+  width: 100%;
+  height: 100%;
+  max-width: 24px;
+  max-height: 24px;
 }
 
 .canvas {
   display: block;
 
-  & canvas {
+  & svg {
     width: 100%;
     height: 100%;
   }
 }
 
-.stickerPacks {
-  padding: 12px;
-}
-
-.packTitle {
+/* Заголовок секции — один и тот же у категорий эмодзи и у паков стикеров. */
+.sectionTitle {
   margin: 0 0 8px;
   padding: 0;
   /* Figma Caption/1M — тот же стиль, что у табов панели. */
@@ -137,13 +195,9 @@
   color: var(--c-text-tertiary);
 }
 
-.stickerPacks section + section {
-  margin-top: 16px;
-}
-
 .stickerGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 

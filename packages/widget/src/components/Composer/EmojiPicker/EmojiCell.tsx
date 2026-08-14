@@ -4,6 +4,7 @@ import { useIntersectionObserver } from '../../../hooks/useIntersectionObserver'
 import type { LottieCache } from '../../../shared/lottie/lottieCache'
 import { createEmojiPlayer, loadLottiePlayer } from '../../../shared/lottie/lottiePlayer'
 import { lottiePool } from '../../../shared/lottie/lottiePool'
+import { Silhouette } from '../../Silhouette/Silhouette'
 import styles from './EmojiPicker.module.css'
 
 interface Props {
@@ -77,15 +78,16 @@ export function EmojiCell({ item, version, cache, scrollRef, onSelect }: Props) 
       className={styles.cell}
       // Имя кнопки — сам символ: он же уедет в текст. Не на <img>, иначе кнопка теряет
       // доступное имя в момент подмены силуэта анимацией.
+      //
+      // `title` намеренно нет: нативная подсказка показала бы тот же символ системным шрифтом
+      // на тёмной плашке — поверх картинки, которая и так видна.
       aria-label={item.char}
-      title={item.char}
       onClick={() => onSelect(item.char)}
     >
       {item.silhouette && !animated && (
-        <img
+        <Silhouette
           className={styles.silhouette}
           src={item.silhouette}
-          alt=""
         />
       )}
       <span

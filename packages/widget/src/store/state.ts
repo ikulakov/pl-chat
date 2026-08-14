@@ -3,6 +3,7 @@ import type { MediaVerdict, MediaVerdictEntry } from '../domain/mediaVerdict'
 import type { OperatorState } from '../domain/operator'
 import type { ReactionDelta, ReactionEntry, ReactionIndex } from '../domain/reactions'
 import type { ReadReceipt } from '../domain/receipts'
+import type { ReplyStickerPreview } from '../domain/reply'
 import type { RoomSyncPatch } from '../domain/roomSync'
 import type { TimelineItem } from '../domain/timeline'
 import type { UploadFailure } from '../domain/uploadError'
@@ -74,6 +75,8 @@ export interface ReplyTarget {
   eventId: string
   sender: string
   body: string
+  /** Оригинал — стикер: превью в композере рисует его самого, а не подпись шрифтом. */
+  sticker?: ReplyStickerPreview
 }
 
 export interface Identity {

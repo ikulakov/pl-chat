@@ -8,6 +8,8 @@ import styles from './EmojiPicker.module.css'
 interface Props {
   /** Контейнер прокрутки панели — он же root наблюдателей, см. PickerPanel. */
   scrollRef: React.RefObject<HTMLDivElement | null>
+  /** Стикер ушёл в ленту. Панель после этого закрывается — в отличие от выбора эмодзи. */
+  onStickerSent: () => void
 }
 
 /**
@@ -15,7 +17,7 @@ interface Props {
  * категории идут секциями. Отдельной догрузки состава здесь нет: каталог приезжает одним
  * ответом вместе с силуэтами, догружать нечего.
  */
-export function StickerGrid({ scrollRef }: Props) {
+export function StickerGrid({ scrollRef, onStickerSent }: Props) {
   const { loadStickerPacks, sendSticker } = useChatActions()
   const [packs, setPacks] = useState<StickerPack[] | null>(null)
   const [failed, setFailed] = useState(false)
@@ -44,10 +46,10 @@ export function StickerGrid({ scrollRef }: Props) {
   if (packs.length === 0) return <p className={styles.message}>{t('picker.empty')}</p>
 
   return (
-    <div className={styles.stickerPacks}>
+    <div className={styles.sections}>
       {packs.map((pack) => (
         <section key={pack.id}>
-          <h3 className={styles.packTitle}>{pack.title}</h3>
+          <h3 className={styles.sectionTitle}>{pack.title}</h3>
 
           <div className={styles.stickerGrid}>
             {pack.stickers.map((sticker) => (
@@ -55,7 +57,12 @@ export function StickerGrid({ scrollRef }: Props) {
                 key={sticker.id}
                 sticker={sticker}
                 scrollRef={scrollRef}
-                onSelect={() => void sendSticker(sticker)}
+                onSelect={() => {
+                  // Не ждём ответа сервера: стикер уже лёг в ленту оптимистично, а панель
+                  // поверх неё мешала бы увидеть отправленное.
+                  void sendSticker(sticker)
+                  onStickerSent()
+                }}
               />
             ))}
           </div>
@@ -78,8 +85,9 @@ function StickerButton({
     <button
       type="button"
       className={styles.stickerCell}
+      // Без `title`: нативная подсказка нарисовала бы подпись-эмодзи системным шрифтом на
+      // тёмной плашке поверх самого стикера. Доступное имя остаётся на aria-label.
       aria-label={sticker.body}
-      title={sticker.body}
       onClick={onSelect}
     >
       <StickerView
