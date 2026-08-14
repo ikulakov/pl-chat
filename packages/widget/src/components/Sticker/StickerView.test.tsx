@@ -87,7 +87,32 @@ describe('StickerView', () => {
       />,
     )
 
-    expect(container.querySelector('img')).toHaveAttribute('src', SILHOUETTE)
+    const mask = container.querySelector<HTMLElement>('[data-silhouette]')
+    expect(mask?.style.getPropertyValue('--silhouette')).toContain(SILHOUETTE)
+  })
+
+  it('силуэт — маска, а не картинка: как <img> это чёрный квадрат на белом фоне', () => {
+    const { container } = render(
+      <StickerView
+        sticker={sticker({ format: 'lottie' })}
+        size={128}
+      />,
+    )
+
+    expect(container.querySelector(`img[src="${SILHOUETTE}"]`)).not.toBeInTheDocument()
+  })
+
+  it('видео скрыто до первого кадра: пустое <video> браузер заливает чёрным', () => {
+    const { container } = render(
+      <StickerView
+        sticker={sticker({ format: 'video' })}
+        size={128}
+      />,
+    )
+
+    const video = container.querySelector('video')
+    expect(video).toHaveAttribute('preload', 'none')
+    expect(video?.className).toMatch(/hidden/)
   })
 
   it('доступное имя — эмодзи-подпись стикера', () => {

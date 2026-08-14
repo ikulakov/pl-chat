@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react'
 import { aggregateReactions, type ReactionEntry } from '../../../domain/reactions'
+import type { ReplyStickerPreview } from '../../../domain/reply'
 import { type MessageTimelineItem } from '../../../domain/timeline'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { useEmojiSegments } from '../../../hooks/useEmojiSegments'
@@ -27,6 +28,7 @@ interface Props {
   reactions: ReactionEntry[] | undefined
   replyAuthor: string | undefined
   replyText: string | undefined
+  replySticker: ReplyStickerPreview | undefined
   replyTargetId: string | undefined
   onReplyClick: (localId: string) => void
 }
@@ -40,6 +42,7 @@ export const MessageRow = memo(
     reactions,
     replyAuthor,
     replyText,
+    replySticker,
     replyTargetId,
     onReplyClick,
   }: Props) => {
@@ -65,6 +68,7 @@ export const MessageRow = memo(
       <ReplyPreview
         author={replyAuthor}
         text={replyText}
+        sticker={replySticker}
         onClick={replyTargetId ? () => onReplyClick(replyTargetId) : undefined}
       />
     ) : undefined
@@ -73,6 +77,15 @@ export const MessageRow = memo(
     // нельзя: их не на чем показать, поэтому такое сообщение остаётся обычным баблом со
     // строчными эмодзи.
     const emojiOnlyLayout = layout !== 'inline' && !reply && summaries.length === 0 ? layout : null
+
+    // Один узел на все ветки: реакции одинаково нужны и пузырю, и картинке, и стикеру.
+    const reactionBar =
+      summaries.length > 0 ? (
+        <ReactionBar
+          summaries={summaries}
+          onToggle={(key) => void toggleReaction(message.eventId, key)}
+        />
+      ) : undefined
 
     return (
       <div
@@ -94,14 +107,14 @@ export const MessageRow = memo(
           <StickerMessage
             item={message}
             meta={meta}
-            reactions={
-              summaries.length > 0 ? (
-                <ReactionBar
-                  summaries={summaries}
-                  onToggle={(key) => void toggleReaction(message.eventId, key)}
-                />
-              ) : undefined
-            }
+            reactions={reactionBar}
+          />
+        ) : message.kind === 'image' ? (
+          <ImageMessage
+            item={message}
+            meta={meta}
+            reply={reply}
+            reactions={reactionBar}
           />
         ) : emojiOnlyLayout ? (
           <EmojiMessage
@@ -116,21 +129,9 @@ export const MessageRow = memo(
               type={isOwn ? 'user' : 'operator'}
               position={position}
               reply={reply}
-              reactions={
-                summaries.length > 0 ? (
-                  <ReactionBar
-                    summaries={summaries}
-                    onToggle={(key) => void toggleReaction(message.eventId, key)}
-                  />
-                ) : undefined
-              }
+              reactions={reactionBar}
             >
-              {message.kind === 'image' ? (
-                <ImageMessage
-                  item={message}
-                  meta={meta}
-                />
-              ) : message.kind === 'file' ? (
+              {message.kind === 'file' ? (
                 <FileChip
                   item={message}
                   meta={meta}

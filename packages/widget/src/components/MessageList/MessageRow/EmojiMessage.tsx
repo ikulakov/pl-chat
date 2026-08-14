@@ -11,7 +11,8 @@ interface Props {
 }
 
 const SIZE_PX: Record<Props['layout'], number> = {
-  big: 128,
+  // 128 из макета −20% по правке дизайна; растр при этом остаётся 128-м (см. AnimatedEmoji).
+  big: 102,
   mid: 48,
 }
 

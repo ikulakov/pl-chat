@@ -767,7 +767,11 @@ function pngChunk(type, data) {
   return Buffer.concat([len, body, crc]);
 }
 
-/** Силуэт 32×32: круглое пятно, как альфа-маска настоящего эмодзи. */
+/**
+ * Силуэт 32×32: круглое пятно. Как и боевой сервер, это **luminance-маска** без альфы —
+ * фигура белая, фон чёрный. Клиент подставляет её в mask-image и красит сам, поэтому
+ * инверсия здесь сразу видна на экране: пятно и фон меняются местами.
+ */
 function grayPng(seed) {
   const size = 32;
   const radius = 12 + (seed % 4);
@@ -779,7 +783,7 @@ function grayPng(seed) {
       const dx = x - 15.5;
       const dy = y - 15.5;
       const inside = dx * dx + dy * dy <= radius * radius;
-      raw[y * (size + 1) + 1 + x] = inside ? 0xb0 : 0xff;
+      raw[y * (size + 1) + 1 + x] = inside ? 0xff : 0x00;
     }
   }
 

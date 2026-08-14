@@ -1,0 +1,18 @@
+.silhouette {
+  display: block;
+  background-color: var(--c-neutral);
+
+  /* `mask-mode: luminance` обязателен: в PNG нет альфы, форму задаёт яркость.
+     Если браузер режим не поддержит, маска сработает по альфе — выйдет ровный серый
+     квадрат вместо фигуры. Это заметно лучше, чем чёрный квадрат оригинала. */
+  mask-image: var(--silhouette);
+  mask-mode: luminance;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-image: var(--silhouette);
+  -webkit-mask-source-type: luminance;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+}

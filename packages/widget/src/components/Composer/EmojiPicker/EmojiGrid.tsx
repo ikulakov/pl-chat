@@ -11,35 +11,49 @@ interface Props {
   cache: LottieCache
   /** Скроллящийся контейнер панели — он же root наблюдателей, см. PickerPanel. */
   scrollRef: React.RefObject<HTMLDivElement | null>
+  /** Отдаёт узел секции наружу — по нему работает быстрый переход, см. useCategoryNav. */
+  registerSection: (categoryId: string, node: HTMLElement | null) => void
   onLoadCategory: (categoryId: string) => void
   onSelect: (char: string) => void
 }
 
 /**
- * Одна непрерывная прокрутка по всем категориям — отдельной ленты вкладок в макете нет.
- * Виртуализации нет намеренно: 580 кнопок DOM держит спокойно, дорог только canvas,
- * а его заводят лишь видимые ячейки.
+ * Одна непрерывная прокрутка по всем категориям, разбитая заголовками секций, — как у паков
+ * стикеров на соседней вкладке. Переключение категорий не подменяет содержимое, а перематывает
+ * эту же ленту (CategoryBar).
+ *
+ * Виртуализации нет намеренно: 580 кнопок DOM держит спокойно, дорог только плеер, а его
+ * заводят лишь видимые ячейки.
  */
 export function EmojiGrid({
   categories,
   version,
   cache,
   scrollRef,
+  registerSection,
   onLoadCategory,
   onSelect,
 }: Props) {
   return (
-    <div className={styles.grid}>
+    <div className={styles.sections}>
       {categories.map((category) => (
-        <CategorySection
+        <section
           key={category.id}
-          category={category}
-          version={version}
-          cache={cache}
-          scrollRef={scrollRef}
-          onLoadCategory={onLoadCategory}
-          onSelect={onSelect}
-        />
+          ref={(node) => registerSection(category.id, node)}
+        >
+          <h3 className={styles.sectionTitle}>{category.title}</h3>
+
+          <div className={styles.grid}>
+            <CategorySection
+              category={category}
+              version={version}
+              cache={cache}
+              scrollRef={scrollRef}
+              onLoadCategory={onLoadCategory}
+              onSelect={onSelect}
+            />
+          </div>
+        </section>
       ))}
     </div>
   )

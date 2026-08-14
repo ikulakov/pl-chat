@@ -42,3 +42,10 @@
   text-overflow: ellipsis;
   opacity: 0.7;
 }
+
+/* Стикер идёт перед подписью — прижимаем к ней и сажаем на базовую линию строки. */
+.sticker {
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: -3px;
+}

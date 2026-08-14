@@ -8,11 +8,14 @@ let playerPromise: Promise<LottiePlayer> | null = null
  * только когда пользователь открыл пикер — статический импорт заставил бы платить за него
  * при каждой загрузке виджета.
  *
- * Сборка `lottie_light_canvas`: canvas-рендерер без выражений. SVG-рендерер на сетке из
- * десятков анимаций создаёт тысячи DOM-узлов, а выражения паку эмодзи не нужны.
+ * Сборка `lottie_light`: SVG-рендерер без выражений. Canvas был бы дешевле по узлам, но его
+ * рендерер в lottie-web **не умеет track matte** — а пак эмодзи держит на маттах блики: сердца
+ * выходили «обрубленными», со срезанной по прямой верхушкой. Проверено на 5.13.0, дефект
+ * одинаков и в `lottie_canvas`, и в `lottie_light_canvas`. По времени кадра SVG при этом не
+ * хуже (60 анимаций 24×24: ~26 мс против ~31 мс на полный обход), платим только узлами DOM.
  */
 export function loadLottiePlayer(): Promise<LottiePlayer> {
-  playerPromise ??= import('lottie-web/build/player/lottie_light_canvas')
+  playerPromise ??= import('lottie-web/build/player/lottie_light')
     .then((module) => module.default)
     .catch((err: unknown) => {
       // Упавший импорт в кэше не держим — как и остальные кэши промисов в проекте. Иначе один
@@ -36,7 +39,7 @@ export function createEmojiPlayer(
 ): AnimationItem {
   return lottie.loadAnimation({
     container,
-    renderer: 'canvas',
+    renderer: 'svg',
     // Кадры проигрывает общий пул (`lottiePool`), а не сам плеер: иначе на каждую анимацию
     // заводился бы отдельный rAF-цикл.
     loop: false,

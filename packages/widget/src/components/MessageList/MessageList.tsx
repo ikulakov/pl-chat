@@ -104,6 +104,7 @@ export function MessageList({ userId }: Props) {
                   reactions={reactions[item.eventId]}
                   replyAuthor={reply?.author}
                   replyText={reply?.text}
+                  replySticker={reply?.sticker}
                   replyTargetId={reply?.targetId}
                   onReplyClick={scrollToItem}
                 />
