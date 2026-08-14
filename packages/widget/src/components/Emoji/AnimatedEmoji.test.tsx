@@ -1,7 +1,9 @@
-import { act, render, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeIntersectionObserver } from '../../../test.setup'
 import { resetAnimationCache } from '../../shared/lottie/animationCache'
+import type { AcquireOptions } from '../../shared/lottie/lottiePool'
 import { AnimatedEmoji } from './AnimatedEmoji'
 
 const destroy = vi.fn()
@@ -9,7 +11,13 @@ const player = { destroy }
 const release = vi.fn()
 
 const createEmojiPlayer = vi.fn(() => player)
-const acquire = vi.fn(() => release)
+const acquire = vi.fn((_player: unknown, _options?: AcquireOptions) => release)
+
+/** Пул зовёт `onComplete`, когда одиночный прогон дошёл до последнего кадра. */
+function finishPlayback(): void {
+  const options = acquire.mock.calls.at(-1)?.[1]
+  act(() => options?.onComplete?.())
+}
 
 vi.mock('../../hooks/useChatActions', () => {
   const actions = { loadEmojiAnimation: () => Promise.resolve({}) }
@@ -26,7 +34,7 @@ vi.mock('../../shared/lottie/lottiePlayer', () => ({
 }))
 
 vi.mock('../../shared/lottie/lottiePool', () => ({
-  lottiePool: { acquire: (...args: unknown[]) => acquire(...(args as [])) },
+  lottiePool: { acquire: (player: unknown, options?: AcquireOptions) => acquire(player, options) },
 }))
 
 function becomeVisible(isVisible: boolean): void {
@@ -64,11 +72,39 @@ describe('AnimatedEmoji', () => {
     renderEmoji()
 
     becomeVisible(true)
-    await waitFor(() => expect(acquire).toHaveBeenCalledWith(player))
+    await waitFor(() => expect(acquire).toHaveBeenCalledWith(player, expect.anything()))
 
     becomeVisible(false)
     // Оставленный в пуле или неуничтоженный плеер — утечка на каждое эмодзи в ленте.
     await waitFor(() => expect(release).toHaveBeenCalledTimes(1))
     expect(destroy).toHaveBeenCalledTimes(1)
+  })
+
+  it('заказывает у пула один прогон, а не бесконечный цикл', async () => {
+    renderEmoji()
+
+    becomeVisible(true)
+
+    // Бесконечный цикл в ленте — ровно то, от чего уходили: сообщение мельтешит всё время,
+    // пока видно.
+    await waitFor(() =>
+      expect(acquire).toHaveBeenCalledWith(player, expect.objectContaining({ loop: false })),
+    )
+  })
+
+  it('после прогона повторяет анимацию по клику, но не поверх идущей', async () => {
+    const user = userEvent.setup()
+    renderEmoji()
+
+    becomeVisible(true)
+    await waitFor(() => expect(acquire).toHaveBeenCalledTimes(1))
+
+    // Пока прогон идёт, клик ничего не делает: второй acquire тикал бы тот же плеер дважды.
+    await user.click(screen.getByRole('img', { name: '😀' }))
+    expect(acquire).toHaveBeenCalledTimes(1)
+
+    finishPlayback()
+    await user.click(screen.getByRole('img', { name: '😀' }))
+    expect(acquire).toHaveBeenCalledTimes(2)
   })
 })

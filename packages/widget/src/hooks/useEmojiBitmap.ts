@@ -5,13 +5,18 @@ import type { EmojiBitmapSize } from '../shared/lottie/types'
 import { useChatActions } from './useChatActions'
 
 /**
- * Первый кадр эмодзи картинкой. `null`, пока кадра нет — вызывающий рисует символ шрифтом,
- * чтобы строка не прыгала.
+ * Первый кадр эмодзи картинкой. `null`, пока кадра нет — вызывающий рисует символ шрифтом
+ * (или силуэт), чтобы строка не прыгала.
+ *
+ * `enabled: false` откладывает загрузку: в сетке пикера 580 позиций, и кадр нужен только тем,
+ * что подошли к вьюпорту. Уже полученный кадр при выключении не теряется — это обычный `<img>`,
+ * который ничего не стоит.
  */
 export function useEmojiBitmap(
   codepoint: string,
   version: string,
   size: EmojiBitmapSize,
+  enabled = true,
 ): string | null {
   const { loadEmojiAnimation } = useChatActions()
   // Ключ хранится вместе с картинкой: так смена эмодзи обнуляет кадр прямо в рендере, без
@@ -20,6 +25,8 @@ export function useEmojiBitmap(
   const key = `${codepoint}@${version}@${size}`
 
   useEffect(() => {
+    if (!enabled) return
+
     // Байты берём из общего с пикером кэша: одно эмодзи качается один раз на всё приложение.
     const cache = getAnimationCache('emoji', loadEmojiAnimation)
     let cancelled = false
@@ -36,7 +43,7 @@ export function useEmojiBitmap(
     return () => {
       cancelled = true
     }
-  }, [codepoint, version, size, loadEmojiAnimation])
+  }, [codepoint, version, size, enabled, loadEmojiAnimation])
 
   return frame?.key === key ? frame.src : null
 }

@@ -1403,4 +1403,37 @@ describe('MatrixController.loadMedia', () => {
 
     expect(api.downloadMedia).toHaveBeenCalledTimes(2)
   })
+
+  it('анимации эмодзи уезжают в сеть одной пачкой', async () => {
+    const api = makeMatrixApi({
+      getEmojiAnimations: vi.fn<MatrixApi['getEmojiAnimations']>().mockResolvedValue({
+        version: 'v1',
+        emoji: { '1f600': { nm: '1f600' }, '2764': { nm: '2764' } },
+      }),
+    })
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    const animations = await Promise.all([
+      controller.loadEmojiAnimation('1f600', 'v1'),
+      controller.loadEmojiAnimation('2764', 'v1'),
+    ])
+
+    expect(animations).toEqual([{ nm: '1f600' }, { nm: '2764' }])
+    // Сетка пикера просит десятки анимаций в один кадр — они обязаны схлопнуться в один запрос.
+    expect(api.getEmojiAnimations).toHaveBeenCalledExactlyOnceWith(['1f600', '2764'], 'v1')
+    expect(api.getEmojiAnimation).not.toHaveBeenCalled()
+  })
+
+  it('сервер без батч-маршрута не ломает загрузку эмодзи', async () => {
+    const api = makeMatrixApi({
+      getEmojiAnimations: vi
+        .fn<MatrixApi['getEmojiAnimations']>()
+        .mockRejectedValue(new MatrixError('M_NOT_FOUND', 'no such route')),
+      getEmojiAnimation: vi.fn<MatrixApi['getEmojiAnimation']>().mockResolvedValue({ nm: 'one' }),
+    })
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await expect(controller.loadEmojiAnimation('1f600', 'v1')).resolves.toEqual({ nm: 'one' })
+    expect(api.getEmojiAnimation).toHaveBeenCalledExactlyOnceWith('1f600', 'v1')
+  })
 })

@@ -1166,6 +1166,43 @@ const server = createServer(async (req, res) => {
       })),
     });
   }
+  // Батч: пачка анимаций одним ответом. Идёт до одиночного маршрута — иначе «bundle» уехал бы
+  // в него как codepoint. Настоящий сервер склеивает gzip-члены встык, здесь просто объект.
+  //
+  // MOCK_NO_EMOJI_BUNDLE=1 выключает оба батч-маршрута: так проверяется откат клиента на
+  // поштучные запросы против сервера, где батча ещё нет.
+  const emojiBundleOff = Boolean(process.env.MOCK_NO_EMOJI_BUNDLE);
+  if (path === "/_matrix/emoji/bundle" && !emojiBundleOff) {
+    const requested = (url.searchParams.get("cp") ?? "").split(",").filter(Boolean);
+    if (requested.length > 300) {
+      return send(res, 400, { errcode: "M_INVALID_PARAM", error: "too many codepoints" });
+    }
+    const bad = requested.find((cp) => !/^[0-9a-f]{4,5}(-[0-9a-f]{4,5})*$/.test(cp));
+    if (bad) {
+      return send(res, 400, { errcode: "M_INVALID_PARAM", error: "bad codepoint: " + bad });
+    }
+
+    // Неизвестные codepoint'ы молча выбрасываются — как на боевом сервере: батч это
+    // оптимизация загрузки, а не место для 404.
+    const emoji = {};
+    for (const cp of requested) {
+      if (EMOJI_BY_CODEPOINT.has(cp)) emoji[cp] = mockLottie(cp);
+    }
+
+    return send(res, 200, { version: EMOJI_PACK_VERSION, emoji });
+  }
+  // Батч по категории. Клиент им не пользуется (тянул бы всю вкладку целиком), но контракт
+  // сервера включает оба маршрута.
+  const bundleCategoryMatch = path.match(/^\/_matrix\/emoji\/bundle\/([^/]+)$/);
+  if (bundleCategoryMatch && !emojiBundleOff) {
+    const category = EMOJI_CATEGORIES.find((c) => c.id === bundleCategoryMatch[1]);
+    if (!category) return send(res, 404, { errcode: "M_NOT_FOUND", error: "unknown category" });
+
+    const emoji = {};
+    for (const [codepoint] of category.emoji) emoji[codepoint] = mockLottie(codepoint);
+
+    return send(res, 200, { version: EMOJI_PACK_VERSION, emoji });
+  }
   // Байты анимации. Настоящий сервер отдаёт gzip'нутый .tgs как есть, но заголовок
   // Content-Encoding ставит только под Accept-Encoding — здесь просто отдаём готовый JSON.
   const emojiMatch = path.match(/^\/_matrix\/emoji\/([^/]+)$/);

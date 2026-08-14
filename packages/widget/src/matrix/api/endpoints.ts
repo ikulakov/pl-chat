@@ -28,6 +28,8 @@ export const Endpoints = createEndpoints({
   // Весь пак разом, без силуэтов: по нему лента ищет эмодзи в тексте сообщения.
   EMOJI_PACKS: `${KC_UNSTABLE}/emoji/v1/packs`,
   EMOJI_LOTTIE: `/_matrix/emoji/{codepoint}`,
+  // Пачка анимаций одним ответом. Потолок сервера — 300 codepoint'ов, больше → 400.
+  EMOJI_BUNDLE: `/_matrix/emoji/bundle`,
   STICKER_PACKS: `${KC_UNSTABLE}/stickers/v1/packs`,
   STICKER_BYTES: `/_matrix/sticker/{mediaId}`,
 } as const)

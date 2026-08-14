@@ -323,6 +323,9 @@ export function makeMatrixApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
       .mockResolvedValue({ id: 'smileys', display_name: 'Смайлы', count: 0, emoji: [] }),
     getEmojiPacks: vi.fn<MatrixApi['getEmojiPacks']>().mockResolvedValue({ packs: [] }),
     getEmojiAnimation: vi.fn<MatrixApi['getEmojiAnimation']>().mockResolvedValue({}),
+    getEmojiAnimations: vi
+      .fn<MatrixApi['getEmojiAnimations']>()
+      .mockResolvedValue({ version: '', emoji: {} }),
     getStickerPacks: vi.fn<MatrixApi['getStickerPacks']>().mockResolvedValue({ packs: [] }),
     getStickerAnimation: vi.fn<MatrixApi['getStickerAnimation']>().mockResolvedValue({}),
     ...overrides,

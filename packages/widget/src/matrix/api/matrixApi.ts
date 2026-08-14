@@ -12,6 +12,7 @@ import type {
   UploadResponse,
 } from '../wire/dto'
 import type {
+  EmojiBundleResponse,
   EmojiCategoriesResponse,
   EmojiCategoryWire,
   EmojiPacksResponse,
@@ -182,6 +183,20 @@ export function createMatrixApi(transport: MatrixTransport) {
     getEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
       return transport.request(Endpoints.EMOJI_LOTTIE({ codepoint }), {
         searchParams: { v: version },
+        signal: emojiDeadline(),
+      })
+    },
+
+    /**
+     * Пачка анимаций одним ответом. `cp` уезжает строкой через запятую — Spring разбирает её
+     * в список; `v` — тот же cache-buster, что и у одиночного маршрута.
+     *
+     * Сервер склеивает ответ из готовых gzip-членов, поэтому распаковывать по-прежнему нечего:
+     * браузер разжимает поток целиком и отдаёт цельный JSON.
+     */
+    getEmojiAnimations(codepoints: string[], version: string): Promise<EmojiBundleResponse> {
+      return transport.request(Endpoints.EMOJI_BUNDLE, {
+        searchParams: { cp: codepoints.join(','), v: version },
         signal: emojiDeadline(),
       })
     },

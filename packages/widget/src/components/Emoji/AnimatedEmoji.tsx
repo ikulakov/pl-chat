@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useChatActions } from '../../hooks/useChatActions'
 import { useEmojiBitmap } from '../../hooks/useEmojiBitmap'
 import { useIntersectionObserver } from '../../hooks/useIntersectionObserver'
 import { getAnimationCache } from '../../shared/lottie/animationCache'
 import { createEmojiPlayer, loadLottiePlayer } from '../../shared/lottie/lottiePlayer'
-import { lottiePool } from '../../shared/lottie/lottiePool'
+import { lottiePool, type PoolPlayer } from '../../shared/lottie/lottiePool'
 import { cn } from '../../shared/utils/cn'
 import styles from './Emoji.module.css'
 
@@ -16,17 +16,26 @@ interface Props {
   size: number
 }
 
+/** `idle` — плеера ещё нет, `playing` — идёт прогон, `done` — замерли на последнем кадре. */
+type Phase = 'idle' | 'playing' | 'done'
+
 /**
- * Крупное эмодзи: анимация, пока элемент виден. Вне вьюпорта плеер снимается с пула и
- * уничтожается — за экраном крутить нечего, а инстанс стоит памяти. Разжатая анимация при
- * этом остаётся в кэше, поэтому возврат в кадр сети не стоит.
+ * Крупное эмодзи: один прогон анимации при появлении, дальше — стоп на последнем кадре, повтор
+ * по клику. Так это ведёт себя в Telegram: анимация привлекает внимание один раз, а не мельтешит
+ * всё время, пока сообщение на экране.
+ *
+ * Плеер живёт, пока элемент виден: вне вьюпорта он снимается с пула и уничтожается — за экраном
+ * крутить нечего, а инстанс стоит памяти. Разжатая анимация при этом остаётся в кэше, поэтому
+ * возврат в кадр сети не стоит.
  */
 export function AnimatedEmoji({ char, codepoint, version, size }: Props) {
   const { loadEmojiAnimation } = useChatActions()
   const wrapRef = useRef<HTMLSpanElement>(null)
   const containerRef = useRef<HTMLSpanElement>(null)
+  const playerRef = useRef<PoolPlayer | null>(null)
+  const releaseRef = useRef<(() => void) | null>(null)
   const [isVisible, setVisible] = useState(false)
-  const [isPlaying, setPlaying] = useState(false)
+  const [phase, setPhase] = useState<Phase>('idle')
 
   const bitmap = useEmojiBitmap(codepoint, version, size > 64 ? 128 : 64)
 
@@ -40,7 +49,6 @@ export function AnimatedEmoji({ char, codepoint, version, size }: Props) {
 
     const cache = getAnimationCache('emoji', loadEmojiAnimation)
     let disposed = false
-    let release: (() => void) | null = null
     let player: { destroy: () => void } | null = null
 
     void Promise.all([cache.get(codepoint, version), loadLottiePlayer()])
@@ -50,8 +58,15 @@ export function AnimatedEmoji({ char, codepoint, version, size }: Props) {
 
         const instance = createEmojiPlayer(lottie, { container, animationData })
         player = instance
-        release = lottiePool.acquire(instance)
-        setPlaying(true)
+        playerRef.current = instance
+
+        // Фазу поднимаем до acquire: при `prefers-reduced-motion` пул зовёт `onComplete`
+        // синхронно, и обратный порядок оставил бы состояние в `playing` навсегда.
+        setPhase('playing')
+        releaseRef.current = lottiePool.acquire(instance, {
+          loop: false,
+          onComplete: () => setPhase('done'),
+        })
       })
       .catch(() => {
         // Анимации нет — остаётся первый кадр или символ шрифтом. Это рабочее состояние.
@@ -59,21 +74,38 @@ export function AnimatedEmoji({ char, codepoint, version, size }: Props) {
 
     return () => {
       disposed = true
-      release?.()
+      releaseRef.current?.()
+      releaseRef.current = null
       player?.destroy()
-      setPlaying(false)
+      playerRef.current = null
+      setPhase('idle')
     }
   }, [isVisible, codepoint, version, loadEmojiAnimation])
 
+  const replay = useCallback(() => {
+    const player = playerRef.current
+    if (!player || phase === 'playing') return
+
+    setPhase('playing')
+    releaseRef.current = lottiePool.acquire(player, {
+      loop: false,
+      onComplete: () => setPhase('done'),
+    })
+  }, [phase])
+
   return (
+    // Остаётся картинкой (`role="img"`), а не кнопкой: повтор анимации — необязательное
+    // украшение, а вот отдельный tab-стоп на каждое эмодзи в ленте мешал бы всерьёз. Тот же
+    // выбор сделан в веб-клиентах Telegram.
     <span
       ref={wrapRef}
       className={styles.animated}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.8) }}
       role="img"
       aria-label={char}
+      onClick={replay}
     >
-      {!isPlaying &&
+      {phase === 'idle' &&
         (bitmap ? (
           <img
             className={styles.layer}

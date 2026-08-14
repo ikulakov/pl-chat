@@ -26,9 +26,16 @@ export interface LottiePoolDeps {
   prefersReducedMotion?: () => boolean
 }
 
+export interface AcquireOptions {
+  /** `false` — проиграть один раз и замереть на последнем кадре. По умолчанию цикл. */
+  loop?: boolean
+  /** Зовётся, когда одиночный прогон дошёл до конца; запись к этому моменту уже снята с пула. */
+  onComplete?: () => void
+}
+
 export interface LottiePool {
   /** Ставит плеер в очередь на тик. Возвращает функцию снятия — звать в cleanup эффекта. */
-  acquire: (player: PoolPlayer) => () => void
+  acquire: (player: PoolPlayer, options?: AcquireOptions) => () => void
   readonly size: number
   readonly playing: number
 }
@@ -38,6 +45,8 @@ interface Entry {
   frame: number
   /** Когда запись играла в прошлый раз: при ротации она пропускает часть тиков. */
   lastPlayedAt: number | null
+  loop: boolean
+  onComplete: (() => void) | undefined
 }
 
 function defaultPrefersReducedMotion(): boolean {
@@ -85,7 +94,19 @@ export function createLottiePool(deps: LottiePoolDeps = {}): LottiePool {
         const since = entry.lastPlayedAt === null ? elapsed : time - entry.lastPlayedAt
         entry.lastPlayedAt = time
 
-        entry.frame = (entry.frame + (since * player.frameRate) / 1000) % player.totalFrames
+        const advanced = entry.frame + (since * player.frameRate) / 1000
+
+        // Одиночный прогон: доехали до конца — замираем на последнем кадре и снимаем запись
+        // сами. Ждать cleanup эффекта нельзя, он наступит только когда эмодзи уедет с экрана,
+        // а до тех пор пул продолжал бы тикать по завершённой анимации.
+        if (!entry.loop && advanced >= player.totalFrames - 1) {
+          player.goToAndStop(player.totalFrames - 1, true)
+          entries.delete(entry)
+          entry.onComplete?.()
+          continue
+        }
+
+        entry.frame = advanced % player.totalFrames
         player.goToAndStop(entry.frame, true)
       }
 
@@ -108,15 +129,24 @@ export function createLottiePool(deps: LottiePoolDeps = {}): LottiePool {
   }
 
   return {
-    acquire(player) {
+    acquire(player, options = {}) {
       // Уважаем prefers-reduced-motion: показываем первый кадр — он информативнее силуэта, —
       // но цикл не заводим вовсе.
       if (prefersReducedMotion()) {
         player.goToAndStop(0, true)
+        // Прогон считается состоявшимся: вызывающий снимает состояние «играет» и показывает
+        // повтор, иначе кнопка повтора осталась бы навсегда неактивной.
+        options.onComplete?.()
         return () => {}
       }
 
-      const entry: Entry = { player, frame: 0, lastPlayedAt: null }
+      const entry: Entry = {
+        player,
+        frame: 0,
+        lastPlayedAt: null,
+        loop: options.loop ?? true,
+        onComplete: options.onComplete,
+      }
       entries.add(entry)
       start()
 

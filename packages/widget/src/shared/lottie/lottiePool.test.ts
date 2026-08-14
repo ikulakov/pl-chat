@@ -86,6 +86,36 @@ describe('lottiePool', () => {
     expect(scheduler.scheduled).toBe(true)
   })
 
+  it('одиночный прогон замирает на последнем кадре и снимает себя с пула', () => {
+    const scheduler = makeScheduler()
+    const pool = createLottiePool({ ...scheduler, prefersReducedMotion: () => false })
+    const player = makePlayer()
+    const onComplete = vi.fn()
+
+    pool.acquire(player, { loop: false, onComplete })
+
+    // 30 кадров при 30 fps — ровно секунда анимации.
+    scheduler.tick(1000)
+    scheduler.tick(2000)
+
+    expect(player.goToAndStop).toHaveBeenLastCalledWith(29, true)
+    // Оставленная в пуле завершённая запись тикала бы вхолостую до ухода эмодзи с экрана.
+    expect(pool.size).toBe(0)
+    expect(onComplete).toHaveBeenCalledOnce()
+  })
+
+  it('цикл по умолчанию перематывается на начало, а не останавливается', () => {
+    const scheduler = makeScheduler()
+    const pool = createLottiePool({ ...scheduler, prefersReducedMotion: () => false })
+    const player = makePlayer()
+
+    pool.acquire(player)
+    scheduler.tick(1000)
+    scheduler.tick(2000)
+
+    expect(pool.size).toBe(1)
+  })
+
   it('при prefers-reduced-motion показывает первый кадр и не заводит цикл', () => {
     const scheduler = makeScheduler()
     const pool = createLottiePool({ ...scheduler, prefersReducedMotion: () => true })
@@ -96,5 +126,16 @@ describe('lottiePool', () => {
     expect(player.goToAndStop).toHaveBeenCalledExactlyOnceWith(0, true)
     expect(pool.size).toBe(0)
     expect(scheduler.scheduled).toBe(false)
+  })
+
+  it('при prefers-reduced-motion одиночный прогон сразу считается завершённым', () => {
+    const scheduler = makeScheduler()
+    const pool = createLottiePool({ ...scheduler, prefersReducedMotion: () => true })
+    const onComplete = vi.fn()
+
+    pool.acquire(makePlayer(), { loop: false, onComplete })
+
+    // Иначе вызывающий навсегда остался бы в состоянии «играет»: повтор по клику не работал бы.
+    expect(onComplete).toHaveBeenCalledOnce()
   })
 })

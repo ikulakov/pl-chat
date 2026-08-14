@@ -20,16 +20,25 @@ vi.mock('../../../hooks/useChatActions', () => ({
   }),
 }))
 
+const destroyPlayer = vi.fn()
+const createEmojiPlayer = vi.fn(() => ({
+  totalFrames: 30,
+  frameRate: 30,
+  goToAndStop: vi.fn(),
+  destroy: destroyPlayer,
+}))
+
 // lottie-web тянет canvas, которого в jsdom нет; здесь проверяется поведение панели,
 // а не сам плеер — у него свои тесты в shared/lottie.
 vi.mock('../../../shared/lottie/lottiePlayer', () => ({
   loadLottiePlayer: () => Promise.resolve({}),
-  createEmojiPlayer: () => ({
-    totalFrames: 30,
-    frameRate: 30,
-    goToAndStop: vi.fn(),
-    destroy: vi.fn(),
-  }),
+  createEmojiPlayer: () => createEmojiPlayer(),
+}))
+
+// Статичный кадр ячейки: в jsdom его не нарисовать (нет ни canvas, ни загрузки ресурсов в
+// <img>), а тесты панели про него и не спрашивают — им важно, что плеера в ячейке нет.
+vi.mock('../../../shared/lottie/emojiBitmap', () => ({
+  getEmojiBitmap: () => Promise.resolve('data:image/png;base64,AAA'),
 }))
 
 function openPicker() {
@@ -50,6 +59,8 @@ async function scrollIntoView() {
 describe('EmojiPickerButton', () => {
   beforeEach(() => {
     FakeIntersectionObserver.instances.length = 0
+    createEmojiPlayer.mockClear()
+    destroyPlayer.mockClear()
     loadEmojiCatalog.mockResolvedValue({
       version: 'v1',
       categories: [{ id: 'smileys', title: 'Смайлы', count: 2, items: null }],
@@ -183,6 +194,35 @@ describe('EmojiPickerButton', () => {
 
     expect(onSelectEmoji).toHaveBeenCalledExactlyOnceWith('😀')
     expect(screen.getByRole('tablist')).toBeInTheDocument()
+  })
+
+  it('сетка стоит неподвижно: плеер заводится только под курсором и уходит вместе с ним', async () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+    openPicker()
+    await scrollIntoView()
+
+    const cell = await screen.findByRole('button', { name: '😀' })
+    // Раньше плеер заводила каждая видимая ячейка — открытая панель крутила десятки анимаций.
+    expect(createEmojiPlayer).not.toHaveBeenCalled()
+
+    fireEvent.pointerEnter(cell)
+    await waitFor(() => expect(createEmojiPlayer).toHaveBeenCalledOnce())
+
+    fireEvent.pointerLeave(cell)
+    await waitFor(() => expect(destroyPlayer).toHaveBeenCalledOnce())
+  })
+
+  it('до наведения ячейка показывает статичный кадр', async () => {
+    render(<EmojiPickerButton onSelectEmoji={vi.fn()} />)
+    openPicker()
+    await scrollIntoView()
+
+    const cell = await screen.findByRole('button', { name: '😀' })
+    // Наблюдатель самой ячейки появился только сейчас — вместе с ней; в браузере он сработал бы
+    // сразу после создания, в jsdom пересечение двигаем руками.
+    await scrollIntoView()
+
+    await waitFor(() => expect(cell.querySelector('img')).not.toBeNull())
   })
 
   it('категории идут секциями со своими заголовками', async () => {

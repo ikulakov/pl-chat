@@ -42,6 +42,17 @@ export interface EmojiPacksResponse {
   packs?: EmojiPackWire[]
 }
 
+/**
+ * Ответ батч-маршрута `GET /_matrix/emoji/bundle?cp=…`.
+ *
+ * Неизвестные серверу codepoint'ы в `emoji` просто отсутствуют — батч сознательно не отвечает
+ * `404` на отдельную позицию, это оптимизация загрузки, а не адресный запрос.
+ */
+export interface EmojiBundleResponse {
+  version: string
+  emoji?: Record<string, Record<string, unknown>>
+}
+
 export interface StickerInfoWire {
   /** Единственный признак рендиции: расширения в `url` нет. */
   mimetype?: string

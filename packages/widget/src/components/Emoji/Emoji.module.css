@@ -20,6 +20,8 @@
   position: relative;
   display: inline-block;
   flex-shrink: 0;
+  /* Клик повторяет прогон анимации — курсор об этом и сообщает. */
+  cursor: pointer;
 }
 
 .layer {

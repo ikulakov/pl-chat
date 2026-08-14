@@ -20,11 +20,21 @@ vi.mock('./rasterizeSvg', () => ({
   rasterizeSvg: () => Promise.resolve(DATA_URL),
 }))
 
+// IndexedDB в jsdom нет вовсе; здесь проверяется, что постоянный слой спрашивают до отрисовки
+// и дописывают после — сам адаптер деградирует до `null` без него.
+const readFrame = vi.fn(() => Promise.resolve<string | null>(null))
+const writeFrame = vi.fn(() => Promise.resolve())
+vi.mock('../emoji/emojiDb', () => ({
+  readFrame: (...args: unknown[]) => readFrame(...(args as [])),
+  writeFrame: (...args: unknown[]) => writeFrame(...(args as [])),
+}))
+
 const VERSION = 'mock-1'
 
 beforeEach(() => {
   clearEmojiBitmaps()
   vi.clearAllMocks()
+  readFrame.mockResolvedValue(null)
 })
 
 function makeLoader(): ReturnType<typeof vi.fn> {
@@ -78,6 +88,25 @@ describe('getEmojiBitmap', () => {
     await getEmojiBitmap('1f600', 'mock-2', 64, load)
 
     expect(load).toHaveBeenCalledTimes(2)
+  })
+
+  it('кадр из постоянного кэша не рисуется заново и не качает байты', async () => {
+    const load = makeLoader()
+    readFrame.mockResolvedValue('data:image/png;base64,stored')
+
+    await expect(getEmojiBitmap('1f600', VERSION, 64, load)).resolves.toBe(
+      'data:image/png;base64,stored',
+    )
+
+    // Ровно ради этого постоянный слой и заводился: ни сети, ни отрисовки в новой сессии.
+    expect(load).not.toHaveBeenCalled()
+    expect(destroy).not.toHaveBeenCalled()
+  })
+
+  it('дописывает нарисованный кадр в постоянный кэш', async () => {
+    await getEmojiBitmap('1f600', VERSION, 64, makeLoader())
+
+    expect(writeFrame).toHaveBeenCalledExactlyOnceWith('1f600@mock-1@64', VERSION, DATA_URL)
   })
 
   it('не кэширует упавшую отрисовку', async () => {

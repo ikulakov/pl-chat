@@ -35,6 +35,7 @@ import {
   isUserDeactivatedError,
   type AuthErrorContext,
 } from './api/matrixError'
+import { createBatchedLoader } from '../shared/lottie/animationBatcher'
 import { MatrixHistoryLoader } from './history/historyLoader'
 import { toEmojiCatalog, toEmojiCategory, toEmojiIndex, toStickerPacks } from './mappers/emoji'
 import { classifyMediaError } from './mappers/mediaError'
@@ -135,6 +136,10 @@ export class MatrixController implements MatrixService {
   // сессии — в новой комнате прежние event_id уже ничего не адресуют.
   private readonly cardActionTxnIds = new Map<string, string>()
 
+  // Склейка загрузок эмодзи в пачки. Заводится в конструкторе: батчер держит окно сбора
+  // заявок, и общий он должен быть на весь контроллер, а не на вызов.
+  private readonly emojiAnimations: (codepoint: string, version: string) => Promise<EmojiAnimation>
+
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
     this.syncLoop = new MatrixSyncLoop(deps.api)
@@ -146,6 +151,11 @@ export class MatrixController implements MatrixService {
     this.sessionManager = deps.sessionManager
     this.dispatch = deps.dispatch
     this.getState = deps.getState
+    this.emojiAnimations = createBatchedLoader({
+      loadBatch: (codepoints, version) =>
+        deps.api.getEmojiAnimations(codepoints, version).then((response) => response.emoji ?? {}),
+      loadOne: (codepoint, version) => deps.api.getEmojiAnimation(codepoint, version),
+    })
   }
 
   async connect(): Promise<void> {
@@ -346,8 +356,12 @@ export class MatrixController implements MatrixService {
     return this.emojiIndex
   }
 
+  /**
+   * Анимация одного эмодзи — но в сеть уходит пачка: заявки соседних ячеек пикера и соседних
+   * сообщений ленты склеиваются в один запрос к `/bundle`, см. `animationBatcher`.
+   */
   loadEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
-    return this.api.getEmojiAnimation(codepoint, version)
+    return this.emojiAnimations(codepoint, version)
   }
 
   async loadStickerPacks(): Promise<StickerPack[]> {
