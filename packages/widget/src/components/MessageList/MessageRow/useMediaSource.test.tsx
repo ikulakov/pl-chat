@@ -53,8 +53,9 @@ describe('useMediaSource', () => {
       room: {
         timeline: [],
         readMarkers: [],
+        reactions: [],
         cardAnswers: [],
-        mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'rejected', error: 'плохой файл' } }],
+        mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'rejected' } }],
         prevBatch: null,
       },
     })
@@ -79,6 +80,7 @@ describe('useMediaSource', () => {
       room: {
         timeline: [],
         readMarkers: [],
+        reactions: [],
         cardAnswers: [],
         mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'ready' } }],
         prevBatch: null,

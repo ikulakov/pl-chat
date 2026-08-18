@@ -6,6 +6,11 @@ import { ITEM_ID_ATTR } from './useLoadMoreHistory'
 const NEAR_BOTTOM_PX = 80
 const SMOOTH_TAIL_PX = 200
 
+// Потолок жизни флага автоскролла. Плавный докат хвоста укладывается в сотни миллисекунд;
+// если 'scrollend' так и не пришёл (пользователь перехватил скролл колесом и отменил
+// анимацию), флаг обязан сняться сам — иначе isNearBottom замерзает навсегда.
+const AUTO_SCROLL_TIMEOUT_MS = 1000
+
 type ScrollTarget = 'bottom' | { element: HTMLElement; block: 'center' }
 
 interface UseChatScrollParams {
@@ -44,7 +49,36 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
   const isNearBottomRef = useRef(true)
 
   const isAutoScrollingRef = useRef(false)
+  const autoScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastMessageIdRef = useRef<string | null>(null)
+
+  // Единственное место снятия флага: и по 'scrollend', и по сторожевому таймеру.
+  const stopAutoScrolling = useCallback(() => {
+    isAutoScrollingRef.current = false
+    if (autoScrollTimerRef.current === null) return
+
+    clearTimeout(autoScrollTimerRef.current)
+    autoScrollTimerRef.current = null
+  }, [])
+
+  const startAutoScrolling = useCallback(() => {
+    isAutoScrollingRef.current = true
+    if (autoScrollTimerRef.current !== null) clearTimeout(autoScrollTimerRef.current)
+
+    autoScrollTimerRef.current = setTimeout(() => {
+      autoScrollTimerRef.current = null
+      isAutoScrollingRef.current = false
+      // Флаг замораживал isNearBottom — после разморозки состояние надо привести к реальности.
+      const list = containerRef.current
+      if (!list) return
+
+      const atBottom = list.scrollHeight - list.clientHeight - list.scrollTop <= NEAR_BOTTOM_PX
+      isNearBottomRef.current = atBottom
+      setIsNearBottom(atBottom)
+    }, AUTO_SCROLL_TIMEOUT_MS)
+  }, [containerRef])
+
+  useEffect(() => stopAutoScrolling, [stopAutoScrolling])
 
   const scrollListTo = useCallback(
     (target: ScrollTarget, behavior: ScrollBehavior): void => {
@@ -82,10 +116,10 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
 
     const behavior = !isFirstRender && isNearBottomRef.current ? 'smooth' : 'auto'
     if (behavior === 'smooth') {
-      isAutoScrollingRef.current = true
+      startAutoScrolling()
     }
     scrollListTo('bottom', behavior)
-  }, [timeline, userId, containerRef, scrollListTo])
+  }, [timeline, userId, containerRef, scrollListTo, startAutoScrolling])
 
   useIntersectionObserver({
     root: containerRef,
@@ -110,15 +144,17 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
       // На длинных прыжках scrollListTo мгновенно перемещается почти к цели, а последние
       // SMOOTH_TAIL_PX доезжает smooth-анимацией — 'scrollend' на этот прыжок приходит раньше,
       // чем хвост доедет. Игнорируем такой преждевременный scrollend, ждём настоящий.
+      // Флаг при этом НЕ трогаем: если хвост так и не доедет (пользователь перехватил скролл),
+      // его снимет сторожевой таймер из startAutoScrolling.
       if (isAutoScrollingRef.current && !atBottom) return
 
       isNearBottomRef.current = atBottom
-      isAutoScrollingRef.current = false
+      stopAutoScrolling()
       setIsNearBottom(atBottom)
     }
     list.addEventListener('scrollend', handleScrollEnd)
     return () => list.removeEventListener('scrollend', handleScrollEnd)
-  }, [containerRef])
+  }, [containerRef, stopAutoScrolling])
 
   //  stick-to-bottom при изменении высоты контейнера + вычисление css переменной --scrollbar-w
   useLayoutEffect(() => {

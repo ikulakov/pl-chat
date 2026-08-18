@@ -1,0 +1,36 @@
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 9px;
+  border: none;
+  /* пилюля: радиус равен половине высоты */
+  border-radius: 15px;
+  background: var(--c-surface-secondary);
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &.own {
+    background: var(--c-surface-accent-soft);
+  }
+}
+
+.emoji {
+  font-size: 16px;
+  line-height: 16px;
+}
+
+.count {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.1px;
+  color: var(--c-text-primary);
+}

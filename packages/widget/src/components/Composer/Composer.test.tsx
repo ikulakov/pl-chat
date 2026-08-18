@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string -- якорь заглушки пикера, не UI-текст */
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '../../i18n'
@@ -11,6 +12,19 @@ const sendFile = vi.fn()
 const cancelReply = vi.fn()
 vi.mock('../../hooks/useChatActions', () => ({
   useChatActions: () => ({ sendMessage, sendFile, cancelReply }),
+}))
+
+// Пикер подменён кнопкой-заглушкой: здесь проверяется только то, что делает композер с
+// выбранным символом. Поведение самой панели покрыто EmojiPickerButton.test.tsx.
+vi.mock('./EmojiPicker/EmojiPickerButton', () => ({
+  EmojiPickerButton: ({ onSelectEmoji }: { onSelectEmoji: (char: string) => void }) => (
+    <button
+      type="button"
+      onClick={() => onSelectEmoji('😀')}
+    >
+      emoji-stub
+    </button>
+  ),
 }))
 
 function pickFile(container: HTMLElement, file: File) {
@@ -213,6 +227,56 @@ describe('Composer — семантика отправки', () => {
       fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' })
 
       expect(cancelReply).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('вставка эмодзи', () => {
+    function selectEmojiAt(value: string, start: number, end = start) {
+      render(<Composer />, { wrapper: AttachmentProvider })
+
+      const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+      fireEvent.change(textarea, { target: { value } })
+      textarea.setSelectionRange(start, end)
+
+      fireEvent.click(screen.getByText('emoji-stub'))
+
+      return textarea
+    }
+
+    it('вставляет символ по каретке, а не в конец', () => {
+      const textarea = selectEmojiAt('абвгд', 2)
+
+      expect(textarea.value).toBe('аб😀вгд')
+    })
+
+    it('заменяет выделение, как обычный ввод', () => {
+      const textarea = selectEmojiAt('абвгд', 1, 4)
+
+      expect(textarea.value).toBe('а😀д')
+    })
+
+    it('в пустом поле просто добавляет символ', () => {
+      const textarea = selectEmojiAt('', 0)
+
+      expect(textarea.value).toBe('😀')
+    })
+
+    it('каретка встаёт после вставленного символа', async () => {
+      const textarea = selectEmojiAt('абвгд', 2)
+
+      // Позицию возвращаем в микротаске — после того, как React применил новое value.
+      await act(async () => {})
+
+      // Эмодзи занимает 2 code unit в UTF-16 — каретка ожидается на 4, а не на 3.
+      expect(textarea.selectionStart).toBe(4)
+      expect(textarea).toHaveFocus()
+    })
+
+    it('вставленный эмодзи уходит в сообщение', () => {
+      const textarea = selectEmojiAt('привет', 6)
+      fireEvent.keyDown(textarea, { key: 'Enter' })
+
+      expect(sendMessage).toHaveBeenCalledExactlyOnceWith('привет😀', undefined)
     })
   })
 })

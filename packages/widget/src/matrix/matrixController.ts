@@ -1,9 +1,27 @@
 import type { CardAction } from '../domain/adaptiveCards'
+import type {
+  EmojiAnimation,
+  EmojiCatalog,
+  EmojiCategory,
+  EmojiIndex,
+  StickerItem,
+  StickerPack,
+} from '../domain/emoji'
 import { MediaUnavailableError } from '../domain/mediaError'
-import { createOptimisticMediaMessage, createOptimisticTextMessage } from '../domain/optimistic'
+import {
+  createOptimisticMediaMessage,
+  createOptimisticStickerMessage,
+  createOptimisticTextMessage,
+  isOptimistic,
+} from '../domain/optimistic'
+import { findOwnReaction, type ReactionEntry } from '../domain/reactions'
 import { canMoveMarker } from '../domain/receipts'
 import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '../domain/timeline'
 import { isAbortError } from '../shared/utils/abort'
+// Оба кэша медиа считают записи, а не байты: вес записи в каждом ограничен сверху
+// (миниатюра — по построению, свой файл — лимитом композера), поэтому число записей и есть
+// предсказуемый потолок памяти.
+import { evictOldest } from '../shared/utils/evictOldest'
 import type { ImageDimensions } from '../shared/utils/imageDimensions'
 import { parseMxcUrl, type ParsedMxcUrl } from '../shared/utils/mxc'
 import { sleep } from '../shared/utils/sleep'
@@ -17,9 +35,12 @@ import {
   isUserDeactivatedError,
   type AuthErrorContext,
 } from './api/matrixError'
+import { createBatchedLoader } from '../shared/lottie/animationBatcher'
 import { MatrixHistoryLoader } from './history/historyLoader'
+import { toEmojiCatalog, toEmojiCategory, toEmojiIndex, toStickerPacks } from './mappers/emoji'
 import { classifyMediaError } from './mappers/mediaError'
 import {
+  outgoingEventType,
   toAdaptiveActionContent,
   toMessageContent,
   type OutgoingTimelineItem,
@@ -28,6 +49,7 @@ import { toRoomSyncPatch } from './mappers/roomSync'
 import { classifyUploadError } from './mappers/uploadError'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
+import { MatrixEventType } from './wire/consts'
 
 export const CONNECTION_FAILED_ERROR = 'Не удалось подключиться'
 
@@ -56,12 +78,20 @@ export interface MatrixService {
   disconnect: () => void
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  sendSticker: (sticker: StickerItem) => Promise<void>
   sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
+  loadEmojiCatalog: () => Promise<EmojiCatalog>
+  loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
+  loadEmojiIndex: () => Promise<EmojiIndex>
+  loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
+  loadStickerPacks: () => Promise<StickerPack[]>
+  loadStickerAnimation: (mediaId: string) => Promise<EmojiAnimation>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   markRead: (eventId: string) => Promise<void>
+  toggleReaction: (targetEventId: string, key: string) => Promise<void>
   loadMoreHistory: () => Promise<void>
   stopLoadingHistory: () => void
 }
@@ -96,6 +126,20 @@ export class MatrixController implements MatrixService {
   // пропадала бы из ленты сразу после отправки. Отвечает и на превью, и на оригинал.
   private readonly localOriginals = new Map<string, Blob>()
 
+  // Индекс пака. В отличие от медиа это server-managed справочник — один и тот же ответ для
+  // всех, поэтому смена сессии его не обесценивает и nextLifecycle() его не чистит. Хранится
+  // промис: он же дедуп параллельных запросов, пока первый ещё в полёте.
+  private emojiIndex: Promise<EmojiIndex> | null = null
+
+  // txnId незавершённых ответов на карточки, по `${cardEventId}#${actionId}`. Нужен, чтобы
+  // повтор после сетевого сбоя ушёл с тем же ключом идемпотентности; чистится при смене
+  // сессии — в новой комнате прежние event_id уже ничего не адресуют.
+  private readonly cardActionTxnIds = new Map<string, string>()
+
+  // Склейка загрузок эмодзи в пачки. Заводится в конструкторе: батчер держит окно сбора
+  // заявок, и общий он должен быть на весь контроллер, а не на вызов.
+  private readonly emojiAnimations: (codepoint: string, version: string) => Promise<EmojiAnimation>
+
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
     this.syncLoop = new MatrixSyncLoop(deps.api)
@@ -107,6 +151,11 @@ export class MatrixController implements MatrixService {
     this.sessionManager = deps.sessionManager
     this.dispatch = deps.dispatch
     this.getState = deps.getState
+    this.emojiAnimations = createBatchedLoader({
+      loadBatch: (codepoints, version) =>
+        deps.api.getEmojiAnimations(codepoints, version).then((response) => response.emoji ?? {}),
+      loadOne: (codepoint, version) => deps.api.getEmojiAnimation(codepoint, version),
+    })
   }
 
   async connect(): Promise<void> {
@@ -172,6 +221,25 @@ export class MatrixController implements MatrixService {
     await this.dispatchSend(connection.identity.roomId, uploaded, 'sendFile')
   }
 
+  /**
+   * Стикер уже лежит на сервере — ни загрузки, ни ожидания mxc. Цитату не переносим: её поля
+   * нет в `RoomStickerContentDto`, и связь была бы молча потеряна. Баннер ответа при этом
+   * снимаем, как на всех остальных путях отправки.
+   */
+  async sendSticker(sticker: StickerItem): Promise<void> {
+    const connection = this.requireConnection()
+    if (!connection) return
+
+    const message = createOptimisticStickerMessage({
+      sender: connection.identity.userId,
+      sticker,
+    })
+    this.dispatch({ type: 'message.optimisticAdded', message })
+    this.dispatch({ type: 'reply.cleared' })
+
+    await this.dispatchSend(connection.identity.roomId, message, 'sendSticker')
+  }
+
   async sendCardAction(cardEventId: string, action: CardAction): Promise<void> {
     const connection = this.requireConnection()
     if (!connection) return
@@ -182,14 +250,24 @@ export class MatrixController implements MatrixService {
     this.dispatch({ type: 'card.answering', cardEventId, actionId: action.id })
     const lifecycleId = this.lifecycleId
 
+    // txnId переживает неудачную попытку: это ключ идемпотентности PUT /send. Если ответ
+    // потерялся уже после записи события (обрыв, 502 от прокси), повтор с тем же ключом
+    // вернёт тот же event_id, а не создаст второе kc.adaptive.action — иначе бот ветвился бы
+    // по одной карточке дважды.
+    const txnKey = `${cardEventId}#${action.id}`
+    const txnId = this.cardActionTxnIds.get(txnKey) ?? crypto.randomUUID()
+    this.cardActionTxnIds.set(txnKey, txnId)
+
     try {
       await this.api.sendMessage({
         roomId: connection.identity.roomId,
-        txnId: crypto.randomUUID(),
+        txnId,
+        eventType: MatrixEventType.RoomMessage,
         content: toAdaptiveActionContent(cardEventId, action),
       })
       if (!this.isCurrentLifecycle(lifecycleId)) return
 
+      this.cardActionTxnIds.delete(txnKey)
       this.dispatch({ type: 'card.answered', cardEventId })
     } catch (err) {
       if (!this.isCurrentLifecycle(lifecycleId)) return
@@ -249,6 +327,49 @@ export class MatrixController implements MatrixService {
     return this.withLocalFallback(mxcUrl, (parsed) =>
       this.fetchMediaBytes(() => this.api.downloadMedia(parsed)),
     )
+  }
+
+  // Каталоги эмодзи и стикеров не проходят через стор и не сверяются с lifecycleId: это не
+  // состояние диалога, а справочник — он одинаков для любой сессии и переживает переподключение.
+  async loadEmojiCatalog(): Promise<EmojiCatalog> {
+    return toEmojiCatalog(await this.api.getEmojiCategories())
+  }
+
+  async loadEmojiCategory(categoryId: string): Promise<EmojiCategory> {
+    return toEmojiCategory(await this.api.getEmojiCategory(categoryId))
+  }
+
+  /**
+   * Индекс пака для ленты. В отличие от каталога вкладок, запрашивается один раз за жизнь
+   * вкладки: он нужен на каждое текстовое сообщение, а меняется только с версией пака.
+   */
+  loadEmojiIndex(): Promise<EmojiIndex> {
+    this.emojiIndex ??= this.api
+      .getEmojiPacks()
+      .then(toEmojiIndex)
+      .catch((err: unknown) => {
+        // Упавший запрос в кэше не держим: следующая попытка начнёт заново.
+        this.emojiIndex = null
+        throw err
+      })
+
+    return this.emojiIndex
+  }
+
+  /**
+   * Анимация одного эмодзи — но в сеть уходит пачка: заявки соседних ячеек пикера и соседних
+   * сообщений ленты склеиваются в один запрос к `/bundle`, см. `animationBatcher`.
+   */
+  loadEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
+    return this.emojiAnimations(codepoint, version)
+  }
+
+  async loadStickerPacks(): Promise<StickerPack[]> {
+    return toStickerPacks(await this.api.getStickerPacks())
+  }
+
+  loadStickerAnimation(mediaId: string): Promise<EmojiAnimation> {
+    return this.api.getStickerAnimation(mediaId)
   }
 
   private async withLocalFallback(
@@ -402,6 +523,78 @@ export class MatrixController implements MatrixService {
     }
   }
 
+  /**
+   * Ставит или снимает свою реакцию — одно действие на оба направления: что делать, знает стор,
+   * а не вызывающий компонент.
+   *
+   * Стор правим ДО запроса (и откатываем на ошибке) по той же причине, что и у read-маркера:
+   * ветку «поставить/снять» выбирает гард по стору, и без немедленного обновления второй тап
+   * ушёл бы вторым PUT'ом на постановку.
+   */
+  async toggleReaction(targetEventId: string, key: string): Promise<void> {
+    const connection = this.requireConnection()
+    if (!connection) return
+
+    const { identity, room } = connection
+    // У черновика нет серверного id — реакции не на что вешать.
+    if (isOptimistic(targetEventId)) return
+
+    const own = findOwnReaction(room.reactions, targetEventId, identity.userId, key)
+
+    if (!own) {
+      await this.addReaction(identity.roomId, targetEventId, identity.userId, key)
+      return
+    }
+    // Постановка ещё в полёте: редактировать нечего, снимет следующий тап.
+    if (isOptimistic(own.eventId)) return
+
+    await this.removeReaction(identity.roomId, targetEventId, own)
+  }
+
+  private async addReaction(
+    roomId: string,
+    targetEventId: string,
+    sender: string,
+    key: string,
+  ): Promise<void> {
+    const localEventId = `optimistic:${crypto.randomUUID()}`
+    const txnId = crypto.randomUUID()
+    const entry: ReactionEntry = { eventId: localEventId, sender, key }
+
+    this.dispatch({ type: 'reaction.added', targetEventId, entry })
+    const lifecycleId = this.lifecycleId
+
+    try {
+      const { event_id } = await this.api.sendReaction({ roomId, txnId, targetEventId, key })
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      this.dispatch({ type: 'reaction.confirmed', targetEventId, localEventId, eventId: event_id })
+    } catch (err) {
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      this.dispatch({ type: 'reaction.removed', targetEventId, eventId: localEventId })
+      this.handleAuthError(err, 'toggleReaction')
+    }
+  }
+
+  private async removeReaction(
+    roomId: string,
+    targetEventId: string,
+    entry: ReactionEntry,
+  ): Promise<void> {
+    this.dispatch({ type: 'reaction.removed', targetEventId, eventId: entry.eventId })
+    const lifecycleId = this.lifecycleId
+
+    try {
+      await this.api.redactEvent({ roomId, txnId: crypto.randomUUID(), eventId: entry.eventId })
+    } catch (err) {
+      if (!this.isCurrentLifecycle(lifecycleId)) return
+
+      this.dispatch({ type: 'reaction.added', targetEventId, entry })
+      this.handleAuthError(err, 'toggleReaction')
+    }
+  }
+
   // Механика догрузки живёт в MatrixHistoryLoader; контроллер даёт ей только сессионный
   // контекст — откуда тянуть (getContext) и когда цикл устарел (isStale по поколению сессии).
   async loadMoreHistory(): Promise<void> {
@@ -438,6 +631,9 @@ export class MatrixController implements MatrixService {
       const { event_id } = await this.api.sendMessage({
         roomId,
         txnId: message.txnId!,
+        // Тип события считаем из элемента, а не из места вызова: так и повтор упавшего
+        // стикера уходит на m.sticker, а не на m.room.message.
+        eventType: outgoingEventType(message),
         content: toMessageContent(message),
       })
       if (!this.isCurrentLifecycle(lifecycleId)) return
@@ -553,6 +749,8 @@ export class MatrixController implements MatrixService {
     // Смена сессии — смена прав на медиа: чужие байты в кэше держать нельзя.
     this.previews.clear()
     this.localOriginals.clear()
+    // Ключи идемпотентности привязаны к событиям прежней комнаты и в новой сессии бессмысленны.
+    this.cardActionTxnIds.clear()
     return this.lifecycleId
   }
 
@@ -570,18 +768,5 @@ export class MatrixController implements MatrixService {
       return null
     }
     return { identity, room }
-  }
-}
-
-/**
- * Держит кэш в пределах `max` записей, выбрасывая самые давние. Оба кэша медиа считают записи,
- * а не байты: вес записи в каждом из них ограничен сверху (миниатюра — по построению,
- * свой файл — лимитом композера), поэтому число записей и есть предсказуемый потолок памяти.
- */
-function evictOldest<T>(entries: Map<string, T>, max: number): void {
-  // Map хранит порядок вставки — он же порядок вытеснения.
-  for (const oldest of entries.keys()) {
-    if (entries.size <= max) break
-    entries.delete(oldest)
   }
 }

@@ -19,5 +19,11 @@ export function SendStatusIcon({ sendStatus: status, isRead }: Props) {
   if (status === 'failed') {
     return <FailedIcon />
   }
-  return <ChecksIcon color={isRead ? 'var(--c-purple-light)' : 'var(--c-text-invert-dim)'} />
+  // Непрочитанные галочки — той же переменной, что и время: на пилюле поверх ленты белое
+  // сливается с подложкой, см. BubbleMeta.module.css.
+  return (
+    <ChecksIcon
+      color={isRead ? 'var(--c-purple-light)' : 'var(--meta-own-color, var(--c-text-invert-dim))'}
+    />
+  )
 }

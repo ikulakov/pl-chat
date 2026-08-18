@@ -1,0 +1,356 @@
+= Эмодзи картинками в ленте сообщений
+:toc: macro
+:toclevels: 2
+:icons: font
+:status: done
+
+Парная задача к xref:emoji-sticker-picker.adoc[пикеру эмодзи и стикеров]: там — вставка,
+здесь — отображение. Клиентская часть xref:../../../matrixkc/docs/plans/task-88-animated-emoji.adoc[TASK-88].
+Контракт — `matrixkc/docs/client/client-protocol.adoc`, секция `[#emoji]`.
+
+toc::[]
+
+== Контекст
+
+Сегодня эмодзи в чате — просто юникод-символы: `TextContent.tsx:11` выводит `body` сырой строкой, и
+как это выглядит, решает системный шрифт ОС. На разных платформах один и тот же смайл выглядит
+по-разному, а «большого эмодзи» из макета (`doc/img_1.png`) нет в принципе.
+
+Бэкенд matrixkc (модуль `matrixkc-emoji`) уже отдаёт пак `tg-animated` — 580 анимаций Lottie/TGS,
+адресуемых каноническим codepoint'ом. Протокол сообщений при этом *не меняется*: эмодзи едут
+обычным юникодом в `body` события `m.text`, каталог нужен только чтобы клиент нарисовал вместо
+символа картинку.
+
+[NOTE]
+====
+Ключевое отличие от Telegram: там кастомное эмодзи приезжает сущностью
+`messageEntityCustomEmoji { offset, length, document_id }` — готовые координаты в строке. Здесь
+никаких entities нет, эмодзи фронт находит в тексте сам.
+====
+
+Итог итерации: эмодзи в теле сообщения, в подписи к медиа и в цитате реплая рисуются картинкой
+(первый кадр Lottie), а сообщение из одних эмодзи показывается крупно и анимированно — одно эмодзи
+большим, два-три средними.
+
+=== Принятые решения
+
+[cols="1,3", options="header"]
+|===
+| Вопрос | Решение
+
+| Анимация в ленте
+| Инлайн в тексте — *статичный первый кадр*: растеризуем один раз на codepoint и переиспользуем
+битмап. Анимируются только emoji-only сообщения (big/mid) и только во вьюпорте. Так делает Telegram
+Web; лента из 50 сообщений не грузит CPU.
+
+| Пороги размеров
+| Сообщение без текста: 1 эмодзи → *big* (128px, без плашки бабла, время поверх), 2–3 → *mid*
+(48px, тоже без бабла), 4+ → инлайн в обычном бабле. Эмодзи вперемешку с текстом — всегда инлайн.
+
+| Охват
+| `TextContent` (тело), `MediaCaption` (подпись), `ReplyPreview` (цитата).
+
+| Владелец `shared/lottie/`
+| Эта задача. Пикер импортирует готовое.
+|===
+
+== Границы задачи
+
+=== Не входит — осознанно
+
+* *Композер.* `<textarea>` не умеет инлайн-картинки: пока набираешь — системный эмодзи, после
+отправки — картинка. Лечится только переездом на `contenteditable`, это отдельная задача.
+* Стикеры и `m.sticker`, реакции, полноэкранные эффекты по тапу.
+* *IndexedDB-кэш.* Байты отдаются с `immutable` на неделю — постоянный слой уже обеспечен
+HTTP-кэшем браузера, IndexedDB его бы дублировал. Сознательное отступление от буквы контракта.
+* *Тона кожи и страновые флаги.* В паке 580 позиций без `1f3fb`–`1f3ff` и без regional-indicator
+пар: `👍🏽` и `🇷🇺` остаются системным шрифтом рядом с картиночными соседями.
+
+== Контракт бэкенда
+
+Сверено с исходниками matrixkc, не по памяти.
+
+[cols="3,4", options="header"]
+|===
+| Эндпоинт | Ответ
+
+| `GET /_matrix/client/unstable/ru.otpbank.kc/emoji/v1/packs`
+| *С Bearer.* `{ packs: [{ id, display_name, version, categories: [{ id, display_name, count,
+emoji: [{ codepoint, e }] }] }] }`, ~14 КБ. Единственный способ узнать список поддерживаемых
+codepoint'ов.
+
+| `GET /_matrix/emoji/{codepoint}?v={version}`
+| *Без токена* (`permitAll` на `/_matrix/emoji/**`). Lottie-JSON, `Content-Type: application/json`,
+`Content-Encoding: gzip` (браузер разжимает сам — `pako` не нужен), `Cache-Control: public,
+max-age=604800, immutable`, `Vary: Accept-Encoding`.
+|===
+
+Критично для разбора текста:
+
+* Канонический codepoint — hex-сегменты нижним регистром через `-`, *без `fe0f`*: `2764` (не
+`2764-fe0f`), `1f469-200d-2695` для 👩‍⚕️. Регулярка сервера `^[0-9a-f]{4,5}(-[0-9a-f]{4,5})*$`,
+несовпадение → `400`.
+* `?v={version}` из `/packs` *обязателен*: URL байтов стабилен и кэшируется на неделю как
+`immutable`; без cache-buster'а после переseed'а пака пользователи неделю увидят старые анимации.
+* При выключенной фиче каталог отдаёт пустые списки (не `403`). Пустой каталог = весь текст
+рисуется системным шрифтом, как сейчас.
+
+[IMPORTANT]
+====
+Цветных растровых вариантов эмодзи на сервере *нет* — только Lottie и серый силуэт 32×32. Поэтому
+«картинка» технически всегда равна отрисованному кадру Lottie, и статичный инлайн-рендер тоже
+требует загрузки анимации (~30 КБ) — но ровно один раз на codepoint.
+====
+
+== Реализация
+
+=== Зависимость
+
+`packages/widget/package.json` — `lottie-web`, узкая сборка
+`lottie-web/build/player/lottie_light_canvas` (canvas-рендерер без выражений). Единственное
+пополнение зависимостей виджета.
+
+Грузится *динамическим импортом* (`shared/lottie/lottieModule.ts`): сборка весит ~450 КБ
+исходника, а виджет встраивается в чужие страницы. Чанк подтягивается при первом эмодзи, которое
+надо нарисовать — стартовый бандл остался прежним (276 КБ), плеер уехал в отдельные 204 КБ.
+
+=== Сеть
+
+`matrix/api/endpoints.ts` — в существующий `createEndpoints`:
+
+[source,ts]
+----
+EMOJI_PACKS: `${MATRIX_CLIENT}/unstable/ru.otpbank.kc/emoji/v1/packs`,
+EMOJI_LOTTIE: `/_matrix/emoji/{codepoint}`,
+----
+
+* `matrix/wire/emoji.ts` — DTO `EmojiPacksResponse`, `EmojiPackWire`, `EmojiCategoryWire`,
+`EmojiWire { codepoint, e }`.
+* `matrix/mappers/emoji.ts` — единственное место перевода wire → домен (`domain/**` и `store/**` не
+имеют права импортировать `matrix/**`, `eslint.config.mjs:42-58`). Собирает
+`EmojiCatalog { version, codepointByChar }`, ключ карты — символ `e` с *выброшенным* `fe0f`, иначе
+`❤️` из текста не найдётся, хотя `2764` в паке есть.
+* `matrix/api/matrixApi.ts` — две обёртки рядом с `downloadMedia`. Байты идут через
+`transport.request`, чтобы `VITE_HOMESERVER_URL` резолвился в одном месте; лишний Bearer на
+permitAll-эндпоинте безвреден.
+* `matrix/matrixController.ts` — по образцу кэша `previews` (`:89-96`, `:267-284`) кэшируется
+*промис*, что заодно дедуплицирует параллельные запросы одного codepoint:
++
+--
+`emojiCatalog: Promise<EmojiCatalog> | null`:: один запрос на сессию, сбрасывается в
+`nextLifecycle()` вместе с `previews`.
+
+`emojiAnimations: Map<string, Promise<LottieJson>>`:: LRU-потолок `MAX_CACHED_EMOJI = 24`. Лимит
+маленький намеренно: разобранный Lottie весит 30–100 КБ в памяти, а повторное скачивание бесплатно
+из-за `immutable`-кэша браузера. Упавший запрос удаляется из кэша, как в `cachedPreview`.
+--
+* `evictOldest` (приватная функция `matrixController.ts:547`) — вынести в
+`shared/utils/evictOldest.ts` и переиспользовать в обоих местах.
+* `chatController.ts` — два новых действия в `ChatActions`: `loadEmojiCatalog`,
+`loadEmojiAnimation`. Форма ровно как у `loadPreview` — возвращают данные, ничего не диспатчат.
+
+Каталог *не* кладём в стор: это не состояние диалога, оно не переживает `lifecycleId` и не
+участвует в редьюсере.
+
+=== Домен — `domain/emoji.ts`
+
+Чистые функции, ноль React и ноль matrix:
+
+[source,ts]
+----
+export interface EmojiCatalog { version: string; codepointByChar: Map<string, string> }
+export type EmojiSegment =
+  | { kind: 'text'; text: string }
+  | { kind: 'emoji'; char: string; codepoint: string }
+
+export function splitEmoji(text: string, catalog: EmojiCatalog | null): EmojiSegment[]
+export function emojiLayout(segments: EmojiSegment[]): 'big' | 'mid' | 'inline'
+----
+
+`splitEmoji`::
+. Быстрый отсев: нет каталога, нет `Intl.Segmenter` или не сработал
+`/\p{Extended_Pictographic}/u` → один текстовый сегмент, больше ни на что не тратимся.
+. `new Intl.Segmenter(undefined, { granularity: 'grapheme' })` режет строку на графемные кластеры.
+Это снимает всю возню с UTF-16, суррогатами, ZWJ-цепочками и longest-match: `👩‍⚕️` — один
+кластер, а не 👩 + ⚕. Тип доступен: `lib: ["ES2023", "DOM"]` в `tsconfig.base.json`.
+. Ключ поиска — кластер без `fe0f`. Нашли в `codepointByChar` → эмодзи-сегмент, нет → продолжаем
+текстовый прогон. Соседние текстовые кластеры склеиваем, чтобы React не получал узел на букву.
+
+`emojiLayout`:: сообщение считается emoji-only, если все текстовые сегменты пробельные. Тогда
+1 → `big`, 2–3 → `mid`, иначе `inline`. Не emoji-only → всегда `inline`.
+
+=== Рантайм анимаций — `shared/lottie/`
+
+Отдельного кэша разобранных анимаций здесь *нет*: дедуп и LRU уже делает `matrixController`
+(`emojiAnimations`), второй слой поверх него был бы дублированием. Загрузчик приходит сверху
+через `useChatActions()`, поэтому модули не тянут `matrix/**`.
+
+`canvasAnimation.ts` — общая обвязка плеера::
+Два подводных камня lottie, каждый из которых даёт пустой прямоугольник вместо картинки:
++
+--
+. `container` передавать *нельзя*. Увидев контейнер, `CanvasRendererBase.configAnimation`
+создаёт внутри него свой холст и игнорирует переданный контекст. Свой контекст плеер берёт
+только когда контейнера нет — в типах он помечен обязательным, отсюда приведение.
+. Размер нужно задать явно (`resize`). Иначе плеер считает его из холста и домножает на dpr;
+у холста вне документа размер нулевой, и первый кадр выходит прозрачным. `dpr: 1` — плотность
+мы уже заложили в размеры сами. `resize` есть в рантайме, но потерян в `.d.ts`.
+--
+
+`emojiBitmap.ts` — ядро статичного рендера::
+`getEmojiBitmap(codepoint, size)` один раз на codepoint создаёт offscreen `<canvas>`, грузит
+анимацию с `autoplay: false`, делает `goToAndStop(0, true)`, снимает `canvas.toDataURL('image/png')`
+и *уничтожает плеер*. Дальше все вхождения этого эмодзи во всех сообщениях — просто
+`<img src={dataUrl}>`, браузер держит одну декодированную картинку. Два бакета: 64 (инлайн и
+mid-плейсхолдер) и 128 (big-плейсхолдер).
+
+`lottiePool.ts`::
+Один `requestAnimationFrame` на весь виджет. Плееры создаются с `autoplay: false`, пул сам зовёт
+`goToAndStop(frame, true)`. Тик троттлится до ~30 fps, потолок одновременно играющих
+`MAX_PLAYING = 12`, приоритет — вошедшим во вьюпорт. При `prefers-reduced-motion: reduce` пул не
+тикает вовсе — остаётся кадр 0. Снятие плеера в cleanup эффекта обязательно: утечка плеера = баг
+(`.claude/rules/codestyle.md`).
+
+=== Каталог в UI
+
+`shared/emoji/emojiCatalogStore.ts` — крошечный внешний стор (`subscribe` / `getSnapshot` /
+`ensureLoaded`) поверх `useSyncExternalStore`, плюс `hooks/useEmojiCatalog.ts`. Пока каталог не
+приехал, снапшот `null` и текст рисуется как сейчас; когда приехал — компоненты перерисовываются
+сами. Ошибка загрузки — один лог и вечный `null`: эмодзи остаются юникодом, чат работает.
+
+[IMPORTANT]
+====
+`ensureEmojiCatalog` дёргает *только* `ChatPanel`, а `useEmojiCatalog` — на чтение. Если загрузку
+запускает сам `EmojiText`, каждый пузырь начинает зависеть от `ChatController`: тесты
+`ReplyPreview` и `Composer`, которые его не поднимают, падают с «Controller not initialized».
+Рендер текста обязан оставаться презентационным.
+====
+
+=== Компоненты — `components/Emoji/`
+
+`EmojiText.tsx`::
+`useEmojiCatalog()` + `splitEmoji`, мемоизация по `text` и `catalog.version`. Текстовые сегменты
+отдаются строками — React экранирует их сам, `dangerouslySetInnerHTML` запрещён линтером
+(`eslint.config.mjs:29-36`).
+
+`InlineEmoji.tsx`::
+`<img class={emoji} src={dataUrl} alt={char} draggable={false}>`, CSS `width: 1.25em;
+height: 1.25em; vertical-align: -0.25em; object-fit: contain`. Пока битмап не готов — сам символ в
+`<span>` того же размера, чтобы строка не прыгала. `alt={char}` обязателен: при копировании текста
+браузер подставляет символ, а не пустоту.
+
+`AnimatedEmoji.tsx`::
+`<canvas>` + `useIntersectionObserver` (`hooks/useIntersectionObserver.ts`): вошёл во вьюпорт —
+берём Lottie из `lottieCache` и регистрируем плеер в пуле, вышел — снимаем. До загрузки и при
+reduced-motion — битмап первого кадра.
+
+`MessageList/MessageRow/EmojiMessage.tsx`::
+Ветка emoji-only: ряд из 1–3 `AnimatedEmoji` (128px / 48px) *без* `MessageBubble` — в макете плашки
+нет. `BubbleMeta` (проп `inline` у него уже есть) заворачивается в `position: absolute` пилюлю в
+правом нижнем углу: `background: var(--c-surface-secondary)`, `border-radius: var(--radius-md)`.
+
+=== Точки правки существующего кода
+
+* `TextContent.tsx:11-14` — `{text}` → `<EmojiText text={text} />`. Не сломать `white-space:
+pre-wrap` и обтекание `BubbleMeta` последней строкой (`float: right` в `BubbleMeta.module.css`).
+* `MediaCaption.tsx:16-22` и `ReplyPreview.tsx:16-17` — то же самое, только инлайн.
+* `MessageRow.tsx:73-88` — для `kind === 'text'` считаем `emojiLayout`. Если `big`/`mid` *и* у
+сообщения нет цитаты — рендерим `<EmojiMessage>` вместо `<MessageBubble>`, иначе всё как сейчас.
+Реплай с эмодзи оставляем в бабле: без плашки цитату вешать не на что.
+* `ChatPanel.tsx` — `useEmojiCatalog()` для разовой загрузки каталога.
+
+=== Мок — `tools/matrix-mock/server.mjs`
+
+`emoji/v1/packs` (14 эмодзи в 3 категориях, включая `2764` для проверки нормализации `fe0f` и две
+ZWJ-цепочки) и `/_matrix/emoji/{codepoint}` с синтетическим Lottie-JSON. Плюс команда `/emoji`:
+шлёт три сообщения — большое, среднее и строчные внутри текста.
+
+Анимация в моке — *пульсация* (масштаб + прозрачность), а не вращение: симметричная фигура,
+вращаясь, на глаз и по пикселям неотличима от статики, и проверить «плеер живой» ею нельзя.
+Цвет берётся из палитры по хэшу codepoint — случайный цвет слишком часто выходил белым на белом.
+
+=== Тесты
+
+[cols="2,3", options="header"]
+|===
+| Тест | Что проверяет
+
+| `domain/emoji.test.ts`
+| `❤️` (`2764-fe0f`) находится как `2764`; 👩‍⚕️ не разваливается на два символа; эмодзи в середине
+текста; `\n` сохраняется; неизвестное эмодзи остаётся текстом; пустой каталог → один текстовый
+сегмент; пороги `emojiLayout`.
+
+| `shared/lottie/emojiBitmap.test.ts`
+| Дедуп параллельных отрисовок одного codepoint, раздельные бакеты размеров, явный `resize`,
+уничтожение плеера, отсутствие кэша у упавшей отрисовки.
+
+| `shared/lottie/lottiePool.test.ts`
+| Потолок одновременно играющих, снятие плеера, `prefers-reduced-motion` не тикает.
+
+| `components/Emoji/EmojiText.test.tsx`
+| Текст с эмодзи → `<img alt="😀">` + текстовые узлы; без каталога — голая строка.
+
+| `components/Emoji/AnimatedEmoji.test.tsx`
+| Вне вьюпорта плеера нет, только первый кадр; во вьюпорте плеер уходит в пул, при уходе —
+снимается и уничтожается.
+
+| `MessageRow.test.tsx` (дописать)
+| 1 эмодзи → нет `[data-role="message-bubble"]`; 3 → mid; 4 → обычный бабл с инлайном; эмодзи +
+реплай → бабл.
+|===
+
+`lottie-web` в юнит-тестах мокается (`vi.mock`). `Intl.Segmenter` в jsdom есть. Сеть мокается
+подменой `useChatActions`, как в `useMediaSource.test.tsx:6-10`.
+
+В `test.setup.ts` добавлена заглушка canvas: jsdom отдаёт `null` из `getContext`, а lottie-web
+трогает 2d-контекст прямо при импорте модуля — без заглушки падает сбор любого теста, который
+тянет рендер эмодзи.
+
+== Проверка
+
+[source,bash]
+----
+pnpm install
+pnpm dev            # host-demo :5173, widget :5174/widget, mock :3001
+pnpm test && pnpm typecheck && pnpm lint
+----
+
+Вручную на `http://localhost:5174/widget`:
+
+. «Привет 👋 как дела ❤️» — оба эмодзи картинками, текст вокруг не поехал, время прилипло к
+последней строке, копирование текста даёт символы.
+. Одно 😋 — крупное, без плашки бабла, время пилюлей поверх, анимируется.
+. «😋😋😋» — три средних без бабла; «😋😋😋😋» — обычный бабл со строчными.
+. Прокрутить крупное эмодзи за экран — анимация встала, вернуть — пошла. В Performance-профиле один
+rAF-цикл на весь виджет, а не по одному на эмодзи.
+. Подпись к картинке и цитата в реплае — тоже с картинками.
+. DevTools → Rendering → `prefers-reduced-motion: reduce` — ничего не крутится, видны первые кадры.
+. Network: `/_matrix/emoji/{cp}?v=…` запрашивается по разу на codepoint; повторные вхождения того же
+эмодзи сети не трогают.
+. Каталог отдаёт `{ packs: [] }` — чат работает, эмодзи системным шрифтом.
+
+== Что проверено вживую
+
+Против мока (`/emoji`, Chrome): три размера рисуются как задумано — большое без плашки бабла,
+три средних без плашки, строчные внутри текста; текст вокруг не едет, время прилипает к последней
+строке. Инлайн-картинки приходят готовыми data-URL, по одной на codepoint.
+
+*Анимацию во вьюпорте проверить в этой сессии не удалось*: Chrome отдавал вкладку как
+`visibilityState: 'hidden'` (окно перекрыто), а в скрытой вкладке браузер не вызывает ни
+`IntersectionObserver`, ни `requestAnimationFrame` — эмодзи оставались на первом кадре, что как раз
+и есть штатный фолбэк. Поведение закрыто юнит-тестами (`AnimatedEmoji.test.tsx`,
+`lottiePool.test.ts`); при первой возможности прогнать пункт 4 «Проверки» руками.
+
+== Открытые вопросы
+
+* *Тона кожи.* Альтернатива фолбэку на шрифт — отбрасывать модификатор и рисовать базовое эмодзи
+(тогда жёлтый вместо выбранного тона). Пока оставлен фолбэк.
+* *Порядок с задачей пикера.* Обе задачи трогают `endpoints.ts`, `matrixApi.ts`,
+`matrixController.ts`, `chatController.ts` и `package.json` — вливать последовательно, эту первой:
+она приносит `shared/lottie/`.
+
+== См. также
+
+* `doc/plans/emoji-sticker-picker.adoc` — парная задача, окно выбора и вставки.
+* `matrixkc/docs/client/client-protocol.adoc` — секция `[#emoji]`.
+* `matrixkc/docs/plans/task-88-animated-emoji.adoc` — серверная часть.

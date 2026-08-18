@@ -5,12 +5,12 @@ describe('mergeMediaVerdicts', () => {
   it('добавляет новые вердикты по mediaId', () => {
     const result = applyMediaVerdicts({}, [
       { mediaId: 'm1', verdict: { status: 'ready' } },
-      { mediaId: 'm2', verdict: { status: 'rejected', error: 'Файл повреждён' } },
+      { mediaId: 'm2', verdict: { status: 'rejected' } },
     ])
 
     expect(result).toEqual({
       m1: { status: 'ready' },
-      m2: { status: 'rejected', error: 'Файл повреждён' },
+      m2: { status: 'rejected' },
     })
   })
 
@@ -18,7 +18,7 @@ describe('mergeMediaVerdicts', () => {
     const existing = { m1: { status: 'ready' as const } }
 
     const result = applyMediaVerdicts(existing, [
-      { mediaId: 'm1', verdict: { status: 'rejected', error: 'дубль' } },
+      { mediaId: 'm1', verdict: { status: 'rejected' } },
     ])
 
     expect(result).toBe(existing)

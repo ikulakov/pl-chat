@@ -6,7 +6,16 @@
 // Запуск:  pnpm dev          (слушает :3001 — vite проксирует /_matrix туда)
 //
 // Покрывает весь клиентский MVP: переписка, статусы, typing, ✓✓ (receipts),
-// история, медиа-заглушки, стикеры, Adaptive Cards, завершение чата.
+// история, медиа-заглушки, стикеры, эмодзи, Adaptive Cards, завершение чата.
+//
+// Стикеры: 5 паков по 3 позиции — структура ответа боевая (силуэты, 24-символьные media_id,
+// три рендиции). Байты: Lottie синтезируется, вместо webp отдаётся PNG, а видео — один
+// настоящий webm из пака Rubi OTP в assets/.
+//
+// Эмодзи: встроенный набор на 22 позиции в 3 категориях (codepoint'ы — из реального пака
+// matrixkc). Силуэты и Lottie генерируются на лету, поэтому анимация в моке одинаковая
+// «пульсирующая клякса» — проверить сетку на настоящих 580 позициях можно только против
+// живого matrixkc с профилем emoji-pack.
 //
 // История: ~480 осмысленных реплик из scenario.json → historyTopics, растянутых на 10 дней
 // (работают date-разделители). Объём: MOCK_HISTORY_MESSAGES=1000 pnpm dev
@@ -31,6 +40,9 @@
 //   /reply      — оператор отвечает цитатой на последнее сообщение клиента
 //   /reply img  — то же картинкой, /reply file — файлом (входящая цитата на медиа)
 //   /sticker    — оператор присылает стикер
+//   /emoji      — три сообщения с эмодзи: большое, среднее и строчные внутри текста
+//   /react [эм] — оператор ставит реакцию (по умолчанию 👍) на последнее сообщение клиента;
+//                 повторный ввод той же реакции снимает её (m.room.redaction)
 //   /fail       — следующая отправка клиента вернёт ошибку (проверка «Повторить»)
 //   /failaction — следующий ответ на кнопку карточки вернёт ошибку (CardActions → failed)
 //   /failupload — следующая загрузка файла вернёт ошибку (сеть/5xx — повтор осмыслен)
@@ -51,6 +63,7 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { deflateSync } from "node:zlib";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const scenario = JSON.parse(readFileSync(join(__dirname, "scenario.json"), "utf8"));
@@ -61,20 +74,116 @@ const OP = scenario.operatorId;
 const GUEST = scenario.guest.user_id;
 
 // ── Каталог стикеров (mock) ──────────────────────────────────────────────────
-const STICKERS = [
-  { id: "s1", body: "Палец вверх", emoji: "👍" },
-  { id: "s2", body: "Сердце", emoji: "❤️" },
-  { id: "s3", body: "Огонь", emoji: "🔥" },
-  { id: "s4", body: "Аплодисменты", emoji: "👏" },
-].map((s) => ({
-  id: s.id,
-  body: s.body,
-  emoji: s.emoji,
-  info: { mimetype: "image/svg+xml", w: 120, h: 120, size: 600 },
-  url: `mxc://bank.ru/${s.id}`,
-  media_id: s.id,
-}));
-const STICKER_EMOJI = Object.fromEntries(STICKERS.map((s) => [s.media_id, s.emoji]));
+// Настоящий каталог — 5 паков и 150 стикеров в трёх рендициях. Здесь по три позиции на пак,
+// но структура ответа повторяет боевую вплоть до силуэтов и 24-символьных media_id: именно по
+// ним клиент строит публичный адрес байтов и ветвится по info.mimetype.
+//
+// Байты: Lottie генерируется тем же mockLottie(), что и у эмодзи; вместо webp отдаётся PNG
+// (синтезировать webp нечем, а ветка выбирается по префиксу image/), а для видео положен один
+// настоящий webm из пака Rubi OTP — VP9 с альфой не синтезируешь, а без него ветка видео
+// локально непроверяема вовсе.
+const STICKER_PACKS = [
+  { id: "rubi_otp", display_name: "Rubi OTP", description: "Фирменный пак ОТП Банка",
+    mimetype: "video/webm", animated: true, bodies: ["🩷", "😎", "🎉"] },
+  { id: "utya", display_name: "Утя", description: "Анимированный утёнок",
+    mimetype: "application/json", animated: true, bodies: ["🐥", "😴", "🥳"] },
+  { id: "hands_for_friends", display_name: "Руки", description: "Анимированные жесты",
+    mimetype: "application/json", animated: true, bodies: ["👍", "👏", "🤝"] },
+  { id: "gentle_rabbit", display_name: "Кролик", description: "Мягкий кролик",
+    mimetype: "image/webp", animated: false, bodies: ["🐰", "❤️", "😢"] },
+  { id: "panda_chan", display_name: "Панда", description: "Панда-тян",
+    mimetype: "image/webp", animated: false, bodies: ["🐼", "🍜", "😆"] },
+];
+
+// media_id боевого сервера — ровно 24 символа [A-Za-z0-9]; клиент на это закладывается.
+const mockMediaId = (packId, index) =>
+  (packId.replace(/[^a-z]/g, "") + "Sticker" + index).padEnd(24, "0").slice(0, 24);
+
+// Индекс байтов заполняется сразу — он нужен маршруту отдачи и не требует генерации PNG.
+const STICKERS_BY_MEDIA_ID = new Map(
+  STICKER_PACKS.flatMap((pack) =>
+    pack.bodies.map((_, i) => [mockMediaId(pack.id, i), { mimetype: pack.mimetype, index: i }]),
+  ),
+);
+
+// Сам каталог — лениво: силуэты строит grayPng(), а тот опирается на таблицу CRC, объявленную
+// ниже по файлу. Собирать его на этапе инициализации модуля значило бы обратиться к ней из TDZ.
+let stickerCatalog = null;
+function getStickerCatalog() {
+  stickerCatalog ??= STICKER_PACKS.map((pack) => ({
+    id: pack.id,
+    display_name: pack.display_name,
+    description: pack.description,
+    stickers: pack.bodies.map((body, i) => ({
+      id: `${String(i + 1).padStart(2, "0")}_${pack.id}`,
+      body,
+      info: {
+        mimetype: pack.mimetype,
+        w: 512,
+        h: 512,
+        size: 4096,
+        // У статичных паков боевой сервер ключ вовсе не шлёт, а не шлёт false.
+        ...(pack.animated ? { is_animated: true } : {}),
+      },
+      url: `mxc://bank.ru/${mockMediaId(pack.id, i)}`,
+      media_id: mockMediaId(pack.id, i),
+      p: grayPng(i).toString("base64"),
+    })),
+  }));
+
+  return stickerCatalog;
+}
+
+// ── Каталог эмодзи (mock) ────────────────────────────────────────────────────
+// Настоящий пак — 580 анимаций на 17 МБ в matrixkc (профиль emoji-pack). Здесь встроенный
+// набор: codepoint'ы взяты из реального emoji.csv, поэтому переключение мока на живой
+// бэкенд ничего не ломает. Силуэты и анимации генерируются на лету (см. grayPng/mockLottie).
+const EMOJI_PACK_VERSION = "mock-1";
+const EMOJI_CATEGORIES = [
+  {
+    id: "smileys",
+    display_name: "Смайлы и эмоции",
+    emoji: [
+      ["1f600", "😀"],
+      ["1f602", "😂"],
+      ["1f60d", "😍"],
+      ["1f618", "😘"],
+      ["1f621", "😡"],
+      ["1f62d", "😭"],
+      ["1f643", "🙃"],
+      ["1f929", "🤩"],
+      ["1f92f", "🤯"],
+      ["1f973", "🥳"],
+      ["1f4a9", "💩"],
+      ["2764", "❤"],
+      ["1f47b", "👻"],
+      ["1f480", "💀"],
+    ],
+  },
+  {
+    id: "animals",
+    display_name: "Животные и природа",
+    emoji: [
+      ["1f331", "🌱"],
+      ["1f333", "🌳"],
+      ["1f337", "🌷"],
+      ["1f339", "🌹"],
+    ],
+  },
+  {
+    id: "food",
+    display_name: "Еда и напитки",
+    emoji: [
+      ["1f32d", "🌭"],
+      ["1f346", "🍆"],
+      ["1f353", "🍓"],
+      ["1f355", "🍕"],
+    ],
+  },
+];
+const EMOJI_BY_CODEPOINT = new Set(
+  EMOJI_CATEGORIES.flatMap((c) => c.emoji.map(([codepoint]) => codepoint)),
+);
 
 // ── In-memory состояние комнаты ──────────────────────────────────────────────
 let seq = 0;
@@ -338,6 +447,23 @@ function lastGuestMessageId(exclude) {
   return null;
 }
 
+// Активная реакция оператора — поставленная и не снятая редакцией. Реакцию снимает
+// редакция её собственного события, а не сообщения, поэтому ищем по event_id самой реакции.
+function activeOperatorReaction(target, key) {
+  const redacted = new Set(
+    events.filter((e) => e.type === "m.room.redaction").map((e) => e.content.redacts)
+  );
+  const hit = events.findLast(
+    (e) =>
+      e.type === "m.reaction" &&
+      e.sender === OP &&
+      e.content["m.relates_to"]?.event_id === target &&
+      e.content["m.relates_to"]?.key === key &&
+      !redacted.has(e.event_id)
+  );
+  return hit?.event_id ?? null;
+}
+
 // Синтетические варианты карточки, которые нет смысла держать в scenario.json — это тест-фикстуры
 // для проверки границ маппера/проекции (domain/adaptiveCards.ts toSubmitActions), не сид-данные.
 const CARD_BUTTONS = {
@@ -463,6 +589,25 @@ function operatorRespond(text, ownEventId) {
       })
     );
   }
+  // Реакция оператора на последнее сообщение клиента: `/react`, `/react 🔥`.
+  // Повторный ввод той же реакции снимает её — так проверяется разбор m.room.redaction.
+  if (t.startsWith("/react")) {
+    const target = lastGuestMessageId(ownEventId);
+    if (!target) return;
+
+    const key = t.slice("/react".length).trim() || "👍";
+
+    return delay(500, () => {
+      const existing = activeOperatorReaction(target, key);
+      if (existing) {
+        push("m.room.redaction", OP, { redacts: existing });
+        return;
+      }
+      push("m.reaction", OP, {
+        "m.relates_to": { rel_type: "m.annotation", event_id: target, key },
+      });
+    });
+  }
   // Возврат оператора после /left — иначе состояние «чат завершён» не откатить без рестарта.
   if (t.startsWith("/join")) {
     return delay(500, () => {
@@ -528,8 +673,16 @@ function operatorRespond(text, ownEventId) {
     );
   }
   if (t.startsWith("/sticker")) {
-    const s = STICKERS[0];
+    const s = getStickerCatalog()[0].stickers[0];
     return delay(700, () => push("m.sticker", OP, { body: s.body, info: s.info, url: s.url }));
+  }
+  // Три размера рендера эмодзи одной командой: большое, среднее и строчные внутри текста.
+  if (t.startsWith("/emoji")) {
+    // Символы — из встроенного набора мока, иначе байтов для них нет и рисовать нечего.
+    const bodies = ["😀", "😀😂❤️", "Держи 🙃 и ещё 😭 в тексте"];
+    return bodies.forEach((body, i) =>
+      delay(400 + i * 300, () => push("m.room.message", OP, { msgtype: "m.text", body })),
+    );
   }
   // Обычный путь: «печатает…» → ответ.
   delay(400, () => setTyping([OP]));
@@ -580,11 +733,183 @@ function svgImage(w, h, label) {
     `text-anchor="middle" dominant-baseline="middle">${label}</text></svg>`
   );
 }
-function svgSticker(emoji) {
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">` +
-    `<text x="50%" y="54%" font-size="84" text-anchor="middle" dominant-baseline="middle">${emoji}</text></svg>`
-  );
+// Один настоящий webm из пака Rubi OTP: VP9 с альфой не синтезируешь, а без файла ветку видео
+// локально не проверить. Читается лениво и один раз — на все позиции пака он один и тот же.
+let stickerWebm = null;
+function loadStickerWebm() {
+  stickerWebm ??= readFileSync(join(__dirname, "assets", "sticker.webm"));
+  return stickerWebm;
+}
+
+// ── Генерация ассетов эмодзи ─────────────────────────────────────────────────
+// Силуэт обязан быть настоящим PNG: клиент подставляет его как data:image/png;base64,...
+// и SVG под этим mime браузер не покажет. Кодировщик минимальный (grayscale 8 бит), zlib
+// в node встроенный — зависимостей у мока по-прежнему нет.
+
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body));
+  return Buffer.concat([len, body, crc]);
+}
+
+/**
+ * Силуэт 32×32: круглое пятно. Как и боевой сервер, это **luminance-маска** без альфы —
+ * фигура белая, фон чёрный. Клиент подставляет её в mask-image и красит сам, поэтому
+ * инверсия здесь сразу видна на экране: пятно и фон меняются местами.
+ */
+function grayPng(seed) {
+  const size = 32;
+  const radius = 12 + (seed % 4);
+  const raw = Buffer.alloc(size * (size + 1));
+
+  for (let y = 0; y < size; y++) {
+    raw[y * (size + 1)] = 0; // фильтр строки: None
+    for (let x = 0; x < size; x++) {
+      const dx = x - 15.5;
+      const dy = y - 15.5;
+      const inside = dx * dx + dy * dy <= radius * radius;
+      raw[y * (size + 1) + 1 + x] = inside ? 0xff : 0x00;
+    }
+  }
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8; // бит на канал
+  ihdr[9] = 0; // grayscale
+
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", deflateSync(raw)),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+/**
+ * Синтетическая Lottie-анимация: пульсирующий круг. Настоящие .tgs весят ~30 КБ каждая,
+ * тащить их в репозиторий фронта незачем — для проверки плеера, пула и пауз по видимости
+ * достаточно того, что что-то заметно движется. Цвет выводится из codepoint'а, чтобы
+ * соседние ячейки визуально различались.
+ *
+ * Структура повторяет вывод Bodymovin вплоть до служебных полей (`d` у эллипса, `r` у
+ * заливки, `ix`/`np`, `sk`/`sa` у трансформа). Это не украшательство: без `d` lottie-web
+ * строит пустой path, и вместо круга рисуется залитый прямоугольник во всю канву.
+ */
+function mockLottie(codepoint) {
+  const seed = [...codepoint].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  const hue = seed % 360;
+  const rgb = hslToRgb(hue / 360, 0.7, 0.55);
+
+  // Промежуточный keyframe обязан нести кривые i/o. Без них lottie-web не считает значение,
+  // трансформ слоя уходит в никуда и не рисуется вообще ничего.
+  const EASE = { i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } };
+  const scale = (t, s) => ({ ...EASE, t, s: [s, s, 100] });
+
+  return {
+    v: "5.7.4",
+    fr: 30,
+    ip: 0,
+    op: 30,
+    w: 512,
+    h: 512,
+    nm: `mock-${codepoint}`,
+    ddd: 0,
+    assets: [],
+    layers: [
+      {
+        ddd: 0,
+        ind: 1,
+        ty: 4,
+        nm: "blob",
+        sr: 1,
+        ao: 0,
+        ks: {
+          o: { a: 0, k: 100, ix: 11 },
+          r: {
+            a: 1,
+            k: [
+              { ...EASE, t: 0, s: [0] },
+              { t: 30, s: [360] },
+            ],
+            ix: 10,
+          },
+          p: { a: 0, k: [256, 256, 0], ix: 2 },
+          a: { a: 0, k: [0, 0, 0], ix: 1 },
+          s: { a: 1, k: [scale(0, 70), scale(15, 110), scale(30, 70)], ix: 6 },
+        },
+        shapes: [
+          {
+            ty: "gr",
+            it: [
+              {
+                d: 1,
+                ty: "el",
+                s: { a: 0, k: [300, 300], ix: 2 },
+                p: { a: 0, k: [0, 0], ix: 3 },
+                nm: "Ellipse Path 1",
+                hd: false,
+              },
+              {
+                ty: "fl",
+                c: { a: 0, k: [...rgb, 1], ix: 4 },
+                o: { a: 0, k: 100, ix: 5 },
+                r: 1,
+                bm: 0,
+                nm: "Fill 1",
+                hd: false,
+              },
+              {
+                ty: "tr",
+                p: { a: 0, k: [0, 0], ix: 2 },
+                a: { a: 0, k: [0, 0], ix: 1 },
+                s: { a: 0, k: [100, 100], ix: 3 },
+                r: { a: 0, k: 0, ix: 6 },
+                o: { a: 0, k: 100, ix: 7 },
+                sk: { a: 0, k: 0, ix: 4 },
+                sa: { a: 0, k: 0, ix: 5 },
+                nm: "Transform",
+              },
+            ],
+            nm: "Ellipse 1",
+            np: 3,
+            cix: 2,
+            bm: 0,
+            ix: 1,
+            hd: false,
+          },
+        ],
+        ip: 0,
+        op: 30,
+        st: 0,
+        bm: 0,
+      },
+    ],
+    markers: [],
+  };
+}
+
+function hslToRgb(h, s, l) {
+  const f = (n) => {
+    const k = (n + h * 12) % 12;
+    return l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  };
+  return [f(0), f(8), f(4)];
 }
 
 const server = createServer(async (req, res) => {
@@ -685,20 +1010,20 @@ const server = createServer(async (req, res) => {
       delay(600, () => operatorRead(ev.event_id));
     }
     // Вердикт CDR по своему вложению: как на настоящем бэкенде, приходит отдельным событием
-    // ПОСЛЕ самого сообщения, привязан к media_id (не к event_id — один вердикт на файл,
-    // не на каждое упоминание). При mediaMode === "pending" событие не шлём вовсе: конвейер
-    // ещё не вынес решения, download продолжает штатно отвечать 504.
+    // ПОСЛЕ самого сообщения. Клиент сопоставляет по media_id (один вердикт на файл, не на
+    // каждое упоминание), event_id — лишь подсказка. Причины отказа в payload нет намеренно:
+    // бэкенд её не раскрывает, текст пользователю клиент берёт из своего словаря.
+    // При mediaMode === "pending" событие не шлём вовсе: конвейер ещё не вынес решения,
+    // download продолжает штатно отвечать 504.
     if (type === "m.room.message" && MEDIA_MSGTYPES.has(content.msgtype) && mediaMode !== "pending") {
       const mediaId = String(content.url || "").split("/").pop();
       if (mediaId) {
         delay(1500, () =>
-          push(
-            "kc.media.status",
-            OP,
-            mediaMode === "rejected"
-              ? { media_id: mediaId, status: "rejected", error: "Файл не прошёл проверку безопасности" }
-              : { media_id: mediaId, status: "ready" },
-          ),
+          push("kc.media.status", OP, {
+            media_id: mediaId,
+            event_id: ev.event_id,
+            status: mediaMode === "rejected" ? "rejected" : "ready",
+          }),
         );
       }
     }
@@ -774,14 +1099,122 @@ const server = createServer(async (req, res) => {
     const label = isThumbnail ? `thumbnail ${w}×${h}` : `original ${w}×${h}`;
     return send(res, 200, svgImage(w, h, label), "image/svg+xml");
   }
-  // Публичные байты стикеров
+  // Публичные байты стикеров: один маршрут на все три рендиции, как на боевом сервере
   const stickerMatch = path.match(/\/_matrix\/sticker\/([^/]+)/);
   if (stickerMatch) {
-    return send(res, 200, svgSticker(STICKER_EMOJI[stickerMatch[1]] || "🙂"), "image/svg+xml");
+    const entry = STICKERS_BY_MEDIA_ID.get(stickerMatch[1]);
+    if (!entry) return send(res, 404, { errcode: "M_NOT_FOUND", error: "no such sticker" });
+
+    res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+
+    if (entry.mimetype === "application/json") {
+      return send(res, 200, mockLottie(`sticker-${stickerMatch[1]}`));
+    }
+    if (entry.mimetype === "video/webm") {
+      return send(res, 200, loadStickerWebm(), "video/webm");
+    }
+    // Вместо webp — PNG: клиент ветвится по префиксу image/, путь тот же.
+    return send(res, 200, grayPng(entry.index), "image/png");
   }
   // Каталог стикеров
   if (/stickers\/v1\/packs$/.test(path)) {
-    return send(res, 200, { packs: [{ id: "otp", display_name: "OTP", stickers: STICKERS }] });
+    return send(res, 200, { packs: getStickerCatalog() });
+  }
+  // Вкладки пикера эмодзи: счётчики без состава
+  if (/emoji\/v1\/categories$/.test(path)) {
+    return send(res, 200, {
+      version: EMOJI_PACK_VERSION,
+      categories: EMOJI_CATEGORIES.map((c) => ({
+        id: c.id,
+        display_name: c.display_name,
+        count: c.emoji.length,
+      })),
+    });
+  }
+  // Весь пак разом, без силуэтов: по нему лента строит индекс «символ → codepoint».
+  if (/emoji\/v1\/packs$/.test(path)) {
+    return send(res, 200, {
+      packs: [
+        {
+          id: "tg-animated",
+          display_name: "Анимированные эмодзи",
+          version: EMOJI_PACK_VERSION,
+          categories: EMOJI_CATEGORIES.map((c) => ({
+            id: c.id,
+            display_name: c.display_name,
+            count: c.emoji.length,
+            emoji: c.emoji.map(([codepoint, e]) => ({ codepoint, e })),
+          })),
+        },
+      ],
+    });
+  }
+  // Состав одной вкладки — вместе с силуэтами
+  const categoryMatch = path.match(/emoji\/v1\/categories\/([^/]+)$/);
+  if (categoryMatch) {
+    const category = EMOJI_CATEGORIES.find((c) => c.id === categoryMatch[1]);
+    if (!category) return send(res, 404, { errcode: "M_NOT_FOUND", error: "unknown category" });
+
+    return send(res, 200, {
+      id: category.id,
+      display_name: category.display_name,
+      count: category.emoji.length,
+      emoji: category.emoji.map(([codepoint, e], i) => ({
+        codepoint,
+        e,
+        p: grayPng(i).toString("base64"),
+      })),
+    });
+  }
+  // Батч: пачка анимаций одним ответом. Идёт до одиночного маршрута — иначе «bundle» уехал бы
+  // в него как codepoint. Настоящий сервер склеивает gzip-члены встык, здесь просто объект.
+  //
+  // MOCK_NO_EMOJI_BUNDLE=1 выключает оба батч-маршрута: так проверяется откат клиента на
+  // поштучные запросы против сервера, где батча ещё нет.
+  const emojiBundleOff = Boolean(process.env.MOCK_NO_EMOJI_BUNDLE);
+  if (path === "/_matrix/emoji/bundle" && !emojiBundleOff) {
+    const requested = (url.searchParams.get("cp") ?? "").split(",").filter(Boolean);
+    if (requested.length > 300) {
+      return send(res, 400, { errcode: "M_INVALID_PARAM", error: "too many codepoints" });
+    }
+    const bad = requested.find((cp) => !/^[0-9a-f]{4,5}(-[0-9a-f]{4,5})*$/.test(cp));
+    if (bad) {
+      return send(res, 400, { errcode: "M_INVALID_PARAM", error: "bad codepoint: " + bad });
+    }
+
+    // Неизвестные codepoint'ы молча выбрасываются — как на боевом сервере: батч это
+    // оптимизация загрузки, а не место для 404.
+    const emoji = {};
+    for (const cp of requested) {
+      if (EMOJI_BY_CODEPOINT.has(cp)) emoji[cp] = mockLottie(cp);
+    }
+
+    return send(res, 200, { version: EMOJI_PACK_VERSION, emoji });
+  }
+  // Батч по категории. Клиент им не пользуется (тянул бы всю вкладку целиком), но контракт
+  // сервера включает оба маршрута.
+  const bundleCategoryMatch = path.match(/^\/_matrix\/emoji\/bundle\/([^/]+)$/);
+  if (bundleCategoryMatch && !emojiBundleOff) {
+    const category = EMOJI_CATEGORIES.find((c) => c.id === bundleCategoryMatch[1]);
+    if (!category) return send(res, 404, { errcode: "M_NOT_FOUND", error: "unknown category" });
+
+    const emoji = {};
+    for (const [codepoint] of category.emoji) emoji[codepoint] = mockLottie(codepoint);
+
+    return send(res, 200, { version: EMOJI_PACK_VERSION, emoji });
+  }
+  // Байты анимации. Настоящий сервер отдаёт gzip'нутый .tgs как есть, но заголовок
+  // Content-Encoding ставит только под Accept-Encoding — здесь просто отдаём готовый JSON.
+  const emojiMatch = path.match(/^\/_matrix\/emoji\/([^/]+)$/);
+  if (emojiMatch) {
+    const codepoint = emojiMatch[1];
+    if (!/^[0-9a-f]{4,5}(-[0-9a-f]{4,5})*$/.test(codepoint)) {
+      return send(res, 400, { errcode: "M_INVALID_PARAM", error: "bad codepoint" });
+    }
+    if (!EMOJI_BY_CODEPOINT.has(codepoint)) {
+      return send(res, 404, { errcode: "M_NOT_FOUND", error: "no such emoji" });
+    }
+    return send(res, 200, mockLottie(codepoint));
   }
   // Web Push — требует реального браузерного push-сервиса
   if (/kc\/push\/webpush/.test(path)) {
@@ -803,6 +1236,7 @@ server.listen(PORT, () => {
   console.log(`BankChat mock-сервер: http://localhost:${PORT}`);
   console.log(`Откройте виджет:     http://localhost:5174`);
   console.log(`Команды в чате: /card [buttons|3|broken|openurl|many]  /notice  /left  /join  /html`);
-  console.log(`                /img  /file  /sticker  /reply [img|file]  /fail  /failaction`);
-  console.log(`                /failupload  /rejectupload  /failthumb  /pendingmedia  /rejectmedia`);
+  console.log(`                /img  /file  /sticker  /emoji  /reply [img|file]  /react [эмодзи]`);
+  console.log(`                /fail  /failaction  /failupload  /rejectupload  /failthumb`);
+  console.log(`                /pendingmedia  /rejectmedia`);
 });
