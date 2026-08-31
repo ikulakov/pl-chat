@@ -1,4 +1,4 @@
-import type { MatrixEventType, MediaScanStatus, MsgType } from './consts'
+import type { MatrixEventType, MediaScanStatus, MsgType, RelType } from './consts'
 
 interface BaseClientEvent {
   event_id: string
@@ -76,6 +76,27 @@ export interface RoomMessageEvent extends BaseClientEvent {
     | AdaptiveActionMessageContent
 }
 
+/**
+ * Эмодзи-реакция. У снятой (отредактированной) реакции сервер отдаёт пустой `content`
+ * во всех read-путях — поэтому связь опциональна и её наличие проверяет маппер.
+ */
+export interface ReactionEvent extends BaseClientEvent {
+  type: typeof MatrixEventType.Reaction
+  content: {
+    'm.relates_to'?: {
+      rel_type?: typeof RelType.Annotation
+      event_id?: string
+      key?: string
+    }
+  }
+}
+
+/** Удаление события: снятие реакции — редакция самого события реакции. */
+export interface RedactionEvent extends BaseClientEvent {
+  type: typeof MatrixEventType.Redaction
+  content: { redacts?: string }
+}
+
 export interface OperatorCurrentEvent extends BaseClientEvent {
   type: typeof MatrixEventType.OperatorCurrent
   state_key: ''
@@ -106,13 +127,34 @@ export interface OperatorLeftEvent extends BaseClientEvent {
   }
 }
 
+/**
+ * Вердикт проверки файла. Причины отказа в событии нет намеренно: назвать, чем именно файл не
+ * прошёл проверку, — подсказать обход тому, кто его подбирает. Текст пользователю — свой, из i18n.
+ */
 export interface MediaStatusEvent extends BaseClientEvent {
   type: typeof MatrixEventType.MediaStatus
   content: {
     media_id: string
+    // Сообщение, в котором сослались на файл. Может отсутствовать: вердикт способен прийти
+    // раньше, чем записано само сообщение, поэтому сопоставляем по media_id, а не по нему.
+    event_id?: string
     status: (typeof MediaScanStatus)[keyof typeof MediaScanStatus]
-    error?: string
   }
+}
+
+/**
+ * Стикер из server-managed каталога. Отдельный тип события со своим `content` — msgtype у него
+ * нет. Связи ответа тоже нет: сервер её не хранит и в эхо не возвращает.
+ */
+export interface StickerMessageContent {
+  body: string
+  url: string
+  info?: Partial<MediaInfo>
+}
+
+export interface StickerEvent extends BaseClientEvent {
+  type: typeof MatrixEventType.Sticker
+  content: StickerMessageContent
 }
 
 export interface GenericClientEvent extends BaseClientEvent {
@@ -122,6 +164,9 @@ export interface GenericClientEvent extends BaseClientEvent {
 
 export type ClientEvent =
   | RoomMessageEvent
+  | StickerEvent
+  | ReactionEvent
+  | RedactionEvent
   | OperatorCurrentEvent
   | OperatorJoinedEvent
   | OperatorLeftEvent

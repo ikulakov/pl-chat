@@ -1,4 +1,4 @@
-import type { MsgType } from './consts'
+import type { MsgType, RelType } from './consts'
 import type { ClientEvent, JoinedRoom, MediaInfo, WithRelation } from './types'
 
 export interface OutgoingTextContent extends WithRelation {
@@ -25,10 +25,34 @@ export interface OutgoingAdaptiveActionContent {
   'm.relates_to': { rel_type: 'm.reference'; event_id: string }
 }
 
+/**
+ * `m.sticker` — ровно `{body, info, url}` из каталога, без `msgtype` (у типа события своего
+ * msgtype нет) и намеренно без `WithRelation`: `RoomStickerContentDto` на бэкенде поля связи не
+ * содержит, а `FAIL_ON_UNKNOWN_PROPERTIES` там выключен — присланная цитата молча потерялась бы.
+ */
+export interface OutgoingStickerContent {
+  body: string
+  url: string
+  info: MediaInfo
+}
+
 export type OutgoingContent =
   | OutgoingTextContent
   | OutgoingMediaContent
   | OutgoingAdaptiveActionContent
+  | OutgoingStickerContent
+
+export interface OutgoingReactionContent {
+  'm.relates_to': {
+    rel_type: typeof RelType.Annotation
+    event_id: string
+    key: string
+  }
+}
+
+export interface OutgoingRedactionContent {
+  redacts: string
+}
 
 export interface RegisterResponse {
   user_id: string

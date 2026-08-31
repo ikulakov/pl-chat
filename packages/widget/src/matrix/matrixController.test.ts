@@ -294,6 +294,34 @@ describe('MatrixController (orchestrator)', () => {
     })
   })
 
+  it('sendSticker уходит на m.sticker с content из каталога и без цитаты', async () => {
+    const api = makeMatrixApi()
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.sendSticker({
+      id: '01_1fa77',
+      body: '🩷',
+      mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
+      url: 'mxc://otpbank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+      info: { mimetype: 'video/webm', w: 512, h: 512, size: 43488 },
+      silhouette: null,
+      format: 'video',
+    })
+
+    expect(api.sendMessage).toHaveBeenCalledExactlyOnceWith({
+      roomId: IDENTITY.roomId,
+      txnId: expect.any(String),
+      eventType: 'm.sticker',
+      content: {
+        body: '🩷',
+        url: 'mxc://otpbank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+        info: { mimetype: 'video/webm', w: 512, h: 512, size: 43488 },
+      },
+    })
+    expect(applied[0]!.type).toBe('message.optimisticAdded')
+    expect(applied.at(-1)).toMatchObject({ type: 'message.sent', eventId: '$real' })
+  })
+
   it('sendMessage without identity does nothing', async () => {
     const { controller, dispatch } = harness()
 
@@ -686,7 +714,9 @@ describe('MatrixController (orchestrator)', () => {
 
     // текстовая отправка выше свой PUT сделала (им и уронили сессию) — важно, что медиа
     // своего не сделала
-    const msgtypes = vi.mocked(api.sendMessage).mock.calls.map(([{ content }]) => content.msgtype)
+    const msgtypes = vi
+      .mocked(api.sendMessage)
+      .mock.calls.map(([{ content }]) => ('msgtype' in content ? content.msgtype : undefined))
     expect(msgtypes).not.toContain('m.file')
     controller.disconnect()
   })
@@ -882,7 +912,9 @@ describe('MatrixController (orchestrator)', () => {
     await controller.resendMessage('local-1')
 
     const [{ content }] = vi.mocked(api.sendMessage).mock.calls[0]!
-    expect(content['m.relates_to']).toEqual({ 'm.in_reply_to': { event_id: '$parent' } })
+    expect(content).toMatchObject({
+      'm.relates_to': { 'm.in_reply_to': { event_id: '$parent' } },
+    })
   })
 
   it('resendMessage does nothing when the failed message has no txnId', async () => {
@@ -952,6 +984,97 @@ describe('MatrixController (orchestrator)', () => {
     expect(applied.filter((action) => action.type === 'message.optimisticAdded')).toHaveLength(1)
     expect(applied.some((action) => action.type === 'message.failed')).toBe(false)
     expect(api.registerGuest).not.toHaveBeenCalled()
+  })
+
+  it('toggleReaction ставит реакцию оптимистично и подтверждает её серверным eventId', async () => {
+    const api = makeMatrixApi()
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('$m1', '👍')
+
+    expect(api.sendReaction).toHaveBeenCalledExactlyOnceWith({
+      roomId: IDENTITY.roomId,
+      txnId: expect.any(String),
+      targetEventId: '$m1',
+      key: '👍',
+    })
+    expect(getState().room.reactions['$m1']).toEqual([
+      { eventId: '$reaction', sender: IDENTITY.userId, key: '👍' },
+    ])
+  })
+
+  it('toggleReaction вторым вызовом снимает свою реакцию редакцией, а не шлёт вторую', async () => {
+    const api = makeMatrixApi()
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('$m1', '👍')
+    await controller.toggleReaction('$m1', '👍')
+
+    expect(api.sendReaction).toHaveBeenCalledOnce()
+    expect(api.redactEvent).toHaveBeenCalledExactlyOnceWith({
+      roomId: IDENTITY.roomId,
+      txnId: expect.any(String),
+      eventId: '$reaction',
+    })
+    expect(getState().room.reactions).toEqual({})
+  })
+
+  it('toggleReaction откатывает реакцию, если отправка не прошла', async () => {
+    const api = makeMatrixApi({
+      sendReaction: vi.fn<MatrixApi['sendReaction']>().mockRejectedValue(new Error('net')),
+    })
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('$m1', '👍')
+
+    expect(getState().room.reactions).toEqual({})
+  })
+
+  it('toggleReaction возвращает реакцию на место, если редакция не прошла', async () => {
+    const api = makeMatrixApi({
+      redactEvent: vi.fn<MatrixApi['redactEvent']>().mockRejectedValue(new Error('net')),
+    })
+    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('$m1', '👍')
+    await controller.toggleReaction('$m1', '👍')
+
+    expect(getState().room.reactions['$m1']).toEqual([
+      { eventId: '$reaction', sender: IDENTITY.userId, key: '👍' },
+    ])
+  })
+
+  it('toggleReaction ничего не шлёт на черновик: аннотировать нечего, серверного id ещё нет', async () => {
+    const api = makeMatrixApi()
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('optimistic:l1', '👍')
+
+    expect(api.sendReaction).not.toHaveBeenCalled()
+  })
+
+  it('toggleReaction молчит вне подключения', async () => {
+    const api = makeMatrixApi()
+    const { controller } = harness({ phase: 'connecting', identity: IDENTITY }, api)
+
+    await controller.toggleReaction('$m1', '👍')
+
+    expect(api.sendReaction).not.toHaveBeenCalled()
+  })
+
+  it('toggleReaction не подтверждает реакцию из мёртвого поколения сессии', async () => {
+    const send = deferred<{ event_id: string }>()
+    const api = makeMatrixApi({
+      sendReaction: vi.fn<MatrixApi['sendReaction']>().mockReturnValue(send.promise),
+    })
+    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    const promise = controller.toggleReaction('$m1', '👍')
+    controller.disconnect()
+    send.resolve({ event_id: '$r1' })
+    await promise
+
+    expect(applied.some((action) => action.type === 'reaction.confirmed')).toBe(false)
   })
 
   it('markRead moves the store marker optimistically and posts the receipt', async () => {
@@ -1061,6 +1184,7 @@ describe('MatrixController — sendCardAction (kc.adaptive.action)', () => {
     expect(api.sendMessage).toHaveBeenCalledWith({
       roomId: IDENTITY.roomId,
       txnId: expect.any(String),
+      eventType: 'm.room.message',
       content: {
         msgtype: 'kc.adaptive.action',
         body: expect.any(String),
@@ -1278,5 +1402,38 @@ describe('MatrixController.loadMedia', () => {
     await controller.downloadFile(MXC)
 
     expect(api.downloadMedia).toHaveBeenCalledTimes(2)
+  })
+
+  it('анимации эмодзи уезжают в сеть одной пачкой', async () => {
+    const api = makeMatrixApi({
+      getEmojiAnimations: vi.fn<MatrixApi['getEmojiAnimations']>().mockResolvedValue({
+        version: 'v1',
+        emoji: { '1f600': { nm: '1f600' }, '2764': { nm: '2764' } },
+      }),
+    })
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    const animations = await Promise.all([
+      controller.loadEmojiAnimation('1f600', 'v1'),
+      controller.loadEmojiAnimation('2764', 'v1'),
+    ])
+
+    expect(animations).toEqual([{ nm: '1f600' }, { nm: '2764' }])
+    // Сетка пикера просит десятки анимаций в один кадр — они обязаны схлопнуться в один запрос.
+    expect(api.getEmojiAnimations).toHaveBeenCalledExactlyOnceWith(['1f600', '2764'], 'v1')
+    expect(api.getEmojiAnimation).not.toHaveBeenCalled()
+  })
+
+  it('сервер без батч-маршрута не ломает загрузку эмодзи', async () => {
+    const api = makeMatrixApi({
+      getEmojiAnimations: vi
+        .fn<MatrixApi['getEmojiAnimations']>()
+        .mockRejectedValue(new MatrixError('M_NOT_FOUND', 'no such route')),
+      getEmojiAnimation: vi.fn<MatrixApi['getEmojiAnimation']>().mockResolvedValue({ nm: 'one' }),
+    })
+    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+
+    await expect(controller.loadEmojiAnimation('1f600', 'v1')).resolves.toEqual({ nm: 'one' })
+    expect(api.getEmojiAnimation).toHaveBeenCalledExactlyOnceWith('1f600', 'v1')
   })
 })

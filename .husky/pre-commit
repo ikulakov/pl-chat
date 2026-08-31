@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
+# nvm есть не везде (внутри банка Node ставится системно) — переключаем версию
+# только если он реально подгрузился, иначе хук падает с "nvm: command not found".
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-nvm use
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  \. "$NVM_DIR/nvm.sh"
+  nvm use
+fi
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 REGEX="^(feature|bugfix|hotfix)/PLC-[0-9]+$|^release/[0-9]+\.[0-9]+\.[0-9]+$"

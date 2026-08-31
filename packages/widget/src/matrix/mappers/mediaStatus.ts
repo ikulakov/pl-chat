@@ -6,15 +6,12 @@ import type * as Matrix from '../wire/types'
 export function toMediaVerdictEntry(event: Matrix.ClientEvent): MediaVerdictEntry | undefined {
   if (!isMediaStatusEvent(event)) return
 
-  const { media_id: mediaId, status, error } = event.content
+  const { media_id: mediaId, status } = event.content
   if (!mediaId) return
 
   return {
     mediaId,
-    verdict:
-      status === MediaScanStatus.Rejected
-        ? { status: 'rejected', ...(error ? { error } : {}) }
-        : { status: 'ready' },
+    verdict: status === MediaScanStatus.Rejected ? { status: 'rejected' } : { status: 'ready' },
   }
 }
 

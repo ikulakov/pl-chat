@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
+import { ensureEmojiIndex } from '../shared/emoji/emojiIndexStore'
 import { Spinner } from '../shared/ui/Spinner'
 import {
   selectOperator,
@@ -25,7 +27,18 @@ export function ChatPanel() {
   const operatorName = useChatStore(selectOperatorName)
   const viewport = useChatStore(selectViewport)
 
-  const { reconnect } = useChatActions()
+  const { reconnect, loadEmojiIndex } = useChatActions()
+
+  // Индекс пака тянем один раз на вкладку и отсюда: лента и цитаты его только читают.
+  // Ждём userId: каталог отдаётся под токеном (permitAll только у /_matrix/emoji/** и
+  // /_matrix/sticker/**), а mount-эффект иначе гонится с регистрацией гостя и получает 401 —
+  // без refresh-токена его нечем починить, и вся отрисовка эмодзи молча оставалась бы
+  // выключенной до перезагрузки страницы.
+  useEffect(() => {
+    if (userId === null) return
+
+    ensureEmojiIndex(loadEmojiIndex)
+  }, [loadEmojiIndex, userId])
 
   return (
     <div className={chatStyles.panel}>

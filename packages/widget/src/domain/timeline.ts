@@ -66,6 +66,22 @@ export interface FileTimelineItem extends BaseTimelineItem {
 
 export type MediaTimelineItem = ImageTimelineItem | FileTimelineItem
 
+/**
+ * Стикер из server-managed каталога. Сознательно НЕ входит в `MediaTimelineItem`: у него нет
+ * ни загрузки, ни имени файла, ни вердикта проверки, а байты лежат за публичным адресом без
+ * токена. Так стикер даром не попадает в ветки медиа — ни в редьюсере, ни в `useMediaUploadView`,
+ * ни в фолбэке имени файла для цитаты.
+ */
+export interface StickerTimelineItem extends BaseTimelineItem {
+  kind: 'sticker'
+  content: {
+    /** Эмодзи-подпись: показываем как alt и как текст цитаты. */
+    body: string
+    url: string
+    info: MediaInfo
+  }
+}
+
 export interface AdaptiveCardTimelineItem extends BaseTimelineItem {
   kind: 'adaptiveCard'
   content: {
@@ -87,7 +103,11 @@ export interface SystemTimelineItem {
   label: SystemLabel
 }
 
-export type MessageTimelineItem = TextTimelineItem | MediaTimelineItem | AdaptiveCardTimelineItem
+export type MessageTimelineItem =
+  | TextTimelineItem
+  | MediaTimelineItem
+  | AdaptiveCardTimelineItem
+  | StickerTimelineItem
 
 export type TimelineItem = MessageTimelineItem | SystemTimelineItem
 
@@ -99,3 +119,6 @@ export const isMedia = (item: TimelineItem): item is MediaTimelineItem =>
 
 export const isAdaptiveCard = (item: TimelineItem): item is AdaptiveCardTimelineItem =>
   item.kind === 'adaptiveCard'
+
+export const isSticker = (item: TimelineItem): item is StickerTimelineItem =>
+  item.kind === 'sticker'

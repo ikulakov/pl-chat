@@ -5,6 +5,7 @@ import type {
   FileTimelineItem,
   ImageTimelineItem,
   MediaContent,
+  StickerTimelineItem,
   SystemTimelineItem,
   TextTimelineItem,
 } from '../../domain/timeline'
@@ -39,6 +40,31 @@ export function textItem(
     sendStatus: 'sent',
     ...rest,
     content: { body: body ?? 'hello' },
+  }
+}
+
+export function stickerItem(
+  overrides: Partial<Omit<StickerTimelineItem, 'kind' | 'content'>> & {
+    body?: string
+    mimetype?: string
+    /** Пустая строка — черновик, у которого байтов ещё нет. */
+    url?: string
+  } = {},
+): StickerTimelineItem {
+  const { body, mimetype, url, ...rest } = overrides
+  return {
+    kind: 'sticker',
+    localId: 'st1',
+    eventId: '$st1',
+    sender: OPERATOR_ID,
+    ts: 0,
+    sendStatus: 'sent',
+    ...rest,
+    content: {
+      body: body ?? '🩷',
+      url: url ?? 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+      info: { mimetype: mimetype ?? 'image/webp', size: 4096, w: 512, h: 512 },
+    },
   }
 }
 
@@ -241,28 +267,21 @@ export function operatorLeftEvent(
   }
 }
 
-export const MEDIA_REJECT_REASON = 'Файл не прошёл проверку безопасности'
-
-// Не привязано к event_id: бэкенд шлёт один вердикт на media_id, не на упоминание в сообщении.
+// Сопоставляем по media_id, а не по content.event_id: вердикт может прийти раньше сообщения,
+// и тогда ссылаться ему не на что.
 export function mediaStatusEvent(
   overrides: Partial<MediaStatusEvent['content']> = {},
 ): MediaStatusEvent {
-  const content: MediaStatusEvent['content'] = {
-    media_id: 'AbCdEfGhIjKlMnOpQrStUvWx',
-    status: MediaScanStatus.Rejected,
-    ...overrides,
-  }
-
   return {
     type: MatrixEventType.MediaStatus,
     event_id: '$media-status',
     sender: OPERATOR_ID,
     origin_server_ts: 3,
-    // error приходит только при rejected — у ready поля нет вовсе
-    content:
-      content.status === MediaScanStatus.Rejected
-        ? { ...content, error: content.error ?? MEDIA_REJECT_REASON }
-        : content,
+    content: {
+      media_id: 'AbCdEfGhIjKlMnOpQrStUvWx',
+      status: MediaScanStatus.Rejected,
+      ...overrides,
+    },
   }
 }
 
@@ -288,12 +307,27 @@ export function makeMatrixApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
     longPollSync: vi.fn<MatrixApi['longPollSync']>().mockReturnValue(new Promise<never>(() => {})),
     getRoomHistory: vi.fn<MatrixApi['getRoomHistory']>().mockResolvedValue(messagesResponse()),
     sendMessage: vi.fn<MatrixApi['sendMessage']>().mockResolvedValue({ event_id: '$real' }),
+    sendReaction: vi.fn<MatrixApi['sendReaction']>().mockResolvedValue({ event_id: '$reaction' }),
+    redactEvent: vi.fn<MatrixApi['redactEvent']>().mockResolvedValue({ event_id: '$redaction' }),
     uploadMedia: vi
       .fn<MatrixApi['uploadMedia']>()
       .mockResolvedValue({ content_uri: 'mxc://bank.ru/abc' }),
     downloadMedia: vi.fn<MatrixApi['downloadMedia']>().mockResolvedValue(new Blob(['bytes'])),
     getThumbnail: vi.fn<MatrixApi['getThumbnail']>().mockResolvedValue(new Blob(['thumb'])),
     sendReadReceipt: vi.fn<MatrixApi['sendReadReceipt']>().mockResolvedValue({}),
+    getEmojiCategories: vi
+      .fn<MatrixApi['getEmojiCategories']>()
+      .mockResolvedValue({ version: '2026-08-12', categories: [] }),
+    getEmojiCategory: vi
+      .fn<MatrixApi['getEmojiCategory']>()
+      .mockResolvedValue({ id: 'smileys', display_name: 'Смайлы', count: 0, emoji: [] }),
+    getEmojiPacks: vi.fn<MatrixApi['getEmojiPacks']>().mockResolvedValue({ packs: [] }),
+    getEmojiAnimation: vi.fn<MatrixApi['getEmojiAnimation']>().mockResolvedValue({}),
+    getEmojiAnimations: vi
+      .fn<MatrixApi['getEmojiAnimations']>()
+      .mockResolvedValue({ version: '', emoji: {} }),
+    getStickerPacks: vi.fn<MatrixApi['getStickerPacks']>().mockResolvedValue({ packs: [] }),
+    getStickerAnimation: vi.fn<MatrixApi['getStickerAnimation']>().mockResolvedValue({}),
     ...overrides,
   }
 }

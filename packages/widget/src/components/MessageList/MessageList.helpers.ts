@@ -1,4 +1,10 @@
-import { replyAuthorLabel, replyEventIdOf, replyText } from '../../domain/reply'
+import {
+  replyAuthorLabel,
+  replyEventIdOf,
+  replyStickerOf,
+  replyText,
+  type ReplyStickerPreview,
+} from '../../domain/reply'
 import { isSystem, type MessageTimelineItem, type TimelineItem } from '../../domain/timeline'
 import { t } from '../../i18n'
 import { formatDateLabel, startOfDay } from '../../shared/utils/formatDate'
@@ -59,6 +65,7 @@ export interface ReplyPreviewData {
   author?: string
   text: string
   targetId?: string
+  sticker?: ReplyStickerPreview
 }
 
 interface GetReplyPreviewParams {
@@ -84,9 +91,12 @@ export function getReplyPreview({
     return { text: t('chat.reply.unavailable') }
   }
 
+  const sticker = replyStickerOf(parent)
+
   return {
     author: replyAuthorLabel(parent.sender, userId),
     text,
     targetId: parent.localId,
+    ...(sticker ? { sticker } : {}),
   }
 }

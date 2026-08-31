@@ -1,0 +1,33 @@
+.picker {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 24px;
+  background: var(--c-surface-primary);
+  box-shadow: var(--shadow-popover);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--c-surface-secondary);
+  }
+
+  &.own {
+    background: var(--c-surface-accent-soft);
+  }
+}

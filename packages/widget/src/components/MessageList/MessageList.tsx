@@ -7,7 +7,12 @@ import { useLoadMoreHistory } from '../../hooks/useLoadMoreHistory'
 import { useSendReadReceipts } from '../../hooks/useSendReadReceipts'
 import { cn } from '../../shared/utils/cn'
 import { Spinner } from '../../shared/ui/Spinner'
-import { selectIsOpen, selectReadReceipts, selectTimeline } from '../../store/selectors'
+import {
+  selectIsOpen,
+  selectReactions,
+  selectReadReceipts,
+  selectTimeline,
+} from '../../store/selectors'
 import {
   getPosition,
   getReplyPreview,
@@ -26,6 +31,7 @@ interface Props {
 export function MessageList({ userId }: Props) {
   const isOpen = useChatStore(selectIsOpen)
   const readReceipts = useChatStore(selectReadReceipts)
+  const reactions = useChatStore(selectReactions)
 
   const timeline = useChatStore(selectTimeline)
   const timelineGroupedByDate = useMemo(() => groupTimelineByDate(timeline), [timeline])
@@ -95,8 +101,10 @@ export function MessageList({ userId }: Props) {
                   message={item}
                   position={position}
                   readByOperator={readByOperatorIds.has(item.eventId)}
+                  reactions={reactions[item.eventId]}
                   replyAuthor={reply?.author}
                   replyText={reply?.text}
+                  replySticker={reply?.sticker}
                   replyTargetId={reply?.targetId}
                   onReplyClick={scrollToItem}
                 />

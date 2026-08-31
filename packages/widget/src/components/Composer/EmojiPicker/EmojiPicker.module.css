@@ -1,0 +1,240 @@
+/* Метрики — из Figma (Chatbot, node 1337:26222 «Emodji»). */
+
+.trigger {
+  /* Иконка 24×24 в слоте 40px — размер уже задан .slot в Composer.module.css. */
+  color: var(--c-text-tertiary);
+}
+
+.panel {
+  position: absolute;
+  /* Панель раскрывается вверх поверх ленты; 4px до верхней кромки композера. */
+  bottom: calc(100% + 4px);
+  /* Правый край — по правому краю слота кнопки-смайла: 8px паддинга .wrap + 44px слота
+     отправки. Так панель «висит» под своим триггером, а не под краем окна. */
+  right: 52px;
+  z-index: var(--z-overlay);
+
+  display: flex;
+  flex-direction: column;
+  width: 264px;
+  height: 284px;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--c-surface-primary);
+  /* В макете 0 15px 56px — на пиксель ниже токена; заводить ради этого второй не стали. */
+  box-shadow: var(--shadow-popover);
+}
+
+.tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+  height: 46px;
+  padding: 12px;
+  border-bottom: 1px solid var(--c-surface-tertiary-pressed);
+}
+
+.tab {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  font-family: var(--font);
+  /* Figma Caption/1M */
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.1px;
+  color: var(--c-text-tertiary);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--c-surface-secondary);
+  }
+}
+
+.tabActive {
+  /* Активная вкладка отличается только фоном — цвет текста в макете тот же. */
+  background: var(--c-surface-tertiary-pressed);
+
+  &:hover {
+    background: var(--c-surface-tertiary-pressed);
+  }
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* Явный `hidden` по горизонтали: при `visible` браузер поднимает ось до `auto` вслед за
+     вертикальной, и лишний пиксель ширины вылезал полосой прокрутки вдоль нижней кромки. */
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-scrollbar) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: var(--c-scrollbar);
+  }
+}
+
+/* Полоска быстрого перехода. Не прокручивается вместе с лентой: она — навигация по ней. */
+.categoryBar {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--c-surface-tertiary-pressed);
+  /* Категорий может быть больше, чем влезает: полоска едет вбок, а не переносится. */
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.categoryButton {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  /* Значок — системный глиф: полоска не должна ждать сеть, чтобы стать кликабельной. */
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--c-surface-secondary);
+  }
+}
+
+.categoryActive {
+  background: var(--c-surface-tertiary-pressed);
+
+  &:hover {
+    background: var(--c-surface-tertiary-pressed);
+  }
+}
+
+.sections {
+  padding: 12px 8px;
+}
+
+.sections section + section {
+  margin-top: 16px;
+}
+
+.grid {
+  display: grid;
+  /* Доли, а не фиксированная ширина: сетка не разъезжается от того, забирает ли скроллбар
+     место под себя. Нижняя граница трека — 0, а не `auto`: иначе ячейка шире доли распирала
+     бы сетку, и панель получала бы горизонтальную прокрутку. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--c-surface-secondary);
+  }
+}
+
+.silhouette,
+.frame,
+.canvas {
+  grid-area: 1 / 1;
+  /* 24px из макета — потолок, а не жёсткий размер: на узкой панели ячейка ужимается, и
+     значок обязан ужаться вместе с ней, иначе он вылезает за сетку. */
+  width: 100%;
+  height: 100%;
+  max-width: 24px;
+  max-height: 24px;
+}
+
+/* Статичный первый кадр — то, что ячейка показывает почти всё время. */
+.frame {
+  object-fit: contain;
+}
+
+.canvas {
+  display: block;
+
+  & svg {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+/* Заголовок секции — один и тот же у категорий эмодзи и у паков стикеров. */
+.sectionTitle {
+  margin: 0 0 8px;
+  padding: 0;
+  /* Figma Caption/1M — тот же стиль, что у табов панели. */
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.1px;
+  color: var(--c-text-tertiary);
+}
+
+.stickerGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stickerCell {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--c-surface-secondary);
+  }
+}
+
+.message {
+  padding: 16px 12px;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+  color: var(--c-text-tertiary);
+}
+
+.retry {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: var(--c-text-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}

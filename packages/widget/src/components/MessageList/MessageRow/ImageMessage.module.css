@@ -1,6 +1,29 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  /* По ширине кадра (MEDIA_BOX, см. MediaImage.module.css): подпись переносится по границе
+     картинки, а не уезжает шире неё. */
+  width: 184px;
   min-width: 0;
+
+  /* Пузыря нет — время и галочки своего сообщения лежат на светлом фоне ленты и на светлой
+     пилюле, инвертированное белое там не читается. См. BubbleMeta.module.css. */
+  --meta-own-color: var(--c-text-disabled);
+}
+
+.frame {
+  position: relative;
+}
+
+/* Время поверх правого нижнего угла кадра — ровно как у стикера и «большого эмодзи». */
+.meta {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: var(--radius-md);
+  background: var(--c-surface-secondary);
 }
