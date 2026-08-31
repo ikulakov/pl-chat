@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toMediaFailure } from '../../../domain/mediaError'
 import type { ThumbnailSize } from '../../../matrix/api/matrixApi'
 import { useChatActions } from '../../../hooks/useChatActions'
@@ -43,6 +43,8 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
   const mediaId = mxcUrl ? parseMxcUrl(mxcUrl)?.mediaId : undefined
   const verdict = mediaId ? verdicts[mediaId] : undefined
 
+  const isRejected = verdict?.status === 'rejected'
+
   const [attempt, setAttempt] = useState(0)
   const retry = useCallback(() => setAttempt((value) => value + 1), [])
 
@@ -54,7 +56,7 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
   useEffect(() => {
     // Вердикт уже отрицателен — сеть не нужна вовсе, сервер уже вынес финальное «нет».
     // Сам REJECTED вернётся ниже как производное значение — эффекту тут делать нечего.
-    if (!key || verdict?.status === 'rejected') return
+    if (!key || isRejected) return
 
     let cancelled = false
     let objectUrl: string | null = null
@@ -90,15 +92,37 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
       URL.revokeObjectURL(objectUrl)
       setResult(null)
     }
-    // verdict?.status — намеренно в зависимостях: переход undefined → ready/rejected
-    // перезапускает эффект и берёт вердикт как второй источник тех же состояний (см. шапку
-    // файла), не дожидаясь, пока пользователь сам спровоцирует повторный рендер.
-  }, [key, mxcUrl, width, height, loadPreview, retry, verdict?.status])
+    // В зависимостях isRejected, а не verdict?.status: перезапуск нужен только на переходе
+    // в rejected — он гасит сеть и снимает картинку. На переходе undefined → ready эффект
+    // перезапускаться не должен: его cleanup отозвал бы object-URL уже показанной картинки,
+    // и пользователь увидел бы спиннер поверх того, на что он смотрит. Состояние ready и так
+    // приходит производным значением ниже.
+  }, [key, mxcUrl, width, height, loadPreview, retry, isRejected])
+
+  // Вердикт ready подталкивает застрявший checking: 504 означал «файл ещё в карантине», после
+  // вердикта его уже отдадут. Отдельным эффектом, а не зависимостью основного: там перезапуск
+  // отозвал бы object-URL уже показанной картинки. Ref гарантирует ровно одну попытку на
+  // приход вердикта — иначе повторный 504 крутил бы бесконечный цикл.
+  const readyRetriedRef = useRef(false)
+  useEffect(() => {
+    if (verdict?.status !== 'ready') {
+      readyRetriedRef.current = false
+      return
+    }
+    if (readyRetriedRef.current) return
+    if (result?.key !== key || result.source.status !== 'checking') return
+
+    // Вердикт приходит из /sync, то есть из внешней системы, и единственная реакция на него
+    // здесь — перезапустить запрос. Каскад ограничен ref'ом: ровно один повтор на вердикт.
+    readyRetriedRef.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- см. комментарий выше
+    retry()
+  }, [verdict?.status, result, key, retry])
 
   if (!key) return IDLE
   // Вердикт приоритетнее любого сетевого результата — актуален и тогда, когда он пришёл
   // уже после того, как сеть успела вернуть что-то другое (например, ещё не 404).
-  if (verdict?.status === 'rejected') return REJECTED
+  if (isRejected) return REJECTED
 
   return result?.key === key ? result.source : LOADING
 }

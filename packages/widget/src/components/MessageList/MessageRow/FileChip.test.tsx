@@ -171,42 +171,14 @@ describe('FileChip', () => {
     expect(cancelUpload).toHaveBeenCalledExactlyOnceWith('m1')
   })
 
-  it('kc.media.status rejected гасит чип и показывает причину сервера вместо размера', () => {
+  it('kc.media.status rejected гасит чип и показывает свой текст вместо размера', () => {
     chatStore.getState().dispatch({
       type: 'sync.received',
       cursor: 's1',
       room: {
         timeline: [],
         readMarkers: [],
-        cardAnswers: [],
-        mediaVerdicts: [
-          { mediaId: 'abc', verdict: { status: 'rejected', error: 'Файл повреждён' } },
-        ],
-        prevBatch: null,
-      },
-    })
-
-    render(
-      <FileChip
-        item={fileItem({ sendStatus: 'sent' })}
-        meta={meta}
-      />,
-    )
-
-    expect(screen.getByText('Файл повреждён')).toBeInTheDocument()
-    expect(screen.queryByText('PDF')).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: t('chat.media.download', { name: 'doc.pdf' }) }),
-    ).not.toBeInTheDocument()
-  })
-
-  it('kc.media.status rejected без текста ошибки показывает свой i18n-фолбэк', () => {
-    chatStore.getState().dispatch({
-      type: 'sync.received',
-      cursor: 's1',
-      room: {
-        timeline: [],
-        readMarkers: [],
+        reactions: [],
         cardAnswers: [],
         mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'rejected' } }],
         prevBatch: null,
@@ -221,5 +193,9 @@ describe('FileChip', () => {
     )
 
     expect(screen.getByText(t('chat.media.rejected'))).toBeInTheDocument()
+    expect(screen.queryByText('PDF')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: t('chat.media.download', { name: 'doc.pdf' }) }),
+    ).not.toBeInTheDocument()
   })
 })

@@ -43,9 +43,9 @@ export function FileChip({ item, meta }: Props) {
 
   // Причину не разворачиваем: пользователю она ничего не меняет — что делать, говорит само
   // действие рядом (повтор либо «убрать»). Различает случаи только текст aria-label кнопки.
-  // Текст отказа проверки уже написан сервером для пользователя — показываем как есть.
+  // Причины отказа проверки сервер не присылает намеренно — берём общую формулировку.
   const subline = isRejected
-    ? (verdict.error ?? t('chat.media.rejected'))
+    ? t('chat.media.rejected')
     : uploadFailed
       ? t('chat.upload.error')
       : isUploading

@@ -21,14 +21,22 @@ function makeMatrix(): MatrixService {
     disconnect: vi.fn(),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     sendFile: vi.fn().mockResolvedValue(undefined),
+    sendSticker: vi.fn().mockResolvedValue(undefined),
     sendCardAction: vi.fn().mockResolvedValue(undefined),
     downloadFile: vi.fn().mockResolvedValue(new Blob()),
     cancelUpload: vi.fn(),
     resendMessage: vi.fn().mockResolvedValue(undefined),
     markRead: vi.fn().mockResolvedValue(undefined),
+    toggleReaction: vi.fn().mockResolvedValue(undefined),
     loadMoreHistory: vi.fn().mockResolvedValue(undefined),
     stopLoadingHistory: vi.fn(),
     loadPreview: vi.fn().mockResolvedValue(new Blob()),
+    loadEmojiCatalog: vi.fn().mockResolvedValue({ version: '1', categories: [] }),
+    loadEmojiCategory: vi.fn().mockResolvedValue({ id: '', title: '', count: 0, items: [] }),
+    loadEmojiIndex: vi.fn().mockResolvedValue({ version: '1', codepointByChar: new Map() }),
+    loadEmojiAnimation: vi.fn().mockResolvedValue({}),
+    loadStickerPacks: vi.fn().mockResolvedValue([]),
+    loadStickerAnimation: vi.fn().mockResolvedValue({}),
   }
 }
 

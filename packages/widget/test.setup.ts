@@ -50,6 +50,20 @@ if (typeof URL.createObjectURL !== 'function') {
   URL.revokeObjectURL = () => {}
 }
 
+// jsdom не рисует в canvas (getContext отдаёт null), а lottie-web трогает 2d-контекст прямо
+// при импорте модуля — без заглушки падает сбор любого теста, который тянет рендер эмодзи.
+// Заглушка молча глотает вызовы: проверять нечего, а сама отрисовка в тестах мокается.
+HTMLCanvasElement.prototype.getContext = (() =>
+  new Proxy({} as Record<string, unknown>, {
+    get: (target, prop) => target[prop as string] ?? (() => {}),
+    set: (target, prop, value) => {
+      target[prop as string] = value
+      return true
+    },
+  })) as unknown as typeof HTMLCanvasElement.prototype.getContext
+
+HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,test'
+
 // jsdom не реализует ResizeObserver — нужен useAutoScroll для прилипания к низу
 // при изменении высоты контейнера (рост композера, мобильная клавиатура).
 class FakeResizeObserver implements ResizeObserver {

@@ -1,6 +1,14 @@
 import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
 import type { CardAction } from './domain/adaptiveCards'
+import type {
+  EmojiAnimation,
+  EmojiCatalog,
+  EmojiCategory,
+  EmojiIndex,
+  StickerItem,
+  StickerPack,
+} from './domain/emoji'
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService, SendFileOptions } from './matrix/matrixController'
 import type { ThumbnailSize } from './matrix/api/matrixApi'
@@ -10,14 +18,22 @@ import { chatStore } from './store/store'
 export interface ChatActions {
   sendMessage: (text: string, replyToEventId?: string) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
+  sendSticker: (sticker: StickerItem) => Promise<void>
   sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
+  loadEmojiCatalog: () => Promise<EmojiCatalog>
+  loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
+  loadEmojiIndex: () => Promise<EmojiIndex>
+  loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
+  loadStickerPacks: () => Promise<StickerPack[]>
+  loadStickerAnimation: (mediaId: string) => Promise<EmojiAnimation>
   cancelUpload: (localId: string) => void
   resendMessage: (localId: string) => Promise<void>
   replyTo: (target: ReplyTarget) => void
   cancelReply: () => void
   markRead: (eventId: string) => Promise<void>
+  toggleReaction: (targetEventId: string, key: string) => Promise<void>
   loadMoreHistory: () => Promise<void>
   stopLoadingHistory: () => void
   reconnect: () => void
@@ -48,14 +64,22 @@ export class ChatController {
     this.actions = {
       sendMessage: this.sendMessage,
       sendFile: this.sendFile,
+      sendSticker: this.sendSticker,
       sendCardAction: this.sendCardAction,
       loadPreview: this.loadPreview,
       downloadFile: this.downloadFile,
+      loadEmojiCatalog: this.loadEmojiCatalog,
+      loadEmojiCategory: this.loadEmojiCategory,
+      loadEmojiIndex: this.loadEmojiIndex,
+      loadEmojiAnimation: this.loadEmojiAnimation,
+      loadStickerPacks: this.loadStickerPacks,
+      loadStickerAnimation: this.loadStickerAnimation,
       cancelUpload: this.cancelUpload,
       resendMessage: this.resendMessage,
       replyTo: this.replyTo,
       cancelReply: this.cancelReply,
       markRead: this.markRead,
+      toggleReaction: this.toggleReaction,
       loadMoreHistory: this.loadMoreHistory,
       stopLoadingHistory: this.stopLoadingHistory,
       reconnect: this.reconnect,
@@ -101,6 +125,8 @@ export class ChatController {
   sendFile = (file: File, options?: SendFileOptions): Promise<void> =>
     this.matrix.sendFile(file, options)
 
+  sendSticker = (sticker: StickerItem): Promise<void> => this.matrix.sendSticker(sticker)
+
   sendCardAction = (cardEventId: string, action: CardAction): Promise<void> =>
     this.matrix.sendCardAction(cardEventId, action)
 
@@ -109,11 +135,29 @@ export class ChatController {
 
   downloadFile = (mxcUrl: string): Promise<Blob> => this.matrix.downloadFile(mxcUrl)
 
+  loadEmojiCatalog = (): Promise<EmojiCatalog> => this.matrix.loadEmojiCatalog()
+
+  loadEmojiCategory = (categoryId: string): Promise<EmojiCategory> =>
+    this.matrix.loadEmojiCategory(categoryId)
+
+  loadEmojiIndex = (): Promise<EmojiIndex> => this.matrix.loadEmojiIndex()
+
+  loadEmojiAnimation = (codepoint: string, version: string): Promise<EmojiAnimation> =>
+    this.matrix.loadEmojiAnimation(codepoint, version)
+
+  loadStickerPacks = (): Promise<StickerPack[]> => this.matrix.loadStickerPacks()
+
+  loadStickerAnimation = (mediaId: string): Promise<EmojiAnimation> =>
+    this.matrix.loadStickerAnimation(mediaId)
+
   cancelUpload = (localId: string): void => this.matrix.cancelUpload(localId)
 
   resendMessage = (localId: string): Promise<void> => this.matrix.resendMessage(localId)
 
   markRead = (eventId: string): Promise<void> => this.matrix.markRead(eventId)
+
+  toggleReaction = (targetEventId: string, key: string): Promise<void> =>
+    this.matrix.toggleReaction(targetEventId, key)
 
   loadMoreHistory = (): Promise<void> => this.matrix.loadMoreHistory()
 
