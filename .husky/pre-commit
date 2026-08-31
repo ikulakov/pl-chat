@@ -15,7 +15,7 @@ if ! [[ $BRANCH =~ $REGEX ]]; then
   exit 1
 fi
 
-STAGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|md)$')
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|md)$' || true)
 if [ -n "$STAGED" ]; then
   while IFS= read -r file; do
     pnpm exec prettier --write "$file"
