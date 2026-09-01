@@ -2,7 +2,9 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover обязателен на стороне хоста: env(safe-area-inset-*) внутри
+         iframe резолвится по верхнему документу вкладки (см. Integration.md §5). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>BankChat — Demo Host</title>
   </head>
   <body>
@@ -12,6 +14,31 @@
       <button id="btn-close">Close</button>
       <button id="btn-toggle">Toggle</button>
     </div>
+
+    <fieldset id="appearance-panel">
+      <legend>Appearance (хост управляет позицией/стилями контейнера)</legend>
+      <p class="hint">
+        «Применить» вызывает <code>ChatSDK.setAppearance()</code> — без перезагрузки.
+        Выбор сохраняется в localStorage, чтобы после reload отработал и init-путь.
+        Размер, скругление и тень в API не выносятся: ими владеет виджет.
+      </p>
+      <div class="appearance-grid">
+        <label>Corner
+          <select id="ap-corner">
+            <option value="bottom-right">bottom-right</option>
+            <option value="bottom-left">bottom-left</option>
+          </select>
+        </label>
+        <label>Offset X <input id="ap-offset-x" type="number" placeholder="17" /></label>
+        <label>Offset Y <input id="ap-offset-y" type="number" placeholder="80" /></label>
+        <label>Z-index <input id="ap-zindex" type="number" placeholder="2147483000" /></label>
+      </div>
+      <div>
+        <button id="ap-apply">Применить</button>
+        <button id="ap-reset">Сбросить</button>
+      </div>
+    </fieldset>
+
     <pre id="log">Log:</pre>
 
     <button id="fab" aria-label="Открыть чат поддержки" aria-expanded="false">

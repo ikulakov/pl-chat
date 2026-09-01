@@ -15,6 +15,56 @@ button {
   padding: 12px;
   font-size: 12px;
   min-height: 80px;
+  overflow: hidden;
+}
+
+#appearance-panel {
+  margin-top: 16px;
+  max-width: 640px;
+  box-sizing: border-box;
+}
+
+#appearance-panel .hint {
+  font-size: 12px;
+  color: #666;
+  margin: 4px 0 12px;
+}
+
+/* auto-fit + minmax сворачивает сетку до меньшего числа колонок на узких
+   экранах — иначе фиксированные 4 колонки распирают страницу шире вьюпорта,
+   и loader ошибочно считает хост «десктопом» (docked вместо fullscreen). */
+.appearance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px 12px;
+}
+
+.appearance-grid label,
+.appearance-raw {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.appearance-raw {
+  margin-top: 12px;
+}
+
+.appearance-grid input,
+.appearance-grid select,
+.appearance-raw textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 4px 6px;
+}
+
+.appearance-raw textarea {
+  resize: vertical;
 }
 
 #fab {

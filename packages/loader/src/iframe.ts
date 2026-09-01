@@ -1,29 +1,32 @@
 import type { ViewportMode } from '@bankchat/protocol'
 import {
-  BASE_STYLE,
-  COLLAPSED_STYLE,
-  DOCKED_STYLE,
-  FULLSCREEN_STYLE,
-  TRANSITION_STYLE,
-  type Style,
-} from './iframeStyles'
-import { HostScrollLock } from './hostScrollLock'
-import { resolveViewportMode } from './viewport'
+  resolveCollapsedStyle,
+  resolveContainerStyle,
+  type PanelAppearance,
+} from './panel/appearance'
+import { HostScrollLock } from './panel/hostScrollLock'
+import { MOBILE_MEDIA_QUERY, resolveViewportMode } from './panel/viewport'
 
 interface IframeViewOptions {
   /** URL документа виджета (с parentOrigin для READY-beacon). */
   src: string
   /** Колбэк смены docked/fullscreen при пересечении брейкпоинта ширины хоста. */
   onViewportChange?: (mode: ViewportMode) => void
+  /** Позиция/z-index/произвольные стили контейнера — управляются хостом. */
+  appearance?: PanelAppearance
 }
 
 export class IframeView {
   private iframe: HTMLIFrameElement | null = null
   private isOpen = false
-  private mode: ViewportMode = resolveViewportMode(window.innerWidth)
+  private readonly mobileQuery = window.matchMedia(MOBILE_MEDIA_QUERY)
+  private mode: ViewportMode = resolveViewportMode(this.mobileQuery.matches)
   private readonly scrollLock = new HostScrollLock()
+  private appearance: PanelAppearance
 
-  constructor(private readonly options: IframeViewOptions) {}
+  constructor(private readonly options: IframeViewOptions) {
+    this.appearance = options.appearance ?? {}
+  }
 
   get contentWindow(): Window | null {
     return this.iframe?.contentWindow ?? null
@@ -33,16 +36,16 @@ export class IframeView {
     if (this.iframe) return
 
     const iframe = document.createElement('iframe')
+    iframe.id = 'plchat-frame'
     iframe.src = this.options.src
     iframe.title = 'Bank chat'
     iframe.allow = 'clipboard-write'
     iframe.tabIndex = -1
-    Object.assign(iframe.style, BASE_STYLE, COLLAPSED_STYLE, TRANSITION_STYLE)
+    Object.assign(iframe.style, resolveCollapsedStyle(this.mode, this.appearance))
     document.body.appendChild(iframe)
     this.iframe = iframe
 
-    window.addEventListener('resize', this.onResize)
-    window.visualViewport?.addEventListener('resize', this.onVisualViewportResize)
+    this.mobileQuery.addEventListener('change', this.onViewportModeChange)
   }
 
   open(): void {
@@ -62,8 +65,13 @@ export class IframeView {
     return this.mode
   }
 
-  private onResize = (): void => {
-    const next = resolveViewportMode(window.innerWidth)
+  setAppearance(appearance: PanelAppearance): void {
+    this.appearance = appearance
+    this.render()
+  }
+
+  private onViewportModeChange = (): void => {
+    const next = resolveViewportMode(this.mobileQuery.matches)
     if (next === this.mode) return
 
     this.mode = next
@@ -71,34 +79,22 @@ export class IframeView {
     if (this.isOpen) this.render()
   }
 
-  private onVisualViewportResize = (): void => {
-    if (!this.isOpen || !this.iframe || this.mode !== 'fullscreen') return
-
-    const vv = window.visualViewport
-    if (!vv) return
-
-    this.iframe.style.height = `${vv.height}px`
-    this.iframe.style.top = `${vv.offsetTop}px`
-  }
-
   private render(): void {
     if (!this.iframe) return
+    this.iframe.style.cssText = ''
+
     if (!this.isOpen) {
       this.scrollLock.unlock()
-      Object.assign(this.iframe.style, {
-        ...COLLAPSED_STYLE,
-        transform: this.mode === 'fullscreen' ? 'translateY(100%)' : 'scale(0.95)',
-      } as Style)
+      Object.assign(this.iframe.style, resolveCollapsedStyle(this.mode, this.appearance))
       return
     }
 
-    const placement = this.mode === 'fullscreen' ? FULLSCREEN_STYLE : DOCKED_STYLE
     Object.assign(this.iframe.style, {
-      ...placement,
+      ...resolveContainerStyle(this.mode, this.appearance),
       opacity: '1',
       pointerEvents: 'auto',
       transform: 'none',
-    } as Style)
+    })
 
     if (this.mode === 'fullscreen') this.scrollLock.lock()
     else this.scrollLock.unlock()

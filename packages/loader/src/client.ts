@@ -11,6 +11,7 @@ import {
 } from '@bankchat/protocol'
 import { chatOrigin, validateConfig, widgetUrl, type LoaderConfig } from './config'
 import { IframeView } from './iframe'
+import type { PanelAppearance } from './panel/appearance'
 
 type EventHandler = (payload: unknown) => void
 
@@ -34,6 +35,7 @@ export class BankChatClient {
     this.iframe = new IframeView({
       src: widgetUrl(config, parentOrigin),
       onViewportChange: this.handleViewportChange,
+      ...(config.appearance !== undefined && { appearance: config.appearance }),
     })
     this.iframe.mount()
 
@@ -56,6 +58,17 @@ export class BankChatClient {
   toggle(): void {
     this.send({ type: 'TOGGLE' })
   }
+  setAppearance(appearance: PanelAppearance): void {
+    if (!this.config || !this.iframe) {
+      console.warn('[BankChat] setAppearance before init() — ignored')
+      return
+    }
+
+    const merged: PanelAppearance = { ...this.config.appearance, ...appearance }
+    this.config = { ...this.config, appearance: merged }
+    this.iframe.setAppearance(merged)
+  }
+
   private handleViewportChange = (mode: ViewportMode): void => {
     this.send({ type: 'SET_VIEWPORT', payload: { mode } })
   }

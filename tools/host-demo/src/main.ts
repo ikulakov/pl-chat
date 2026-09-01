@@ -1,5 +1,6 @@
 import './main.css'
 import { ChatSDK } from '@bankchat/loader'
+import { initAppearancePanel, loadStoredAppearance } from './appearancePanel'
 
 const log = document.getElementById('log')!
 
@@ -11,9 +12,15 @@ function append(msg: string): void {
 
 append('BankChat Demo Host')
 
+const appearance = loadStoredAppearance()
+if (appearance) append(`appearance из localStorage: ${JSON.stringify(appearance)}`)
+
 ChatSDK.init({
   chatUrl: 'http://localhost:5174',
+  ...(appearance && { appearance }),
 })
+
+initAppearancePanel(append)
 
 const fab = document.getElementById('fab')!
 const fabBadge = document.getElementById('fab-badge')!

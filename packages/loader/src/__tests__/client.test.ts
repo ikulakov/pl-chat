@@ -6,11 +6,14 @@ const CHAT_ORIGIN = 'http://localhost:5174'
 
 const mockContentWindow = { postMessage: vi.fn() }
 
+const mockSetAppearance = vi.fn()
+
 vi.mock('../iframe', () => ({
   IframeView: vi.fn().mockImplementation(() => ({
     mount: vi.fn(),
     open: vi.fn(),
     close: vi.fn(),
+    setAppearance: mockSetAppearance,
     getViewportMode: vi.fn().mockReturnValue('docked'),
     get contentWindow() {
       return mockContentWindow
@@ -123,5 +126,42 @@ describe('BankChatClient — command queue', () => {
     expect(portSend).toHaveBeenCalledTimes(2)
     expect(portSend.mock.calls[0][0].msg.type).toBe('OPEN')
     expect(portSend.mock.calls[1][0].msg.type).toBe('CLOSE')
+  })
+})
+
+describe('BankChatClient.setAppearance', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // Позиция контейнера не едет по протоколу, поэтому смена не должна ждать INIT_ACK:
+  // иначе хост не сможет подвинуть панель, пока виджет ещё грузится.
+  it('applies without waiting for the handshake', () => {
+    const client = new BankChatClient()
+    client.init({ chatUrl: CHAT_ORIGIN })
+
+    client.setAppearance({ offsetY: 160 })
+
+    expect(mockSetAppearance).toHaveBeenCalledWith({ offsetY: 160 })
+  })
+
+  it('merges over the appearance given at init', () => {
+    const client = new BankChatClient()
+    client.init({ chatUrl: CHAT_ORIGIN, appearance: { corner: 'bottom-left', offsetY: 80 } })
+
+    client.setAppearance({ offsetY: 160 })
+
+    expect(mockSetAppearance).toHaveBeenCalledWith({ corner: 'bottom-left', offsetY: 160 })
+  })
+
+  it('ignores the call before init instead of throwing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const client = new BankChatClient()
+
+    client.setAppearance({ offsetY: 160 })
+
+    expect(mockSetAppearance).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 })

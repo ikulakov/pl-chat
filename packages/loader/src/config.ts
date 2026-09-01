@@ -1,9 +1,12 @@
 import { type InitConfig } from '@bankchat/protocol'
+import type { PanelAppearance } from './panel/appearance'
 
 // Публичный конфиг, который хост передаёт в ChatSDK.init()
 export interface LoaderConfig extends Omit<InitConfig, 'viewport'> {
   /** Источник истины для origin и URL виджета, напр. https://chat.bank.com */
   chatUrl: string
+  /** Позиция и слой контейнера виджета на странице хоста. */
+  appearance?: PanelAppearance
 }
 
 export function validateConfig(cfg: LoaderConfig): void {

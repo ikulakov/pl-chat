@@ -1,54 +1,73 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { IframeView } from '../iframe'
-import { MOBILE_BREAKPOINT_PX } from '../viewport'
 
-function setInnerWidth(width: number): void {
-  Object.defineProperty(window, 'innerWidth', { value: width, configurable: true })
+// jsdom не реализует matchMedia — подкладываем управляемый дубль: `matches`
+// читается геттером, а emitMobileChange меняет его и шлёт 'change' (как реальный
+// MediaQueryList при пересечении брейкпоинта).
+let mobileMatches = false
+let mobileQuery: EventTarget
+
+function setMobile(matches: boolean): void {
+  mobileMatches = matches
 }
 
-// jsdom не реализует VisualViewport вовсе — подкладываем минимальный дубль
-// (EventTarget + height/offsetTop), которого достаточно для onVisualViewportResize.
-function installFakeVisualViewport(height: number, offsetTop = 0): VisualViewport {
-  const target = new EventTarget() as unknown as VisualViewport
-  Object.defineProperty(target, 'height', { value: height, configurable: true })
-  Object.defineProperty(target, 'offsetTop', { value: offsetTop, configurable: true })
-  Object.defineProperty(window, 'visualViewport', { value: target, configurable: true })
-  return target
+function emitMobileChange(matches: boolean): void {
+  mobileMatches = matches
+  mobileQuery.dispatchEvent(new Event('change'))
+}
+
+// HostScrollLock вешает touchmove-листенер на document; вьюшки, открытые в
+// fullscreen и не закрытые явно, оставляют его между тестами. Трекаем и закрываем
+// все созданные вьюшки в afterEach — close() снимает lock (и листенер).
+const views: IframeView[] = []
+
+function createView(options: ConstructorParameters<typeof IframeView>[0]): IframeView {
+  const view = new IframeView(options)
+  views.push(view)
+  return view
 }
 
 beforeEach(() => {
-  setInnerWidth(1440)
+  mobileMatches = false
+  mobileQuery = new EventTarget()
+  Object.defineProperty(mobileQuery, 'matches', { get: () => mobileMatches, configurable: true })
+  window.matchMedia = vi
+    .fn()
+    .mockReturnValue(
+      mobileQuery as unknown as MediaQueryList,
+    ) as unknown as typeof window.matchMedia
   // jsdom не реализует window.focus() — IframeView.open() безусловно дёргает его
   // на contentWindow; глушим, чтобы не засорять вывод теста "Not implemented" ошибкой.
   vi.spyOn(HTMLIFrameElement.prototype, 'contentWindow', 'get').mockReturnValue(null)
 })
 
 afterEach(() => {
+  views.forEach((view) => view.close())
+  views.length = 0
   document.querySelectorAll('iframe').forEach((el) => el.remove())
   document.body.style.overflow = ''
   document.documentElement.style.overflow = ''
-  Reflect.deleteProperty(window, 'visualViewport')
   vi.restoreAllMocks()
 })
 
 describe('IframeView — mobile fullscreen placement', () => {
   it('picks docked mode on a desktop-width host', () => {
-    setInnerWidth(1440)
-    const view = new IframeView({ src: 'about:blank' })
+    setMobile(false)
+    const view = createView({ src: 'about:blank' })
 
     expect(view.getViewportMode()).toBe('docked')
   })
 
   it('picks fullscreen mode on a phone-width host', () => {
-    setInnerWidth(375)
-    const view = new IframeView({ src: 'about:blank' })
+    setMobile(true)
+    const view = createView({ src: 'about:blank' })
 
     expect(view.getViewportMode()).toBe('fullscreen')
   })
 
   it('sizes the iframe edge-to-edge (100dvh) when open in fullscreen mode', () => {
-    setInnerWidth(375)
-    const view = new IframeView({ src: 'about:blank' })
+    setMobile(true)
+    const view = createView({ src: 'about:blank' })
     view.mount()
 
     view.open()
@@ -59,14 +78,13 @@ describe('IframeView — mobile fullscreen placement', () => {
   })
 
   it('resets docked width to full-bleed when crossing into fullscreen while open', () => {
-    setInnerWidth(1440)
-    const view = new IframeView({ src: 'about:blank' })
+    setMobile(false)
+    const view = createView({ src: 'about:blank' })
     view.mount()
     view.open()
     expect(document.querySelector('iframe')!.style.width).toBe('444px')
 
-    setInnerWidth(375)
-    window.dispatchEvent(new Event('resize'))
+    emitMobileChange(true)
 
     const iframe = document.querySelector('iframe')!
     expect(iframe.style.width).toBe('100%')
@@ -74,8 +92,8 @@ describe('IframeView — mobile fullscreen placement', () => {
   })
 
   it('locks host body scroll while open in fullscreen, restores on close', () => {
-    setInnerWidth(375)
-    const view = new IframeView({ src: 'about:blank' })
+    setMobile(true)
+    const view = createView({ src: 'about:blank' })
     view.mount()
 
     view.open()
@@ -86,8 +104,8 @@ describe('IframeView — mobile fullscreen placement', () => {
   })
 
   it('does not lock host body scroll when docked', () => {
-    setInnerWidth(1440)
-    const view = new IframeView({ src: 'about:blank' })
+    setMobile(false)
+    const view = createView({ src: 'about:blank' })
     view.mount()
 
     view.open()
@@ -95,46 +113,55 @@ describe('IframeView — mobile fullscreen placement', () => {
     expect(document.body.style.overflow).not.toBe('hidden')
   })
 
-  it('notifies onViewportChange when a resize crosses the breakpoint', () => {
-    setInnerWidth(1440)
+  it('notifies onViewportChange when the media query crosses the breakpoint', () => {
+    setMobile(false)
     const onViewportChange = vi.fn()
-    const view = new IframeView({ src: 'about:blank', onViewportChange })
+    const view = createView({ src: 'about:blank', onViewportChange })
     view.mount()
 
-    setInnerWidth(MOBILE_BREAKPOINT_PX - 1)
-    window.dispatchEvent(new Event('resize'))
+    emitMobileChange(true)
 
     expect(onViewportChange).toHaveBeenCalledTimes(1)
     expect(onViewportChange).toHaveBeenCalledWith('fullscreen')
     expect(view.getViewportMode()).toBe('fullscreen')
   })
 
-  it('does not notify when resize stays within the same mode', () => {
-    setInnerWidth(1440)
+  it('does not notify when a change event keeps the same mode', () => {
+    setMobile(false)
     const onViewportChange = vi.fn()
-    const view = new IframeView({ src: 'about:blank', onViewportChange })
+    const view = createView({ src: 'about:blank', onViewportChange })
     view.mount()
 
-    setInnerWidth(1920)
-    window.dispatchEvent(new Event('resize'))
+    emitMobileChange(false)
 
     expect(onViewportChange).not.toHaveBeenCalled()
   })
 
-  it('slides down on close in fullscreen, scales down when docked', () => {
-    setInnerWidth(375)
-    const mobile = new IframeView({ src: 'about:blank' })
+  it('opens/closes instantly in fullscreen (no animation), scales when docked', () => {
+    setMobile(true)
+    const mobile = createView({ src: 'about:blank' })
     mobile.mount()
     mobile.open()
     mobile.close()
-    expect(document.querySelector('iframe')!.style.transform).toBe('translateY(100%)')
+    const iframe = document.querySelector('iframe')!
+    expect(iframe.style.transform).toBe('none')
+    expect(iframe.style.transition).toBe('none')
+  })
+
+  it('scales down on close when docked', () => {
+    setMobile(false)
+    const view = createView({ src: 'about:blank' })
+    view.mount()
+    view.open()
+    view.close()
+    expect(document.querySelector('iframe')!.style.transform).toBe('scale(0.95)')
   })
 })
 
 describe('IframeView — iOS scroll lock', () => {
   it('locks html overflow in addition to body, restores on close', () => {
-    setInnerWidth(375)
-    const view = new IframeView({ src: 'about:blank' })
+    setMobile(true)
+    const view = createView({ src: 'about:blank' })
     view.mount()
 
     view.open()
@@ -145,8 +172,8 @@ describe('IframeView — iOS scroll lock', () => {
   })
 
   it('blocks touchmove while locked, stops blocking after close', () => {
-    setInnerWidth(375)
-    const view = new IframeView({ src: 'about:blank' })
+    setMobile(true)
+    const view = createView({ src: 'about:blank' })
     view.mount()
 
     view.open()
@@ -161,45 +188,41 @@ describe('IframeView — iOS scroll lock', () => {
   })
 })
 
-describe('IframeView — keyboard-aware fullscreen sizing', () => {
-  it('shrinks to visualViewport height/offset when the keyboard opens', () => {
-    setInnerWidth(375)
-    const vv = installFakeVisualViewport(667)
-    const view = new IframeView({ src: 'about:blank' })
+describe('IframeView.setAppearance — рантайм-смена позиции', () => {
+  it('repositions an already open panel', () => {
+    setMobile(false)
+    const view = createView({ src: 'about:blank', appearance: { offsetY: 80 } })
     view.mount()
     view.open()
+    expect(document.querySelector('iframe')!.style.inset).toBe('auto 17px 80px auto')
 
-    Object.defineProperty(vv, 'height', { value: 320, configurable: true })
-    Object.defineProperty(vv, 'offsetTop', { value: 12, configurable: true })
-    vv.dispatchEvent(new Event('resize'))
+    view.setAppearance({ offsetY: 160, corner: 'bottom-left' })
 
+    expect(document.querySelector('iframe')!.style.inset).toBe('auto auto 160px 17px')
+  })
+
+  it('keeps the collapsed box anchored to the new corner while closed', () => {
+    setMobile(false)
+    const view = createView({ src: 'about:blank' })
+    view.mount()
+
+    view.setAppearance({ corner: 'bottom-left' })
+
+    expect(document.querySelector('iframe')!.style.inset).toBe('auto auto 0px 0px')
+  })
+
+  // Наборы свойств у состояний не совпадают: раскрытая docked-панель пишет
+  // borderRadius/boxShadow, свёрнутая — нет. Без сброса cssText они бы на ней оседали.
+  it('leaves no styles from the previous state when collapsing', () => {
+    setMobile(false)
+    const view = createView({ src: 'about:blank' })
+    view.mount()
     const iframe = document.querySelector('iframe')!
-    expect(iframe.style.height).toBe('320px')
-    expect(iframe.style.top).toBe('12px')
-  })
+    const freshCollapsed = iframe.style.cssText
 
-  it('ignores visualViewport resize when docked', () => {
-    setInnerWidth(1440)
-    const vv = installFakeVisualViewport(900)
-    const view = new IframeView({ src: 'about:blank' })
-    view.mount()
     view.open()
+    view.close()
 
-    Object.defineProperty(vv, 'height', { value: 300, configurable: true })
-    vv.dispatchEvent(new Event('resize'))
-
-    expect(document.querySelector('iframe')!.style.height).toBe('656px')
-  })
-
-  it('ignores visualViewport resize while closed', () => {
-    setInnerWidth(375)
-    const vv = installFakeVisualViewport(667)
-    const view = new IframeView({ src: 'about:blank' })
-    view.mount()
-
-    Object.defineProperty(vv, 'height', { value: 320, configurable: true })
-    vv.dispatchEvent(new Event('resize'))
-
-    expect(document.querySelector('iframe')!.style.height).toBe('0px')
+    expect(iframe.style.cssText).toBe(freshCollapsed)
   })
 })

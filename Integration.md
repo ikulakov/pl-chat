@@ -1,70 +1,29 @@
-# Интеграция BankChat на хост-страницу
+# Подключение BankChat
 
-## Подключение
-
-Добавьте скрипт в конец `<body>`:
+## 1. Вставьте на страницу
 
 ```html
 <script
   src="https://chat.bank.ru/loader.js"
   defer
 ></script>
-```
-
-## Инициализация
-
-Вызовите `ChatSDK.init()` после загрузки скрипта:
-
-```js
-window.addEventListener('load', () => {
-  ChatSDK.init({
-    chatUrl: 'https://chat.bank.ru',
+<script>
+  window.addEventListener('load', () => {
+    ChatSDK.init({ chatUrl: 'https://chat.bank.ru' })
   })
-})
+</script>
 ```
 
-`init` идемпотентен — повторные вызовы игнорируются.
+Всё. Виджет готов, панель откроется по `ChatSDK.open()`.
 
-## Управление виджетом
+## 2. Добавьте свою кнопку
 
-```js
-ChatSDK.open() // открыть
-ChatSDK.close() // закрыть
-ChatSDK.toggle() // переключить
-```
-
-## События
-
-```js
-ChatSDK.on('INIT_ACK', () => {
-  // handshake завершён, виджет готов принимать команды
-})
-
-ChatSDK.on('OPENED', () => {
-  // виджет открылся — скройте свою FAB-кнопку или поменяйте иконку
-})
-
-ChatSDK.on('CLOSED', () => {
-  // виджет закрылся — восстановите FAB-кнопку
-})
-```
-
-`on()` возвращает функцию отписки:
-
-```js
-const off = ChatSDK.on('OPENED', handler)
-off() // отписаться
-```
-
-## Пример FAB-кнопки
-
-Виджет позиционируется в правом нижнем углу экрана (`bottom: 24px, right: 24px`).
-Разместите кнопку там же:
+Кнопку рисует хост — своей вёрсткой, в своём месте.
 
 ```html
 <button
   id="chat-fab"
-  aria-label="Открыть чат поддержки"
+  aria-label="Чат поддержки"
 >
   💬
 </button>
@@ -72,50 +31,92 @@ off() // отписаться
 <style>
   #chat-fab {
     position: fixed;
-    bottom: 24px;
     right: 24px;
+    bottom: 24px;
+    z-index: 2147483000;
     width: 56px;
     height: 56px;
+    border: 0;
     border-radius: 50%;
     background: #a06ec5;
-    border: none;
     cursor: pointer;
-    z-index: 9999;
   }
 </style>
 
 <script>
-  document.getElementById('chat-fab').addEventListener('click', () => {
-    ChatSDK.toggle()
-  })
+  document.getElementById('chat-fab').onclick = () => ChatSDK.toggle()
 </script>
 ```
 
-## Требования к хосту
+## 3. Методы
 
-| Требование         | Детали                                                                                    |
-| ------------------ | ----------------------------------------------------------------------------------------- |
-| HTTPS              | `chatUrl` должен быть `https://`                                                          |
-| Разрешённый origin | `chat.bank.ru` должен разрешить ваш домен через `VITE_ALLOWED_PARENTS` на стороне сервера |
+```js
+ChatSDK.init(config) // идемпотентен, вызывать один раз
+ChatSDK.open()
+ChatSDK.close()
+ChatSDK.toggle()
+ChatSDK.setAppearance({ offsetY: 160 })
+ChatSDK.on(event, handler) // возвращает функцию отписки
+```
 
-## Next.js
+Команды можно звать сразу после `init()` — они выполнятся, когда виджет загрузится.
 
-```tsx
-import Script from 'next/script'
+## 4. События
 
-export default function Layout({ children }) {
-  return (
-    <>
-      {children}
-      <Script
-        src="https://chat.bank.ru/loader.js"
-        strategy="afterInteractive"
-      />
-    </>
-  )
+```js
+ChatSDK.on('INIT_ACK', () => {}) // виджет готов
+ChatSDK.on('OPENED', () => {}) // панель открылась
+ChatSDK.on('CLOSED', () => {}) // панель закрылась
+```
+
+## 5. Позиция панели
+
+По умолчанию — правый нижний угол, выше кнопки. Меняется на `init()` или в любой момент через `ChatSDK.setAppearance()`.
+
+```js
+ChatSDK.init({
+  chatUrl: 'https://chat.bank.ru',
+  appearance: { corner: 'bottom-left', offsetX: 24, offsetY: 96 },
+})
+```
+
+| Поле      | Тип                               | По умолчанию   | Что задаёт                      |
+| --------- | --------------------------------- | -------------- | ------------------------------- |
+| `corner`  | `'bottom-right' \| 'bottom-left'` | `bottom-right` | Угол экрана                     |
+| `offsetX` | `number` (px)                     | `17`           | Отступ сбоку                    |
+| `offsetY` | `number` (px)                     | `80`           | Отступ снизу — место под кнопку |
+| `zIndex`  | `number`                          | `2147483000`   | Слой панели                     |
+
+`setAppearance()` мержит поверх текущего конфига — передавайте только то, что меняете:
+
+```js
+cookieBanner.on('show', () => ChatSDK.setAppearance({ offsetY: 160 }))
+cookieBanner.on('hide', () => ChatSDK.setAppearance({ offsetY: 80 }))
+```
+
+Размер, скругление и тень панели не настраиваются — виджет вёрстан под свои габариты.
+Если нужна вёрстка за пределами полей выше, у контейнера есть стабильный селектор
+`#bankchat-frame`. Стили на нём инлайновые, поэтому потребуется `!important`.
+
+```css
+#bankchat-frame {
+  width: 50vw !important;
 }
 ```
 
-## Безопасность
+## 6. Мобильный режим
 
-- Виджет живёт на отдельном origin — полная изоляция через same-origin policy.
+Уже ниже 480px панель сама разворачивается на весь экран. `corner` и отступы там не применяются, работает только `zIndex`. Скройте свою кнопку по `OPENED` — она окажется под панелью.
+
+## 7. Требования
+
+- `chatUrl` — только `https://`.
+- Ваш домен должен быть в allowlist на стороне команды чата — иначе виджет не запустится.
+- В `<meta name="viewport">` вашей страницы нужен `viewport-fit=cover` — иначе на iPhone поедут отступы под чёлку:
+
+  ```html
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  ```
