@@ -51,7 +51,6 @@ export function ImageMessage({ item, meta, reply, reactions }: Props) {
           <span className={styles.meta}>
             <BubbleMeta
               {...meta}
-              inline
               isStatusHidden={isStatusHidden}
             />
           </span>

@@ -5,3 +5,7 @@
   justify-content: center;
   align-items: center;
 }
+
+.failed {
+  color: var(--meta-own-color, var(--c-text-invert));
+}

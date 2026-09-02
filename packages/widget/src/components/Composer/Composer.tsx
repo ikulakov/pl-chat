@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { replyAuthorLabel } from '../../domain/reply'
 import { useChatActions } from '../../hooks/useChatActions'
 import { useChatStore } from '../../hooks/useChatStore'
 import { t } from '../../i18n'
 import { IconButton } from '../../shared/ui/IconButton'
-import { CloseIcon, SendIcon } from '../../shared/ui/icons'
+import { CloseIcon, FailedIcon, SendIcon } from '../../shared/ui/icons'
+import { cn } from '../../shared/utils/cn'
 import { selectReplyTarget, selectUserId } from '../../store/selectors'
 import { useAttachment } from '../Attachment/AttachmentContext'
 import { ReplyPreview } from '../ReplyPreview'
@@ -12,7 +13,7 @@ import { AttachmentPreview } from './AttachmentPreview'
 import styles from './Composer.module.css'
 import { EmojiPickerButton } from './EmojiPicker/EmojiPickerButton'
 import { FilePickerButton } from './FilePickerButton'
-import { MessageTextarea } from './MessageTextarea'
+import { MAX_MESSAGE_LENGTH, MessageTextarea } from './MessageTextarea'
 
 export function Composer() {
   const [text, setText] = useState('')
@@ -23,16 +24,6 @@ export function Composer() {
   const userId = useChatStore(selectUserId)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const pendingCaretRef = useRef<number | null>(null)
-
-  // Каретку ставим после коммита нового value — только тогда позиция считается от новой строки.
-  useLayoutEffect(() => {
-    const caret = pendingCaretRef.current
-    if (caret === null) return
-
-    pendingCaretRef.current = null
-    textareaRef.current?.setSelectionRange(caret, caret)
-  }, [text])
 
   // фокус в поле ввода при выборе "Ответить" в ленте
   useEffect(() => {
@@ -40,9 +31,13 @@ export function Composer() {
   }, [replyTarget])
 
   const trimmed = text.trim()
-  const canSend = !attachment.pending?.error && (trimmed.length > 0 || attachment.pending !== null)
+  const charsOverLimit = trimmed.length - MAX_MESSAGE_LENGTH
+  const isTooLong = charsOverLimit > 0
+  const hasContent = trimmed.length > 0 || attachment.pending !== null
   // файл прикреплён и прошёл валидацию — второй пока нельзя выбрать
   const hasValidAttachment = attachment.pending !== null && !attachment.pending.error
+
+  const canSend = hasContent && !isTooLong && !attachment.pending?.error
 
   /**
    * Вставка эмодзи по каретке, а не в конец: пользователь мог поставить курсор в середину
@@ -50,19 +45,11 @@ export function Composer() {
    */
   function insertEmoji(char: string) {
     const textarea = textareaRef.current
-    const start = textarea?.selectionStart ?? text.length
-    const end = textarea?.selectionEnd ?? text.length
+    if (!textarea) return
 
-    // Позицию каретки браузер сам не сдвинет: значение приходит извне, а не из ввода.
-    // Восстанавливаем её в layout-эффекте ниже, а не микротаском: React 19 выполняет
-    // апдейтер сразу, в момент dispatchSetState, и планирует свой коммит уже после — так что
-    // микротаск успел бы отработать на ещё старом value, а последующее присваивание
-    // node.value по спецификации HTML унесло бы курсор в конец.
-    pendingCaretRef.current = start + char.length
-    setText((prev) => prev.slice(0, start) + char + prev.slice(end))
-
-    // Панель остаётся открытой — подряд набрать несколько эмодзи должно быть можно.
-    textarea?.focus()
+    textarea.focus()
+    textarea.setRangeText(char, textarea.selectionStart, textarea.selectionEnd, 'end')
+    setText(textarea.value)
   }
 
   function submit() {
@@ -105,7 +92,7 @@ export function Composer() {
         </div>
       )}
 
-      <div className={styles.field}>
+      <div className={cn(styles.field, isTooLong && styles.error)}>
         <div className={styles.main}>
           <FilePickerButton
             disabled={hasValidAttachment}
@@ -137,6 +124,16 @@ export function Composer() {
           </div>
         </div>
       </div>
+
+      {isTooLong && (
+        <p
+          className={styles.limitError}
+          role="alert"
+        >
+          <FailedIcon />
+          {t('composer.tooLong', { count: charsOverLimit })}
+        </p>
+      )}
     </div>
   )
 }

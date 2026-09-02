@@ -38,10 +38,7 @@ export function EmojiMessage({ segments, layout, version, meta }: Props) {
       )}
 
       <span className={styles.meta}>
-        <BubbleMeta
-          {...meta}
-          inline
-        />
+        <BubbleMeta {...meta} />
       </span>
     </div>
   )

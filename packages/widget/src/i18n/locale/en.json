@@ -65,6 +65,7 @@
   "composer.upload.progress": "{percent}%",
   "composer.upload.badType": "File format is not supported",
   "composer.upload.tooLarge": "File is too large",
+  "composer.tooLong": "Message can't be sent. Extra characters: {count}",
   "chat.upload.error": "Error",
   "picker.tab.emoji": "Emoji",
   "picker.tab.stickers": "Stickers",

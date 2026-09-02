@@ -5,12 +5,12 @@
   /* обтекание последней строкой текста абзаца */
   float: right;
   margin-left: 8px;
-  margin-top: 4px;
   align-self: end;
+  height: 18px;
 }
 
-.inline {
-  margin-top: 0;
+.metaOwn {
+  color: var(--meta-own-color, var(--c-text-invert-dim));
 }
 
 .time {
@@ -22,11 +22,8 @@
   min-width: 28px;
   white-space: nowrap;
   flex-shrink: 0;
-}
 
-/* Инвертированное белое — для времени на тёмном пузыре своего сообщения. Мета вне пузыря
-   (пилюля у стикера и «большого эмодзи») переопределяет `--meta-own-color`: на светлой
-   подложке белое не читается. */
-.timeOwn {
-  color: var(--meta-own-color, var(--c-text-invert-dim));
+  .metaOwn & {
+    color: inherit;
+  }
 }

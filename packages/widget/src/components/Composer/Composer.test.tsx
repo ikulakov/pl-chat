@@ -6,6 +6,7 @@ import { makeFile } from '../../shared/testUtils/matrixFixtures'
 import { chatStore, INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '../../store/store'
 import { AttachmentProvider } from '../Attachment/AttachmentProvider'
 import { Composer } from './Composer'
+import { MAX_MESSAGE_LENGTH } from './MessageTextarea'
 
 const sendMessage = vi.fn()
 const sendFile = vi.fn()
@@ -76,6 +77,25 @@ describe('Composer — семантика отправки', () => {
     typeThenEnter('   ')
 
     expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('текст сверх лимита не отправляется, а в ошибке видно, на сколько символов перебор', () => {
+    render(<Composer />, { wrapper: AttachmentProvider })
+
+    typeThenEnter('я'.repeat(MAX_MESSAGE_LENGTH + 5))
+
+    expect(sendMessage).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: t('input.send') })).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Лишних символов: 5')
+  })
+
+  it('ровно лимит отправляется', () => {
+    render(<Composer />, { wrapper: AttachmentProvider })
+
+    typeThenEnter('я'.repeat(MAX_MESSAGE_LENGTH))
+
+    expect(sendMessage).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('неподдерживаемый тип виден в превью с ошибкой и не отправляется', async () => {
@@ -264,7 +284,8 @@ describe('Composer — семантика отправки', () => {
     it('каретка встаёт после вставленного символа', async () => {
       const textarea = selectEmojiAt('абвгд', 2)
 
-      // Позицию возвращаем в микротаске — после того, как React применил новое value.
+      // Каретку ставит сам setRangeText, но проверяем после коммита React: важно, что он
+      // не переписал value и не сбил её.
       await act(async () => {})
 
       // Эмодзи занимает 2 code unit в UTF-16 — каретка ожидается на 4, а не на 3.

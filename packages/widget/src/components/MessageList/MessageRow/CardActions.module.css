@@ -3,11 +3,15 @@
   flex-wrap: wrap;
   gap: 4px;
   width: 100%;
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .chip {
-  flex: 1 1 188px;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: min(188px, 100%);
+  max-width: 100%;
   padding: 11px 16px;
   background: var(--c-surface-secondary);
   border-radius: var(--radius-sm);
@@ -36,18 +40,6 @@
 
   &.chosen {
     background: var(--c-neutral);
-  }
-
-  /* «одна из последних двух» n: 
-     при чётном total это предпоследняя (левый край пары), 
-     при нечётном единственная кнопка в своём ряду (нечётная позиция всегда у одиночных) 
-     */
-  &:nth-last-of-type(-n + 2):nth-of-type(odd) {
-    border-bottom-left-radius: var(--radius-lg);
-  }
-
-  &:nth-last-of-type(1) {
-    border-bottom-right-radius: var(--radius-lg);
   }
 }
 

@@ -70,7 +70,6 @@ export function FileChip({ item, meta }: Props) {
         {!hasCaption && (
           <BubbleMeta
             {...meta}
-            inline
             isStatusHidden={isStatusHidden}
           />
         )}

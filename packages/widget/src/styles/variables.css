@@ -25,6 +25,7 @@
   --c-border: #f3f4f6;
   --c-scrollbar: #e2e4e6;
   --c-neutral: #dedfe1;
+  --c-error-border: #f7d7cf;
 
   /* Оттенок подложки иконки (адаптируется к currentColor) */
   --c-icon-tint: color-mix(in srgb, currentColor 12%, transparent);

@@ -111,13 +111,12 @@ describe('MessageList', () => {
     })
 
     const { container } = render(<MessageList userId={ME} />)
-    const ticks = container.querySelectorAll('[data-role="message-bubble"] svg')
 
-    // оба тика (включая ранний $a) — фиолетовые: порог покрывает всё ≤ ts($b)
-    expect(ticks).toHaveLength(2)
-    ticks.forEach((svg) => {
-      expect((svg as SVGElement).style.color).toBe('var(--c-purple-light)')
-    })
+    // оба сообщения (включая ранний $a) — с двойной галочкой: порог покрывает всё ≤ ts($b)
+    expect(
+      container.querySelectorAll('[data-role="message-bubble"] [data-read="true"]'),
+    ).toHaveLength(2)
+    expect(container.querySelectorAll('[data-read="false"]')).toHaveLength(0)
   })
 
   it('marks only operator messages as receipt candidates, never own ones (incl. optimistic drafts)', () => {
@@ -141,6 +140,32 @@ describe('MessageList', () => {
     const candidates = [...container.querySelectorAll('[data-receipt-id]')]
 
     expect(candidates.map((el) => el.getAttribute('data-receipt-id'))).toEqual(['$op'])
+  })
+
+  it('linkifies operator messages only — own text stays plain, even if it looks like a link', () => {
+    const ts = new Date('2026-07-01T10:00:00').getTime()
+
+    chatStore.setState({
+      room: {
+        ...INITIAL_ROOM_STATE,
+        timeline: [
+          message({
+            localId: 'a',
+            eventId: '$op',
+            sender: '@op:bank',
+            ts,
+            body: 'см. https://bank.ru',
+          }),
+          message({ localId: 'b', eventId: '$own', sender: ME, ts, body: 'см. https://bank.ru' }),
+        ],
+      },
+    })
+
+    const { container } = render(<MessageList userId={ME} />)
+    const links = [...container.querySelectorAll('a')]
+
+    expect(links.map((el) => el.getAttribute('href'))).toEqual(['https://bank.ru'])
+    expect(screen.getAllByText(/см\./)).toHaveLength(2)
   })
 
   it('history has no retry button — recovery is scroll-driven, spinner only while loading', () => {

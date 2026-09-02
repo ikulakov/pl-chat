@@ -1,6 +1,6 @@
 import type { SendStatus } from '../../../domain/timeline'
 import { Spinner } from '../../../shared/ui/Spinner'
-import { ChecksIcon, FailedIcon } from '../../../shared/ui/icons'
+import { CheckmarkDoubleIcon, CheckmarkIcon, FailedIcon } from '../../../shared/ui/icons'
 import styles from './SendStatusIcon.module.css'
 
 interface Props {
@@ -17,13 +17,7 @@ export function SendStatusIcon({ sendStatus: status, isRead }: Props) {
     )
   }
   if (status === 'failed') {
-    return <FailedIcon />
+    return <FailedIcon className={styles.failed} />
   }
-  // Непрочитанные галочки — той же переменной, что и время: на пилюле поверх ленты белое
-  // сливается с подложкой, см. BubbleMeta.module.css.
-  return (
-    <ChecksIcon
-      color={isRead ? 'var(--c-purple-light)' : 'var(--meta-own-color, var(--c-text-invert-dim))'}
-    />
-  )
+  return isRead ? <CheckmarkDoubleIcon data-read="true" /> : <CheckmarkIcon data-read="false" />
 }

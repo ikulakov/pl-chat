@@ -65,6 +65,7 @@
   "composer.upload.progress": "{percent}%",
   "composer.upload.badType": "Формат файла не поддерживается",
   "composer.upload.tooLarge": "Файл слишком большой",
+  "composer.tooLong": "Не можем отправить сообщение. Лишних символов: {count}",
   "chat.upload.error": "Ошибка",
   "picker.tab.emoji": "Эмодзи",
   "picker.tab.stickers": "Стикеры",

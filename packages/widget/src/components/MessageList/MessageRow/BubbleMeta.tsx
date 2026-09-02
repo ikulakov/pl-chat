@@ -12,14 +12,13 @@ export interface BubbleMetaData {
 }
 
 interface Props extends BubbleMetaData {
-  inline?: boolean
   isStatusHidden?: boolean
 }
 
-export function BubbleMeta({ ts, own, sendStatus, isRead, inline, isStatusHidden }: Props) {
+export function BubbleMeta({ ts, own, sendStatus, isRead, isStatusHidden }: Props) {
   return (
-    <span className={cn(styles.meta, inline && styles.inline)}>
-      <span className={cn(styles.time, own && styles.timeOwn)}>{formatTime(ts)}</span>
+    <span className={cn(styles.meta, own && styles.metaOwn)}>
+      <span className={styles.time}>{formatTime(ts)}</span>
       {own && !isStatusHidden ? (
         <SendStatusIcon
           sendStatus={sendStatus}

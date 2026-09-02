@@ -184,8 +184,7 @@ export function SendIcon(props: IconProps) {
     </Icon>
   )
 }
-
-export function ChecksIcon(props: IconProps) {
+export function CheckmarkIcon(props: IconProps) {
   return (
     <Icon
       size={16}
@@ -193,14 +192,32 @@ export function ChecksIcon(props: IconProps) {
       {...props}
     >
       <path
-        d="M1.5 8l3 3L11 4"
+        d="M3.5 8.25L6.75 11.5L12 5.75"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Icon>
+  )
+}
+
+export function CheckmarkDoubleIcon(props: IconProps) {
+  return (
+    <Icon
+      size={16}
+      viewBox="0 0 16 16"
+      {...props}
+    >
+      <path
+        d="M1.75 8.25L5 11.5L10.25 5.75"
         stroke="currentColor"
         strokeWidth="1.3"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M5 8l3 3 6.5-7"
+        d="M8.75 11.5L14 5.75"
         stroke="currentColor"
         strokeWidth="1.3"
         strokeLinecap="round"
@@ -331,7 +348,7 @@ export function FailedIcon(props: IconProps) {
         fillRule="evenodd"
         clipRule="evenodd"
         d="M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C11.3137 2 14 4.68629 14 8ZM8 4.25C8.41421 4.25 8.75 4.58579 8.75 5V8.5C8.75 8.91421 8.41421 9.25 8 9.25C7.58579 9.25 7.25 8.91421 7.25 8.5V5C7.25 4.58579 7.58579 4.25 8 4.25ZM8 11.75C8.41421 11.75 8.75 11.4142 8.75 11C8.75 10.5858 8.41421 10.25 8 10.25C7.58579 10.25 7.25 10.5858 7.25 11C7.25 11.4142 7.58579 11.75 8 11.75Z"
-        fill="#C51E37"
+        fill="currentColor"
       />
     </Icon>
   )

@@ -10,7 +10,11 @@ interface Props {
   onEscape?: (() => void) | undefined
 }
 
-export const MAX_MESSAGE_LENGTH = 32_000
+/** Лимит отправки */
+export const MAX_MESSAGE_LENGTH = 2048
+
+/** Лимит ввода текстового сообщения */
+const MAX_INPUT_LENGTH = 32_000
 
 /**
  * Поле ввода композера: изменяет размер при вводе текста, до 10 строк далее скролл,
@@ -53,7 +57,7 @@ export function MessageTextarea({ value, placeholder, ref, onChange, onSubmit, o
       aria-label={placeholder}
       autoComplete="off"
       rows={1}
-      maxLength={MAX_MESSAGE_LENGTH}
+      maxLength={MAX_INPUT_LENGTH}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={handleKeyDown}

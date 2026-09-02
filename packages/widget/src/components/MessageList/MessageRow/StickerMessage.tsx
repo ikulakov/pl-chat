@@ -41,10 +41,7 @@ export function StickerMessage({ item, meta, reactions }: Props) {
       )}
 
       <span className={styles.meta}>
-        <BubbleMeta
-          {...meta}
-          inline
-        />
+        <BubbleMeta {...meta} />
       </span>
 
       {reactions}

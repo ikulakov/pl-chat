@@ -7,3 +7,9 @@
   margin: 0;
   overflow: hidden;
 }
+
+.link {
+  color: inherit;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}

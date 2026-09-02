@@ -9,7 +9,9 @@ import './styles/global.css'
 const bridge = new IframeBridge()
 const controller = initChatController(bridge)
 
-// Standalone dev mode //import.meta.env.DEV &&
+// Standalone dev mode
+// import.meta.env.DEV &&
+// todo: запретить на PROD через переменную окружения, прокинуть через build args
 if (window.parent === window) {
   controller.open()
 }
