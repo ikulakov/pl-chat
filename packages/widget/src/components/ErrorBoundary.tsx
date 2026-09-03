@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { ERROR_ILLUSTRATION } from '../shared/assets/inlineAssets'
 import { t } from '../i18n'
 import styles from './ErrorBoundary.module.css'
 import { StatusScreen } from './StatusScreen'
@@ -30,7 +31,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <StatusScreen
             title={t('status.crash')}
             subtitle={t('status.crash.subtitle')}
-            illustration={`/error-illustration.png`}
+            illustration={ERROR_ILLUSTRATION}
             action={
               <button
                 className={statusStyles.retryBtn}

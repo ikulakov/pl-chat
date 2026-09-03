@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { ERROR_ILLUSTRATION } from '../shared/assets/inlineAssets'
 import { FEATURES } from '../features'
 import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
@@ -60,7 +61,7 @@ export function ChatPanel() {
         <StatusScreen
           title={t('status.error')}
           subtitle={t('status.error.subtitle')}
-          illustration={'/error-illustration.png'}
+          illustration={ERROR_ILLUSTRATION}
           action={
             <button
               className={statusStyles.retryBtn}

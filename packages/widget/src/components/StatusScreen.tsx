@@ -21,7 +21,7 @@ export function StatusScreen({ children, illustration, title, subtitle, action }
         aria-hidden="true"
       >
         <img
-          src={`${import.meta.env.BASE_URL}${illustration}`}
+          src={illustration}
           alt={title}
           className={styles.illustrationImg}
         />
