@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { FEATURES } from '../../../features'
 import { t } from '../../../i18n'
 import { fileItem, textItem } from '../../../shared/testUtils/matrixFixtures'
 import { MessageActions } from './MessageActions'
@@ -14,6 +15,9 @@ vi.mock('../../../hooks/useChatActions', () => ({
 
 describe('MessageActions', () => {
   beforeEach(() => {
+    // Реакции включаем явно: тесты не должны зависеть от того, в каком положении флаг
+    // лежит в features.ts на момент сборки. Выключенное состояние проверяет свой тест ниже.
+    vi.spyOn(FEATURES, 'reactions', 'get').mockReturnValue(true)
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
     resendMessage.mockClear()
     replyTo.mockClear()
@@ -286,6 +290,24 @@ describe('MessageActions', () => {
     fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
 
     expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+  })
+
+  it('при выключённой фиче реакций прячет панель, но оставляет ответ и копирование', () => {
+    vi.spyOn(FEATURES, 'reactions', 'get').mockReturnValue(false)
+
+    render(
+      <MessageActions
+        message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello' })}
+        isOwn={false}
+        reactions={[]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+
+    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+    expect(screen.getByText(t('chat.action.reply'))).toBeInTheDocument()
+    expect(screen.getByText(t('chat.action.copy'))).toBeInTheDocument()
   })
 
   it('does not render "Повторить отправку" for a non-own or non-failed message', () => {

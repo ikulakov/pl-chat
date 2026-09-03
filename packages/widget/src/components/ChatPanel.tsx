@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { FEATURES } from '../features'
 import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
@@ -35,7 +36,7 @@ export function ChatPanel() {
   // без refresh-токена его нечем починить, и вся отрисовка эмодзи молча оставалась бы
   // выключенной до перезагрузки страницы.
   useEffect(() => {
-    if (userId === null) return
+    if (!FEATURES.emoji || userId === null) return
 
     ensureEmojiIndex(loadEmojiIndex)
   }, [loadEmojiIndex, userId])

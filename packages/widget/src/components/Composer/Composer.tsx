@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { replyAuthorLabel } from '../../domain/reply'
+import { FEATURES } from '../../features'
 import { useChatActions } from '../../hooks/useChatActions'
 import { useChatStore } from '../../hooks/useChatStore'
 import { t } from '../../i18n'
@@ -108,9 +109,11 @@ export function Composer() {
           />
         </div>
         <div className={styles.rightBtns}>
-          <div className={styles.slot}>
-            <EmojiPickerButton onSelectEmoji={insertEmoji} />
-          </div>
+          {FEATURES.emoji && (
+            <div className={styles.slot}>
+              <EmojiPickerButton onSelectEmoji={insertEmoji} />
+            </div>
+          )}
           <div className={styles.slot}>
             <IconButton
               variant="contrast"

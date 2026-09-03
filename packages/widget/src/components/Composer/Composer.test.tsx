@@ -1,6 +1,7 @@
 /* eslint-disable i18next/no-literal-string -- якорь заглушки пикера, не UI-текст */
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { FEATURES } from '../../features'
 import { t } from '../../i18n'
 import { makeFile } from '../../shared/testUtils/matrixFixtures'
 import { chatStore, INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '../../store/store'
@@ -251,6 +252,12 @@ describe('Composer — семантика отправки', () => {
   })
 
   describe('вставка эмодзи', () => {
+    // Флаг фичи держим включённым явно: тесты пикера не должны зависеть от того, в каком
+    // положении он лежит в features.ts на момент сборки.
+    beforeEach(() => {
+      vi.spyOn(FEATURES, 'emoji', 'get').mockReturnValue(true)
+    })
+
     function selectEmojiAt(value: string, start: number, end = start) {
       render(<Composer />, { wrapper: AttachmentProvider })
 

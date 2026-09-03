@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react'
 import { aggregateReactions, type ReactionEntry } from '../../../domain/reactions'
 import type { ReplyStickerPreview } from '../../../domain/reply'
 import { type MessageTimelineItem } from '../../../domain/timeline'
+import { FEATURES } from '../../../features'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { useEmojiSegments } from '../../../hooks/useEmojiSegments'
 import { ITEM_ID_ATTR } from '../../../hooks/useLoadMoreHistory'
@@ -55,7 +56,11 @@ export const MessageRow = memo(
     )
 
     // Свёртка — новая коллекция на выходе, поэтому живёт здесь, а не в селекторе.
-    const summaries = useMemo(() => aggregateReactions(reactions, userId), [reactions, userId])
+    // При выключённой фиче реакции продолжают копиться в сторе, но в ленту не попадают.
+    const summaries = useMemo(
+      () => (FEATURES.reactions ? aggregateReactions(reactions, userId) : []),
+      [reactions, userId],
+    )
 
     const meta: BubbleMetaData = {
       ts: message.ts,

@@ -2,6 +2,7 @@ import { isOptimistic } from '../../../domain/optimistic'
 import type { ReactionSummary } from '../../../domain/reactions'
 import { replyStickerOf, replyText } from '../../../domain/reply'
 import { isMedia, type MessageTimelineItem } from '../../../domain/timeline'
+import { FEATURES } from '../../../features'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { t } from '../../../i18n'
 import { copyText } from '../../../shared/utils/clipboard'
@@ -24,9 +25,10 @@ export function MessageActions({ message, isOwn, reactions }: Props) {
 
   const uploadFailed = isMedia(message) && message.upload?.error
   const canRetry = isOwn && message.sendStatus === 'failed' && !uploadFailed
-  // Реакция адресует событие на сервере — у черновика его ещё нет.
-  const canReact = !isOptimistic(message.eventId)
-  const canReply = canReact && reply !== ''
+  // Реакция и ответ адресуют событие на сервере — у черновика его ещё нет.
+  const isSent = !isOptimistic(message.eventId)
+  const canReact = FEATURES.reactions && isSent
+  const canReply = isSent && reply !== ''
   const canCopy = message.content.body.trim() !== ''
 
   // canReact включает не пункт меню, а надстройку `above` — поэтому в условие доступности
