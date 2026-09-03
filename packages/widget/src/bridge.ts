@@ -9,17 +9,24 @@ import {
 
 type CommandHandler = (cmd: HostCommand) => void
 
+const DEV_PARENT_ORIGIN = 'http://localhost:5173'
+
+// То же правило — в `frame-ancestors` (docker/nginx/default.conf.template), менять вместе.
+const ALLOWED_PARENT_ORIGIN = /^https:\/\/([a-z0-9-]+\.)*otpbank\.ru$/
+
+/**
+ * Можно ли доверять этому origin'у как хосту виджета.
+ */
+export function isAllowedParentOrigin(origin: string): boolean {
+  return ALLOWED_PARENT_ORIGIN.test(origin) || (import.meta.env.DEV && origin === DEV_PARENT_ORIGIN)
+}
+
 export interface HostBridge {
   setCommandHandler(handler: CommandHandler): void
   send(event: ChatEvent): void
 }
 
 export class IframeBridge implements HostBridge {
-  private readonly allowedParents: string[] = (
-    import.meta.env.VITE_ALLOWED_PARENTS ?? 'http://localhost:5173'
-  )
-    .split(',')
-    .map((s: string) => s.trim())
   private port: MessagePort | null = null
   private handler: CommandHandler | null = null
 
@@ -44,21 +51,17 @@ export class IframeBridge implements HostBridge {
       )
       return
     }
-    if (!this.isAllowedOrigin(parentOrigin)) {
+    if (!isAllowedParentOrigin(parentOrigin)) {
       console.error(
-        `[BankChat] parentOrigin "${parentOrigin}" is not in ALLOWED_PARENTS — widget will not initialize. Check the environment variable.`,
+        `[BankChat] parentOrigin "${parentOrigin}" is not an allowed host — widget will not initialize.`,
       )
       return
     }
     window.parent.postMessage(makeEnvelope<ChatEvent>({ type: 'READY' }), parentOrigin)
   }
 
-  private isAllowedOrigin(origin: string): boolean {
-    return this.allowedParents.includes(origin)
-  }
-
   private onWindowMessage = (e: MessageEvent): void => {
-    if (!this.isAllowedOrigin(e.origin) || !isEnvelope(e.data) || !withinSizeLimit(e.data.msg))
+    if (!isAllowedParentOrigin(e.origin) || !isEnvelope(e.data) || !withinSizeLimit(e.data.msg))
       return
 
     const msg = e.data.msg

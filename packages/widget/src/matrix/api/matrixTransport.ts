@@ -24,13 +24,15 @@ export interface DownloadOptions {
 const UPLOAD_TIMEOUT_MS = 120_000
 const DOWNLOAD_TIMEOUT_MS = 60_000
 
+/**
+ * HTTP-доступ к homeserver. Пути всегда относительные: виджет обращается к своему origin,
+ * а до homeserver `/_matrix` доводит инфраструктура — Ingress в проде, прокси dev-сервера локально.
+ */
 export class MatrixTransport {
-  private readonly baseUrl: string
   private readonly tokens: TokenSource
   private refreshing: Promise<boolean> | null = null
 
-  constructor(baseUrl: string, tokens: TokenSource) {
-    this.baseUrl = baseUrl
+  constructor(tokens: TokenSource) {
     this.tokens = tokens
   }
 
@@ -159,15 +161,13 @@ export class MatrixTransport {
   }
 
   private buildUrl(path: string, searchParams?: Record<string, string | number>): string {
-    const url = `${this.baseUrl}${path}`
-
-    if (!searchParams) return url
+    if (!searchParams) return path
 
     const query = new URLSearchParams(
       Object.entries(searchParams).map(([key, value]) => [key, String(value)]),
     ).toString()
 
-    return query ? `${url}?${query}` : url
+    return query ? `${path}?${query}` : path
   }
 
   private silentRefresh(): Promise<boolean> {
@@ -176,7 +176,7 @@ export class MatrixTransport {
     const refreshToken = this.tokens.getRefreshToken()
     if (!refreshToken) return Promise.resolve(false)
 
-    this.refreshing = fetch(`${this.baseUrl}${Endpoints.REFRESH}`, {
+    this.refreshing = fetch(Endpoints.REFRESH, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

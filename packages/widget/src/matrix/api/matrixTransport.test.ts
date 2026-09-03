@@ -3,8 +3,6 @@ import { createFakeTokenStore } from '../../shared/testUtils/matrixFixtures'
 import { LocalStorageSessionStore } from '../session/localStorageSessionStore'
 import { MatrixTransport } from './matrixTransport'
 
-const BASE_URL = 'https://matrix.bank'
-
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -54,12 +52,12 @@ describe('MatrixTransport', () => {
 
   it('adds auth, traceparent and default JSON content-type headers', async () => {
     const tokens = createFakeTokenStore('access-token')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ ok: true }))
 
     await transport.request('/_matrix/client/v3/send', { method: 'POST', body: {} })
 
-    expect(fetchSpy).toHaveBeenCalledWith(`${BASE_URL}/_matrix/client/v3/send`, expect.anything())
+    expect(fetchSpy).toHaveBeenCalledWith(`/_matrix/client/v3/send`, expect.anything())
     const headers = fetchSpy.mock.calls[0]![1]!.headers as Headers
     expect(headers.get('Authorization')).toBe('Bearer access-token')
     expect(headers.get('Content-Type')).toBe('application/json')
@@ -68,7 +66,7 @@ describe('MatrixTransport', () => {
 
   it('serializes searchParams into the query string and encodes values', async () => {
     const tokens = createFakeTokenStore('access-token')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ ok: true }))
 
     await transport.request('/_matrix/client/v3/sync', {
@@ -76,14 +74,12 @@ describe('MatrixTransport', () => {
     })
 
     // timeout=0 (число → строка), since url-энкодится, порядок = порядок ключей объекта.
-    expect(fetchSpy.mock.calls[0]![0]).toBe(
-      `${BASE_URL}/_matrix/client/v3/sync?timeout=0&since=s+42%2F%26x`,
-    )
+    expect(fetchSpy.mock.calls[0]![0]).toBe(`/_matrix/client/v3/sync?timeout=0&since=s+42%2F%26x`)
   })
 
   it('refreshes on 401 and retries the original request with the new token', async () => {
     const tokens = createFakeTokenStore('old-token', 'refresh-token')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ errcode: 'M_UNKNOWN_TOKEN' }, 401))
@@ -101,7 +97,7 @@ describe('MatrixTransport', () => {
     // expires_in_ms (123) is present in the response but intentionally not forwarded —
     // expiresAt is a fixed session TTL, not the access token's own expiry.
     expect(tokens.setTokens).toHaveBeenCalledWith('new-token', 'new-refresh')
-    expect(fetchSpy.mock.calls[1]![0]).toBe(`${BASE_URL}/_matrix/client/v3/refresh`)
+    expect(fetchSpy.mock.calls[1]![0]).toBe(`/_matrix/client/v3/refresh`)
     const refreshHeaders = fetchSpy.mock.calls[1]![1]!.headers as Record<string, string>
     expect(refreshHeaders.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
 
@@ -111,7 +107,7 @@ describe('MatrixTransport', () => {
 
   it('retries with the fresher session instead of failing when another caller already refreshed', async () => {
     const tokens = createFakeTokenStore('old-token', 'old-refresh')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ errcode: 'M_UNKNOWN_TOKEN' }, 401))
@@ -145,7 +141,7 @@ describe('MatrixTransport', () => {
       refreshToken: 'old-refresh',
       userId: '@old:bank',
     })
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
 
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
@@ -176,7 +172,7 @@ describe('MatrixTransport', () => {
 
   it('still reports session expired when another tab cleared the session entirely mid-refresh', async () => {
     const tokens = createFakeTokenStore('old-token', 'old-refresh')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ errcode: 'M_UNKNOWN_TOKEN' }, 401))
       .mockImplementationOnce(async () => {
@@ -195,7 +191,7 @@ describe('MatrixTransport', () => {
 
   it('deduplicates parallel refresh requests', async () => {
     const tokens = createFakeTokenStore('old-token', 'refresh-token')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ errcode: 'M_UNKNOWN_TOKEN' }, 401))
@@ -219,7 +215,7 @@ describe('MatrixTransport', () => {
 
   it('throws MatrixError when refresh fails', async () => {
     const tokens = createFakeTokenStore('old-token', 'refresh-token')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ errcode: 'M_UNKNOWN_TOKEN' }, 401))
       .mockResolvedValueOnce(jsonResponse({ errcode: 'M_UNKNOWN_TOKEN' }, 401))
@@ -232,7 +228,7 @@ describe('MatrixTransport', () => {
 
   it('rounds upload progress to a whole percent and reports it only when it changes', async () => {
     const tokens = createFakeTokenStore('access-token')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
     const onProgress = vi.fn()
 
     vi.stubGlobal('XMLHttpRequest', FakeXhr as unknown as typeof XMLHttpRequest)
@@ -255,7 +251,7 @@ describe('MatrixTransport', () => {
 
   it('fails a timed out upload with an error distinct from user cancellation', async () => {
     const tokens = createFakeTokenStore('access-token')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
 
     vi.stubGlobal('XMLHttpRequest', FakeXhr as unknown as typeof XMLHttpRequest)
 
@@ -278,7 +274,7 @@ describe('MatrixTransport', () => {
   // а mxc-ссылки для сообщения не будет.
   it('rejects an upload when the server answers with an error status', async () => {
     const tokens = createFakeTokenStore('access-token')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
 
     vi.stubGlobal('XMLHttpRequest', FakeXhr as unknown as typeof XMLHttpRequest)
 
@@ -297,7 +293,7 @@ describe('MatrixTransport', () => {
 
   it('throws the terminal MatrixError when refresh reports a deactivated user', async () => {
     const tokens = createFakeTokenStore('old-token', 'refresh-token')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ errcode: 'M_UNKNOWN_TOKEN' }, 401))
       .mockResolvedValueOnce(
@@ -314,7 +310,7 @@ describe('MatrixTransport', () => {
   // иначе протухший токен ломал бы картинки до того, как его заметит sync-петля.
   it('download refreshes on 401 and retries with the new token', async () => {
     const tokens = createFakeTokenStore('old-token', 'refresh-token')
-    const transport = new MatrixTransport(BASE_URL, tokens)
+    const transport = new MatrixTransport(tokens)
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
@@ -333,7 +329,7 @@ describe('MatrixTransport', () => {
   // Ветвление media-ошибок (404 → оригинал, 504 → «ещё проверяется») строится на статусе:
   // шлюз отдаёт такие ответы не-JSON'ом, и errcode в них схлопывается в M_UNKNOWN.
   it('download reports the HTTP status on error responses', async () => {
-    const transport = new MatrixTransport(BASE_URL, createFakeTokenStore('token', 'refresh'))
+    const transport = new MatrixTransport(createFakeTokenStore('token', 'refresh'))
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('<html>gateway</html>', {
         status: 504,

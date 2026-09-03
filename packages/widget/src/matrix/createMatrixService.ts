@@ -10,11 +10,9 @@ interface CreateMatrixServiceDeps {
   getState: () => ChatRuntimeState
 }
 
-const MATRIX_BASE_URL = import.meta.env.VITE_HOMESERVER_URL ?? ''
-
 export function createMatrixService(deps: CreateMatrixServiceDeps): MatrixService {
   const sessionStore = new LocalStorageSessionStore()
-  const transport = new MatrixTransport(MATRIX_BASE_URL, sessionStore)
+  const transport = new MatrixTransport(sessionStore)
   const api = createMatrixApi(transport)
   const sessionManager = new MatrixSessionManager(api, sessionStore)
 

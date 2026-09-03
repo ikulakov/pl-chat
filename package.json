@@ -13,9 +13,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "prepare": "husky",
-    "docker:build": "docker build -t bankchat:local .",
-    "docker:run": "docker run --rm -p 8181:8080 bankchat:local"
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
