@@ -30,7 +30,7 @@ export function chatOrigin(cfg: LoaderConfig): string {
 
 /** URL документа виджета с parentOrigin для READY-beacon. */
 export function widgetUrl(cfg: LoaderConfig, parentOrigin: string): string {
-  const url = new URL('/widget', chatOrigin(cfg))
+  const url = new URL('/widget/', chatOrigin(cfg))
   url.searchParams.set('parentOrigin', parentOrigin)
   return url.toString()
 }

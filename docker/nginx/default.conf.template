@@ -5,6 +5,12 @@ server {
     listen      ${NGINX_PORT};
     server_name _;
 
+    server_tokens off;
+    port_in_redirect off;
+
+    # Сохраняем внешний HTTPS при редиректах за TLS-терминирующим Ingress.
+    absolute_redirect off;
+
     root  /usr/share/nginx/html;
     index index.html;
 
@@ -12,7 +18,9 @@ server {
     # То же правило продублировано в bridge.ts (проверка origin для postMessage) — два слоя
     # одной защиты, менять только вместе. Здесь домен задаётся один раз, в $csp.
     set $csp "frame-ancestors https://otpbank.ru https://*.otpbank.ru";
-    add_header Content-Security-Policy $csp always;
+
+    # В location со своим add_header общий файл подключается повторно.
+    include /etc/nginx/snippets/security-headers.conf;
 
     # Liveness-проба для оркестратора / docker healthcheck.
     location = /healthz {
@@ -25,13 +33,24 @@ server {
     # поэтому no-cache: браузер ревалидирует при каждом обращении.
     location = /loader.js {
         add_header Cache-Control "no-cache";
-        add_header Content-Security-Policy $csp always;
+        include /etc/nginx/snippets/security-headers.conf;
         try_files  $uri =404;
     }
 
+    # Source map не публикуем на клиентских стендах (PL-03).
+    location = /loader.js.map {
+        return 404;
+    }
+
+    # Дефолтный Welcome to nginx не отдаём (PL-04).
+    location = /index.html {
+        return 404;
+    }
+
     # Корень → виджет (живёт под base="/widget/").
+    # Относительный Location: за TLS-терминатором $scheme не должен становиться http (PL-02).
     location = / {
-        return 302 $scheme://$http_host/widget/;
+        return 302 /widget/;
     }
 
     # Хешированные ассеты виджета (vite content-hash в имени) — иммутабельный долгий кеш.
@@ -39,14 +58,14 @@ server {
         access_log off;
         expires    1y;
         add_header Cache-Control "public, immutable";
-        add_header Content-Security-Policy $csp always;
+        include /etc/nginx/snippets/security-headers.conf;
         try_files  $uri =404;
     }
 
     # SPA виджета: статичный файл или fallback на index.html. index.html — без кеша.
     location /widget/ {
         add_header Cache-Control "no-cache";
-        add_header Content-Security-Policy $csp always;
+        include /etc/nginx/snippets/security-headers.conf;
         try_files  $uri $uri/ /widget/index.html;
     }
 

@@ -44,12 +44,16 @@ FROM nexus.isb/library/nginx:1.27-alpine-obru AS runtime
 # NGINX_ENVSUBST_FILTER ограничивает подстановку только NGINX_*-переменными,
 # чтобы не затереть nginx-переменные $uri / $request_uri / $host.
 COPY docker/nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY docker/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 
 # Виджет-SPA (index.html + assets/*) — под /widget/, как и ожидает widgetUrl() в loader.
 COPY --from=build /app/packages/widget/dist /usr/share/nginx/html/widget
 
 # Лоадер — один файл в корне без Sourcemap.
 COPY --from=build /app/packages/loader/dist/loader.js /usr/share/nginx/html/loader.js
+
+# Убрать дефолтный Welcome to nginx из root образа (PL-04).
+RUN rm -f /usr/share/nginx/html/index.html
 
 ENV NGINX_PORT=8080 \
     NGINX_ENVSUBST_FILTER=^NGINX_

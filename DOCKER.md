@@ -40,6 +40,10 @@ TeamCity; шаг сводится к `docker build` + `docker push`.
 правки кода, ни пересборки: она подпадает под правило автоматически. Пересборка нужна лишь
 для домена за пределами `otpbank.ru`.
 
+Дополнительно edge отдаёт `Strict-Transport-Security`, `X-Content-Type-Options`,
+`Referrer-Policy`, `Permissions-Policy`; `server_tokens off`; редирект `/` → относительный
+`/widget/` (без `http://` и `:8080`); `/loader.js.map` и корневой `/index.html` → 404.
+
 ## Что внутри
 
 - **Stage 1** (`node:24-alpine`) — `pnpm install --frozen-lockfile` + `pnpm build`
@@ -47,20 +51,29 @@ TeamCity; шаг сводится к `docker build` + `docker push`.
 - **Stage 2** (`nginx:1.27-alpine`) — копирует артефакты в `/usr/share/nginx/html`:
   - `packages/widget/dist/` → `/widget/` (SPA + хешированные ассеты)
   - `packages/loader/dist/loader.js` → `/loader.js`
+  - дефолтный `index.html` образа nginx удаляется
 - Кеш: `/widget/assets/*` — `immutable, 1y`; `index.html` и `loader.js` — `no-cache`.
 - Корень `/` редиректит на `/widget/`.
+- `absolute_redirect off` сохраняет внешний HTTPS при редиректах за Ingress.
 - `/healthz` — liveness-проба для оркестратора.
 
 Конфиг: [`docker/nginx/default.conf.template`](docker/nginx/default.conf.template)
 (envsubst по `NGINX_*`). Entrypoint-скриптов у образа нет.
 
-⚠️ Правя конфиг, помните: **`add_header` не наследуется в `location`, где объявлен свой
-`add_header`**. Поэтому CSP-директива повторена в каждом таком блоке — иначе заголовок
-пропадёт именно на `/widget/`, то есть на встраиваемой странице.
+Общие заголовки задаются в [`security-headers.conf`](docker/nginx/security-headers.conf).
+Файл подключается через `include` в `server` и `location` со своим `add_header`, где наследование отключается.
 
 ## Проверка после выката
 
 ```bash
-# заголовок должен быть на встраиваемой странице, а не только в корне
-curl -sI https://<чат-домен>/widget/ | grep -i content-security-policy
+# security headers на встраиваемой странице
+curl -sI https://<чат-домен>/widget/ | grep -iE 'content-security-policy|strict-transport|x-content-type|referrer-policy|permissions-policy'
+
+# cleartext Location и версия nginx не должны светиться
+curl -skI https://<чат-домен>/ | grep -iE 'location|server'
+curl -sk https://<чат-домен>/missing | grep -i nginx || true
+
+# source map и welcome page закрыты
+curl -sk -o /dev/null -w '%{http_code}\n' https://<чат-домен>/loader.js.map
+curl -sk -o /dev/null -w '%{http_code}\n' https://<чат-домен>/index.html
 ```
