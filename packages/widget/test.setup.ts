@@ -10,7 +10,9 @@ if (!Element.prototype.scrollTo) {
 
 // jsdom не реализует IntersectionObserver — нужен MessageList для видимости кнопки "вниз".
 // Управляемая заглушка: тесты дёргают trigger() на последнем инстансе, чтобы эмулировать
-// пересечение сентинела без реального layout (см. useChatScroll.test.tsx).
+// пересечение без реального layout. Аргумент нужен там, где компонент читает
+// isIntersecting (AnimatedEmoji, EmojiPickerButton); useChatScroll его игнорирует —
+// он считает положение по геометрии контейнера, и там trigger() зовут без аргумента.
 export class FakeIntersectionObserver implements IntersectionObserver {
   static instances: FakeIntersectionObserver[] = []
 
@@ -34,7 +36,7 @@ export class FakeIntersectionObserver implements IntersectionObserver {
     return []
   }
 
-  trigger(isIntersecting: boolean): void {
+  trigger(isIntersecting = false): void {
     this.callback([{ isIntersecting } as IntersectionObserverEntry], this)
   }
 }

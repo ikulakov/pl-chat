@@ -13,6 +13,10 @@ const AUTO_SCROLL_TIMEOUT_MS = 1000
 
 type ScrollTarget = 'bottom' | { element: HTMLElement; block: 'center' }
 
+function isAtBottom(list: HTMLElement): boolean {
+  return list.scrollHeight - list.clientHeight - list.scrollTop <= NEAR_BOTTOM_PX
+}
+
 interface UseChatScrollParams {
   timeline: TimelineItem[]
   userId: string
@@ -72,7 +76,7 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
       const list = containerRef.current
       if (!list) return
 
-      const atBottom = list.scrollHeight - list.clientHeight - list.scrollTop <= NEAR_BOTTOM_PX
+      const atBottom = isAtBottom(list)
       isNearBottomRef.current = atBottom
       setIsNearBottom(atBottom)
     }, AUTO_SCROLL_TIMEOUT_MS)
@@ -125,10 +129,20 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
     root: containerRef,
     rootMargin: `0px 0px ${NEAR_BOTTOM_PX}px 0px`,
     triggerRef: bottomRef,
-    callback: ({ isIntersecting }) => {
-      isNearBottomRef.current = isIntersecting
+    // Наблюдатель здесь — только триггер пересчёта; положение считаем по геометрии.
+    // Его собственный отчёт источником правды быть не может: хост ресайзит рамку iframe
+    // асинхронно после OPEN, и пересечение, посчитанное в ещё нулевом боксе, приезжает
+    // ложным промахом уже по нормальной геометрии. Повторно наблюдатель его не перевыдаёт —
+    // после повторного открытия панели кнопка «вниз» залипала у самого низа ленты, а
+    // isNearBottomRef=false заодно отключал автоскролл на входящие.
+    callback: () => {
+      const list = containerRef.current
+      if (!list) return
+
+      const atBottom = isAtBottom(list)
+      isNearBottomRef.current = atBottom
       if (!isAutoScrollingRef.current) {
-        setIsNearBottom(isIntersecting)
+        setIsNearBottom(atBottom)
       }
     },
   })
@@ -139,7 +153,7 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
     if (!list) return
 
     const handleScrollEnd = () => {
-      const atBottom = list.scrollHeight - list.clientHeight - list.scrollTop <= NEAR_BOTTOM_PX
+      const atBottom = isAtBottom(list)
 
       // На длинных прыжках scrollListTo мгновенно перемещается почти к цели, а последние
       // SMOOTH_TAIL_PX доезжает smooth-анимацией — 'scrollend' на этот прыжок приходит раньше,

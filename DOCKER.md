@@ -40,9 +40,9 @@ TeamCity; шаг сводится к `docker build` + `docker push`.
 правки кода, ни пересборки: она подпадает под правило автоматически. Пересборка нужна лишь
 для домена за пределами `otpbank.ru`.
 
-Дополнительно edge отдаёт `Strict-Transport-Security`, `X-Content-Type-Options`,
+Дополнительно nginx образа отдаёт `Strict-Transport-Security`, `X-Content-Type-Options`,
 `Referrer-Policy`, `Permissions-Policy`; `server_tokens off`; редирект `/` → относительный
-`/widget/` (без `http://` и `:8080`); `/loader.js.map` и корневой `/index.html` → 404.
+`/widget/` (без `http://` и `:8080`); любой `*.map` и корневой `/index.html` → 404.
 
 ## Что внутри
 
@@ -52,16 +52,22 @@ TeamCity; шаг сводится к `docker build` + `docker push`.
   - `packages/widget/dist/` → `/widget/` (SPA + хешированные ассеты)
   - `packages/loader/dist/loader.js` → `/loader.js`
   - дефолтный `index.html` образа nginx удаляется
-- Кеш: `/widget/assets/*` — `immutable, 1y`; `index.html` и `loader.js` — `no-cache`.
+- Кеш (`map $uri $cache_control`): `/widget/assets/*` — `public, max-age=31536000, immutable`;
+  всё остальное, включая `index.html` и `loader.js`, — `no-cache`.
 - Корень `/` редиректит на `/widget/`.
 - `absolute_redirect off` сохраняет внешний HTTPS при редиректах за Ingress.
-- `/healthz` — liveness-проба для оркестратора.
+- `location ~ \.map$` → 404: правило по маске, а не по одному пути, — `dist` виджета
+  копируется в образ целиком, и включённый в сборке sourcemap иначе уехал бы наружу.
+- `/healthz` — liveness-проба для оркестратора (в чарте пока не подключена).
 
 Конфиг: [`docker/nginx/default.conf.template`](docker/nginx/default.conf.template)
 (envsubst по `NGINX_*`). Entrypoint-скриптов у образа нет.
 
-Общие заголовки задаются в [`security-headers.conf`](docker/nginx/security-headers.conf).
-Файл подключается через `include` в `server` и `location` со своим `add_header`, где наследование отключается.
+Общие заголовки задаются в [`security-headers.conf`](docker/nginx/security-headers.conf) и
+подключаются `include`'ом **один раз**, на уровне `server`. Держится это на том, что ни в одном
+`location` нет собственного `add_header`: кеш-политика вычисляется `map`'ом по `$uri`. Заводя в
+`location` свой `add_header`, подключи файл там повторно — иначе серверные заголовки в этом
+блоке пропадут (`add_header` не наследуется в блок, где объявлен свой).
 
 ## Проверка после выката
 
@@ -73,7 +79,8 @@ curl -sI https://<чат-домен>/widget/ | grep -iE 'content-security-policy
 curl -skI https://<чат-домен>/ | grep -iE 'location|server'
 curl -sk https://<чат-домен>/missing | grep -i nginx || true
 
-# source map и welcome page закрыты
+# source map (и корневой, и ассетный) и welcome page закрыты — всюду 404
 curl -sk -o /dev/null -w '%{http_code}\n' https://<чат-домен>/loader.js.map
+curl -sk -o /dev/null -w '%{http_code}\n' https://<чат-домен>/widget/assets/probe.js.map
 curl -sk -o /dev/null -w '%{http_code}\n' https://<чат-домен>/index.html
 ```

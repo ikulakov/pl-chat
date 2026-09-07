@@ -18,6 +18,6 @@ export default defineConfig([
     noExternal: [/@bankchat\/protocol/],
     outExtension: () => ({ js: '.js' }),
     minify: true,
-    sourcemap: true,
+    sourcemap: false,
   },
 ])

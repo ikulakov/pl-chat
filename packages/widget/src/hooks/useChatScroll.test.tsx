@@ -23,6 +23,19 @@ function sentinel(): FakeIntersectionObserver {
   return observer
 }
 
+// Наблюдатель для хука — только триггер пересчёта, положение он берёт из геометрии
+// (scrollHeight в setup = 1000). Поэтому тесты двигают scrollTop, а отчёт наблюдателя
+// не передают вовсе — на состояние он не влияет.
+function scrollUp(container: HTMLElement): void {
+  container.scrollTop = 0
+  act(() => sentinel().trigger())
+}
+
+function scrollToBottom(container: HTMLElement): void {
+  container.scrollTop = 1000
+  act(() => sentinel().trigger())
+}
+
 function setup(initialTimeline: TimelineItem[], userId: string = ME) {
   const container = document.createElement('div')
   const bottom = document.createElement('div')
@@ -55,7 +68,7 @@ describe('useChatScroll', () => {
 
   it('auto-scrolls to a freshly sent own message even when the user has scrolled up', () => {
     const { rerender, scrollTo, container } = setup([message(OPERATOR)])
-    act(() => sentinel().trigger(false)) // пользователь ушёл вверх
+    scrollUp(container) // пользователь ушёл вверх
     scrollTo.mockClear()
 
     act(() => rerender({ timeline: [message(OPERATOR), message(ME)] }))
@@ -65,8 +78,8 @@ describe('useChatScroll', () => {
   })
 
   it('does not auto-scroll on an incoming message while the user is scrolled up', () => {
-    const { rerender, scrollTo } = setup([message(OPERATOR)])
-    act(() => sentinel().trigger(false))
+    const { rerender, scrollTo, container } = setup([message(OPERATOR)])
+    scrollUp(container)
     scrollTo.mockClear()
 
     act(() => rerender({ timeline: [message(OPERATOR), message(OPERATOR)] }))
@@ -75,8 +88,8 @@ describe('useChatScroll', () => {
   })
 
   it('auto-scrolls on an incoming message while the user is near the bottom', () => {
-    const { rerender, scrollTo } = setup([message(OPERATOR)])
-    act(() => sentinel().trigger(true))
+    const { rerender, scrollTo, container } = setup([message(OPERATOR)])
+    scrollToBottom(container)
     scrollTo.mockClear()
 
     act(() => rerender({ timeline: [message(OPERATOR), message(OPERATOR)] }))
@@ -85,18 +98,27 @@ describe('useChatScroll', () => {
   })
 
   it('toggles the scroll-to-bottom button as the sentinel leaves and re-enters the viewport', () => {
-    const { result } = setup([message(OPERATOR)])
+    const { result, container } = setup([message(OPERATOR)])
 
-    act(() => sentinel().trigger(false))
+    scrollUp(container)
     expect(result.current.isNearBottom).toBe(false)
 
-    act(() => sentinel().trigger(true))
+    scrollToBottom(container)
+    expect(result.current.isNearBottom).toBe(true)
+  })
+
+  it('ложный промах IntersectionObserver не поднимает кнопку «вниз», когда лента у самого низа: отчёт, посчитанный пока бокс iframe был 0×0 (хост ресайзит рамку после OPEN), приезжает уже по нормальной геометрии', () => {
+    const { result, container } = setup([message(OPERATOR)])
+    scrollToBottom(container)
+
+    act(() => sentinel().trigger(false))
+
     expect(result.current.isNearBottom).toBe(true)
   })
 
   it('преждевременный scrollend (инстант-снап до цели, см. SMOOTH_TAIL_PX) не размораживает isNearBottom, пока DOM реально не у низа — иначе на длинном прыжке (/card many) на кадр мигает кнопка «вниз»', () => {
     const { rerender, container, result } = setup([message(OPERATOR)])
-    act(() => sentinel().trigger(true)) // пользователь у низа → следующее сообщение уйдёт smooth-скроллом
+    scrollToBottom(container) // пользователь у низа → следующее сообщение уйдёт smooth-скроллом
 
     // smooth-путь: isAutoScrollingRef взводится, IO-обновления isNearBottom заморожены
     act(() => rerender({ timeline: [message(OPERATOR), message(OPERATOR)] }))
@@ -118,8 +140,8 @@ describe('useChatScroll', () => {
 
     expect(result.current.isNearBottom).toBe(true)
 
-    // Разморозка подтверждена: IO снова управляет состоянием, а не игнорируется.
-    act(() => sentinel().trigger(false))
+    // Разморозка подтверждена: пересчёт снова управляет состоянием, а не игнорируется.
+    scrollUp(container)
     expect(result.current.isNearBottom).toBe(false)
   })
 

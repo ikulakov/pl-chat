@@ -1,26 +1,31 @@
-# nginx-конфиг bankchat. ${NGINX_PORT} подставляется envsubst'ом на старте контейнера;
+# nginx-конфиг plchat. ${NGINX_PORT} подставляется envsubst'ом на старте контейнера;
 # остальные $-переменные — nginx-овые (NGINX_ENVSUBST_FILTER=^NGINX_ их не трогает).
+
+# Кеш вычисляется по $uri, чтобы add_header остался только на уровне server:
+# в location со своим add_header серверные заголовки не наследуются.
+map $uri $cache_control {
+    default           "no-cache";
+    ~^/widget/assets/ "public, max-age=31536000, immutable";
+}
 
 server {
     listen      ${NGINX_PORT};
     server_name _;
 
     server_tokens off;
-    port_in_redirect off;
 
-    # Сохраняем внешний HTTPS при редиректах за TLS-терминирующим Ingress.
+    # Относительный Location: за TLS-терминирующим Ingress абсолютный увёл бы на http://<host>:8080.
     absolute_redirect off;
 
-    root  /usr/share/nginx/html;
-    index index.html;
+    root /usr/share/nginx/html;
 
-    # Защита от clickjacking: встраивать виджет может только сам otpbank.ru и его поддомены.
-    # То же правило продублировано в bridge.ts (проверка origin для postMessage) — два слоя
-    # одной защиты, менять только вместе. Здесь домен задаётся один раз, в $csp.
+    # Защита от clickjacking. То же правило — в bridge.ts (проверка origin для postMessage),
+    # менять только вместе.
     set $csp "frame-ancestors https://otpbank.ru https://*.otpbank.ru";
 
-    # В location со своим add_header общий файл подключается повторно.
+    # Заводя в location собственный add_header, подключи этот файл там повторно.
     include /etc/nginx/snippets/security-headers.conf;
+    add_header Cache-Control $cache_control always;
 
     # Liveness-проба для оркестратора / docker healthcheck.
     location = /healthz {
@@ -29,48 +34,36 @@ server {
         return 200 "ok\n";
     }
 
-    # loader.js — IIFE-скрипт для встраивания. Без content-hash в имени,
-    # поэтому no-cache: браузер ревалидирует при каждом обращении.
     location = /loader.js {
-        add_header Cache-Control "no-cache";
-        include /etc/nginx/snippets/security-headers.conf;
-        try_files  $uri =404;
+        try_files $uri =404;
     }
 
-    # Source map не публикуем на клиентских стендах (PL-03).
-    location = /loader.js.map {
+    location ~ \.map$ {
         return 404;
     }
 
-    # Дефолтный Welcome to nginx не отдаём (PL-04).
     location = /index.html {
         return 404;
     }
 
     # Корень → виджет (живёт под base="/widget/").
-    # Относительный Location: за TLS-терминатором $scheme не должен становиться http (PL-02).
     location = / {
         return 302 /widget/;
     }
 
-    # Хешированные ассеты виджета (vite content-hash в имени) — иммутабельный долгий кеш.
     location /widget/assets/ {
         access_log off;
-        expires    1y;
-        add_header Cache-Control "public, immutable";
-        include /etc/nginx/snippets/security-headers.conf;
         try_files  $uri =404;
     }
 
-    # SPA виджета: статичный файл или fallback на index.html. index.html — без кеша.
+    # SPA виджета: статичный файл или fallback на index.html.
     location /widget/ {
-        add_header Cache-Control "no-cache";
-        include /etc/nginx/snippets/security-headers.conf;
-        try_files  $uri $uri/ /widget/index.html;
+        try_files $uri $uri/ /widget/index.html;
     }
 
     gzip            on;
     gzip_vary       on;
+    gzip_comp_level 6;
     gzip_min_length 1024;
     gzip_types      text/css application/javascript application/json image/svg+xml;
 }
