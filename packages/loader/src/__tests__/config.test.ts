@@ -32,4 +32,12 @@ describe('widgetUrl', () => {
       'BankChat: chatUrl must use HTTPS',
     )
   })
+
+  // Хост зовёт init() из нетипизированного JS: опечатка в режиме не должна
+  // молча превращаться в дефолт — иначе «почему чат грузится сразу» ищут в бандле.
+  it('rejects an unknown preload mode instead of silently falling back to the default', () => {
+    expect(() =>
+      validateConfig({ chatUrl: 'https://chat.example.com', preload: 'lazy' as never }),
+    ).toThrow('preload must be one of idle, eager, on-open')
+  })
 })

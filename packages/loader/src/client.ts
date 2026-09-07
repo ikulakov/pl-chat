@@ -21,6 +21,7 @@ export class BankChatClient {
   private iframe: IframeView | null = null
   private port: MessagePort | null = null
   private ready = false
+  private pendingOpen = false
   private queue: HostCommand[] = []
   private readonly handlers = new Map<string, Set<EventHandler>>()
 
@@ -36,12 +37,15 @@ export class BankChatClient {
       src: widgetUrl(config, parentOrigin),
       onViewportChange: this.handleViewportChange,
       ...(config.appearance !== undefined && { appearance: config.appearance }),
+      ...(config.preload !== undefined && { preload: config.preload }),
     })
     this.iframe.mount()
 
     this.on('INIT_ACK', () => {
       this.ready = true
       this.flush()
+      // Одна команда по последнему намерению, а не проигрывание накопленных в очереди OPEN/CLOSE.
+      if (this.pendingOpen) this.open()
     })
     this.on('OPENED', () => this.iframe?.open())
     this.on('CLOSED', () => this.iframe?.close())
@@ -49,13 +53,43 @@ export class BankChatClient {
     window.addEventListener('message', this.onWindowMessage)
   }
 
+  // Рамку разворачиваем в тот же тик, что и отправку команды: если ждать ответного
+  // OPENED, виджет успеет отрисовать панель, пока бокс iframe ещё нулевой (свёрнутая
+  // рамка — 0×0), и его ResizeObserver/IntersectionObserver посчитают геометрию по
+  // пустому боксу. До готовности рамку, наоборот, не трогаем: бандла ещё нет, и
+  // развёрнутый бокс был бы пустым белым прямоугольником.
+  //
+  // Команды панели, в отличие от остальных, не буферизуются — хранится только
+  // последнее намерение. Иначе «открыл и передумал» проигрывался бы логом: виджет на
+  // OPEN разворачивает панель, забирает фокус и поднимает Matrix-сессию (register +
+  // sync) ради диалога, от которого пользователь уже отказался.
   open(): void {
+    // Намерение открыть — это и есть сигнал качать бандл: при preload='on-open' его ещё нет.
+    this.iframe?.load()
+    if (!this.ready) {
+      this.pendingOpen = true
+      return
+    }
+
+    this.pendingOpen = false
+    this.iframe?.open()
     this.send({ type: 'OPEN' })
   }
   close(): void {
+    this.pendingOpen = false
+    if (!this.ready) return
+
+    this.iframe?.close()
     this.send({ type: 'CLOSE' })
   }
   toggle(): void {
+    if (!this.ready) {
+      if (this.pendingOpen) this.close()
+      else this.open()
+      return
+    }
+
+    this.iframe?.toggle()
     this.send({ type: 'TOGGLE' })
   }
   setAppearance(appearance: PanelAppearance): void {

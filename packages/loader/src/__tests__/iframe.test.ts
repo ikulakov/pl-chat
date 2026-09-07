@@ -50,6 +50,94 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+describe('IframeView — момент загрузки виджета (preload)', () => {
+  const SRC = 'https://chat.otpbank.ru/widget/?parentOrigin=https%3A%2F%2Fotpbank.ru'
+  // jsdom не реализует requestIdleCallback — idle уходит в таймерный фолбэк IframeView.
+  const IDLE_FALLBACK_TICK_MS = 300
+
+  function iframeSrc(): string {
+    return document.querySelector('iframe')!.getAttribute('src') ?? ''
+  }
+
+  // jsdom не реализует requestIdleCallback — режим idle уходит в таймерный фолбэк.
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('по умолчанию (idle) не трогает сеть на mount и грузит виджет в простое', () => {
+    const view = createView({ src: SRC })
+
+    view.mount()
+    expect(iframeSrc()).toBe('')
+
+    vi.runAllTimers()
+    expect(iframeSrc()).toBe(SRC)
+  })
+
+  // Один зависший сторонний ресурс держит документ в readyState=interactive сколь угодно
+  // долго (проверено на otpbank.ru). Прогрев не должен зависеть от события, которого нет.
+  it('idle не ждёт load хоста бесконечно: грузит виджет по потолку ожидания', () => {
+    const readyState = vi.spyOn(document, 'readyState', 'get').mockReturnValue('interactive')
+    const view = createView({ src: SRC })
+    view.mount()
+
+    vi.advanceTimersByTime(4000)
+    expect(iframeSrc()).toBe('')
+
+    vi.advanceTimersByTime(2000)
+    expect(iframeSrc()).toBe(SRC)
+    readyState.mockRestore()
+  })
+
+  it('idle грузит виджет сразу по load хоста, не дожидаясь потолка', () => {
+    const readyState = vi.spyOn(document, 'readyState', 'get').mockReturnValue('interactive')
+    const view = createView({ src: SRC })
+    view.mount()
+
+    window.dispatchEvent(new Event('load'))
+    vi.advanceTimersByTime(IDLE_FALLBACK_TICK_MS)
+
+    expect(iframeSrc()).toBe(SRC)
+    readyState.mockRestore()
+  })
+
+  it('eager грузит виджет сразу на mount', () => {
+    const view = createView({ src: SRC, preload: 'eager' })
+
+    view.mount()
+
+    expect(iframeSrc()).toBe(SRC)
+  })
+
+  it('on-open не грузит виджет, пока панель не открыли', () => {
+    const view = createView({ src: SRC, preload: 'on-open' })
+    view.mount()
+
+    vi.runAllTimers()
+    expect(iframeSrc()).toBe('')
+
+    view.open()
+    expect(iframeSrc()).toBe(SRC)
+  })
+
+  // Клик раньше прогрева — единственный случай, когда откладывать больше нечего.
+  it('открытие до простоя грузит виджет немедленно и снимает отложенную загрузку', () => {
+    const view = createView({ src: SRC })
+    view.mount()
+
+    view.open()
+    expect(iframeSrc()).toBe(SRC)
+
+    const setSrc = vi.spyOn(HTMLIFrameElement.prototype, 'src', 'set')
+    vi.runAllTimers()
+    expect(setSrc).not.toHaveBeenCalled()
+  })
+})
+
 describe('IframeView — mobile fullscreen placement', () => {
   it('picks docked mode on a desktop-width host', () => {
     setMobile(false)
