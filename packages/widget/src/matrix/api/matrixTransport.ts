@@ -46,14 +46,17 @@ export class MatrixTransport {
   }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-    // Бюджет общий на запрос и его повтор после refresh — как у download().
-    const response = await withDeadline(
+    return withDeadline(
       options.deadlineMs ?? REQUEST_DEADLINE_MS,
       options.signal,
-      (signal) => this.withRefresh(() => this.fetchRequest(path, { ...options, signal })),
-    )
+      async (signal) => {
+        const response = await this.withRefresh(() =>
+          this.fetchRequest(path, { ...options, signal }),
+        )
 
-    return MatrixTransport.unwrapJsonResponse<T>(response)
+        return MatrixTransport.unwrapJsonResponse<T>(response)
+      },
+    )
   }
 
   async upload<T>(path: string, file: File, options: UploadOptions = {}): Promise<T> {
@@ -62,13 +65,11 @@ export class MatrixTransport {
   }
 
   async download(path: string, options: DownloadOptions = {}): Promise<Blob> {
-    // Срок щедрее обычного (файл может быть большой), но обязателен: промис download'а лежит
-    // в кэше превью, и зависший запрос без отказа возвращался бы оттуда до конца сессии.
-    const response = await withDeadline(DOWNLOAD_TIMEOUT_MS, undefined, (signal) =>
-      this.withRefresh(() => this.fetchRequest(path, { ...options, signal })),
-    )
+    return withDeadline(DOWNLOAD_TIMEOUT_MS, undefined, async (signal) => {
+      const response = await this.withRefresh(() => this.fetchRequest(path, { ...options, signal }))
 
-    return MatrixTransport.unwrapBlobResponse(response)
+      return MatrixTransport.unwrapBlobResponse(response)
+    })
   }
 
   private async withRefresh(call: () => Promise<Response>): Promise<Response> {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { isDeadlineError } from '../../shared/utils/abort'
 import { createFakeTokenStore } from '../../shared/testUtils/matrixFixtures'
 import { LocalStorageSessionStore } from '../session/localStorageSessionStore'
-import { isConnectivityError } from './matrixError'
 import { MatrixTransport } from './matrixTransport'
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -18,6 +18,22 @@ function hangingFetch(): (input: RequestInfo | URL, init?: RequestInit) => Promi
       const signal = init?.signal
       signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
     })
+}
+
+// Заголовки пришли, тело — нет. Настоящий fetch рвёт поток тела по сигналу запроса,
+// двойник обязан вести себя так же, иначе тест проверял бы фикцию.
+function hangingBodyFetch(): (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> {
+  return (_input, init) => {
+    const body = new ReadableStream({
+      start(controller) {
+        init?.signal?.addEventListener('abort', () => controller.error(init.signal?.reason), {
+          once: true,
+        })
+      },
+    })
+
+    return Promise.resolve(new Response(body, { headers: { 'Content-Type': 'application/json' } }))
+  }
 }
 
 interface FakeProgressEvent {
@@ -261,7 +277,21 @@ describe('MatrixTransport', () => {
     const failed = transport.request('/_matrix/client/v3/sync').catch((err: unknown) => err)
     await vi.advanceTimersByTimeAsync(30_000)
 
-    expect(isConnectivityError(await failed)).toBe(true)
+    expect(isDeadlineError(await failed)).toBe(true)
+  })
+
+  it('дедлайн покрывает и чтение тела, а не только ожидание заголовков', async () => {
+    // Сервер отдал заголовки и замолчал на теле: если снять таймер по возврату fetch,
+    // запрос снова висит без срока — ровно та дыра, ради которой дедлайн и заводился.
+    vi.useFakeTimers()
+    const transport = new MatrixTransport(createFakeTokenStore('access-token'))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(hangingBodyFetch())
+
+    const pending = transport.request('/_matrix/client/v3/account/whoami')
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'TimeoutError' })
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    await rejected
   })
 
   it('уважает свой deadlineMs вместо общего срока — иначе long-poll срезало бы на каждом окне', async () => {

@@ -4,6 +4,16 @@ export function isAbortError(err: unknown): boolean {
 }
 
 /**
+ * Запрос снят собственным дедлайном: ответа не было столько, что ждать больше нечего.
+ *
+ * Живёт рядом с `withDeadline` намеренно — связка держится на имени DOMException, и
+ * классификатор должен переезжать вместе с ним.
+ */
+export function isDeadlineError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'TimeoutError'
+}
+
+/**
  * Дедлайн на одну операцию: таймер снимается сразу, как она завершилась.
  *
  * Не `AbortSignal.timeout`: тот таймер не отменить, и на петле вроде `/sync` каждый удачный

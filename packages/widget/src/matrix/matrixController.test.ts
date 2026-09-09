@@ -234,26 +234,40 @@ describe('MatrixController (orchestrator)', () => {
     ).toEqual([{ type: 'network.lost' }, { type: 'network.restored' }])
   })
 
-  it('does not blame the network when the server answers with an error', async () => {
-    // Пятисотка — это ответ: связь есть, лежит бэкенд. Баннер про соединение тут соврал бы,
-    // и «Устанавливаем соединение…» вместо честной ошибки только запутает.
+  it('reports connection lost when the server keeps answering with errors', async () => {
+    // Причину сбоя из браузера не узнать, и молчать при лежащем бэкенде хуже, чем показать
+    // нейтральное «Устанавливаем соединение…»: события не идут в обоих случаях одинаково.
     const api = makeMatrixApi()
     let syncCalls = 0
     vi.mocked(api.longPollSync).mockImplementation(async () => {
       syncCalls += 1
-      if (syncCalls <= 3) throw new MatrixError('M_UNKNOWN', 'boom', undefined, 500)
+      if (syncCalls <= 2) throw new MatrixError('M_UNKNOWN', 'boom', undefined, 500)
       return new Promise<never>(() => {})
     })
     const { controller, applied } = harness({}, api)
 
     await controller.connect()
-    // Не «ровно 3»: sleep замокан, петля крутится быстрее, чем waitFor успевает посмотреть.
-    await vi.waitFor(() =>
-      expect(vi.mocked(api.longPollSync).mock.calls.length).toBeGreaterThanOrEqual(3),
-    )
+    await vi.waitFor(() => expect(applied).toContainEqual({ type: 'network.lost' }))
+    controller.disconnect()
+  })
+
+  it('announces the loss on the first request that died on its deadline', async () => {
+    // Дедлайн — это уже отсчитанные десятки секунд тишины: второго провала ждать незачем,
+    // иначе баннер появлялся бы через минуту после фактического обрыва.
+    const api = makeMatrixApi()
+    let syncCalls = 0
+    vi.mocked(api.longPollSync).mockImplementation(async () => {
+      syncCalls += 1
+      if (syncCalls === 1) throw new DOMException('Deadline exceeded', 'TimeoutError')
+      return new Promise<never>(() => {})
+    })
+    const { controller, applied } = harness({}, api)
+
+    await controller.connect()
+    await vi.waitFor(() => expect(applied).toContainEqual({ type: 'network.lost' }))
     controller.disconnect()
 
-    expect(applied.some((action) => action.type === 'network.lost')).toBe(false)
+    expect(api.longPollSync).toHaveBeenCalledTimes(2)
   })
 
   it('reports connection lost on the browser offline event, without waiting for a failed sync', async () => {
@@ -270,8 +284,10 @@ describe('MatrixController (orchestrator)', () => {
     controller.disconnect()
   })
 
-  it('does not lift the banner on a sync answer that arrived after the connection died', async () => {
-    // Ответ мог уехать в сокет до обрыва: тик обработается штатно, но связи за ним уже нет.
+  it('lifts the banner on a successful sync even while the browser claims to be offline', async () => {
+    // `navigator.onLine` — подсказка и врёт в обе стороны (LAN/VPN без интернета считается
+    // online, и наоборот). Ответ сервера — факт, и он сильнее: иначе при вранье браузера
+    // баннер завис бы навсегда на работающем чате.
     const late = deferred<Awaited<ReturnType<MatrixApi['longPollSync']>>>()
     let syncCalls = 0
     const api = makeMatrixApi({
@@ -289,12 +305,8 @@ describe('MatrixController (orchestrator)', () => {
     window.dispatchEvent(new Event('offline'))
     late.resolve(syncResponse('late'))
 
-    // Тик дошёл до обработчика — значит статус удержал гард, а не остановленная петля.
-    await vi.waitFor(() =>
-      expect(applied).toContainEqual(expect.objectContaining({ type: 'sync.received' })),
-    )
-    expect(getState().online).toBe(false)
-    expect(applied.some((action) => action.type === 'network.restored')).toBe(false)
+    await vi.waitFor(() => expect(applied).toContainEqual({ type: 'network.restored' }))
+    expect(getState().online).toBe(true)
     controller.disconnect()
   })
 

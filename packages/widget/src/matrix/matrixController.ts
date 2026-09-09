@@ -17,7 +17,7 @@ import {
 import { findOwnReaction, type ReactionEntry } from '../domain/reactions'
 import { canMoveMarker } from '../domain/receipts'
 import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '../domain/timeline'
-import { isAbortError } from '../shared/utils/abort'
+import { isAbortError, isDeadlineError } from '../shared/utils/abort'
 // Оба кэша медиа считают записи, а не байты: вес записи в каждом ограничен сверху
 // (миниатюра — по построению, свой файл — лимитом композера), поэтому число записей и есть
 // предсказуемый потолок памяти.
@@ -28,7 +28,6 @@ import { sleep } from '../shared/utils/sleep'
 import type { ChatRuntimeState, RuntimeAction } from '../store/state'
 import { type MatrixApi, type ThumbnailSize } from './api/matrixApi'
 import {
-  isConnectivityError,
   isForbiddenError,
   isMatrixAuthError,
   isMediaPendingError,
@@ -64,8 +63,8 @@ export interface SendFileOptions {
 // в /sync может обогнать её на доли секунды — отсюда единственный отложенный повтор на 403.
 const FORBIDDEN_RETRY_DELAY_MS = 400
 
-// Сколько подряд оставшихся без ответа sync'ов считаем потерей связи. Одиночный сбой
-// ретраится через секунду и обычно проходит — баннер из-за него мигал бы на ровном месте.
+// Сколько подряд упавших sync'ов считаем потерей связи. Одиночный сбой ретраится через
+// секунду и обычно проходит — баннер из-за него мигал бы на ровном месте.
 const OFFLINE_AFTER_FAILURES = 2
 
 // Сколько миниатюр держим. Вытеснение безопасно в любой момент: object-URL сам держит свой
@@ -753,13 +752,17 @@ export class MatrixController implements MatrixService {
     // Её лечит recovery, и баннер «нет соединения» там только соврал бы.
     if (this.handleAuthError(err, 'sync')) return
 
-    console.error('[PLChat] sync error, retrying in', meta.backoff, 'ms:', err)
+    console.error('[PLChat] sync error, retrying in up to', meta.backoff, 'ms:', err)
 
-    // Сервер ответил — связь есть, виноват бэкенд; баннер про соединение тут соврал бы.
-    if (!isConnectivityError(err)) return
-
+    // Считаем любой сбой, кроме auth. Строка в шапке отвечает на вопрос «доходят ли до нас
+    // события», а не «есть ли интернет»: причину из браузера всё равно не узнать (мёртвая сеть
+    // и мёртвый сервер дают один и тот же TypeError), а молчать при лежащем бэкенде хуже, чем
+    // сказать нейтральное «Устанавливаем соединение…».
     this.syncFailures += 1
-    if (this.syncFailures >= OFFLINE_AFTER_FAILURES) this.markOffline()
+
+    // Свой дедлайн — это уже отсчитанные десятки секунд тишины, ждать второго провала незачем.
+    // Остальным сбоям порог нужен: они возвращаются мгновенно и часто проходят со второго раза.
+    if (isDeadlineError(err) || this.syncFailures >= OFFLINE_AFTER_FAILURES) this.markOffline()
   }
 
   // Потерю связи объявляем один раз: сюда ведут оба сигнала — счётчик провалов и событие
@@ -771,13 +774,14 @@ export class MatrixController implements MatrixService {
     this.dispatch({ type: 'network.lost' })
   }
 
+  // Успешный тик — доказательство связи, и оно сильнее мнения браузера: `navigator.onLine`
+  // врёт в обе стороны (MDN прямо называет его подсказкой), а ответ сервера — факт. Поздний
+  // ответ, приехавший уже после обрыва, снимет баннер лишь до следующего запроса: петля жива,
+  // и он вернётся через секунду.
+  //
   // Зовётся на каждый успешный тик, поэтому дешёвая проверка стора вместо dispatch'а:
   // редьюсер и так вернул бы то же состояние, но devtools собирали бы пустой экшен раз в 25 секунд.
   private markOnline(): void {
-    // Ответ мог прийти уже после того, как браузер сообщил о потере связи: снимать по нему
-    // баннер значит соврать — он приехал по коннекту, которого больше нет.
-    if (!navigator.onLine) return
-
     this.syncFailures = 0
     if (this.getState().online) return
 

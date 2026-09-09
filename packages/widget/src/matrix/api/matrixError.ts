@@ -86,20 +86,6 @@ export function isMediaPendingError(err: unknown): boolean {
   return isHttpStatus(err, 504) || isMatrixError(err, MatrixErrCode.NotYetUploaded)
 }
 
-/**
- * Можно ли по ошибке судить о связи: ответа не было вовсе.
- *
- * `MatrixError` значит, что сервер ответил — пусть и пятисоткой: связь есть, виноват бэкенд,
- * и баннер «нет соединения» тут соврал бы. Ответа не было в двух случаях: `fetch` не дошёл
- * (`TypeError`) и запрос снят своим дедлайном (`TimeoutError`). Всё остальное — незнакомая
- * ошибка уже полученного ответа (разбор тела и т.п.), сетевым вердиктом её не считаем.
- */
-export function isConnectivityError(err: unknown): boolean {
-  if (err instanceof TypeError) return true
-
-  return err instanceof DOMException && err.name === 'TimeoutError'
-}
-
 export type AuthErrorContext =
   | 'sync'
   | 'sendMessage'
