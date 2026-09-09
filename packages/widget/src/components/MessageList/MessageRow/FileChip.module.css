@@ -45,7 +45,7 @@
   grid-area: 1 / 1;
   display: grid;
   place-items: center;
-  transition: opacity 0.15s;
+  transition: opacity var(--dur-fast);
 }
 
 .hoverIcon {
@@ -74,7 +74,7 @@
   flex-shrink: 0;
   color: inherit;
   background: var(--c-icon-tint);
-  transition: background-color 0.15s;
+  transition: background-color var(--dur-fast);
 
   &:not(:disabled):hover {
     background: color-mix(in srgb, currentColor 24%, transparent);
@@ -148,7 +148,7 @@
   flex-shrink: 0;
   color: inherit;
   background: var(--c-icon-tint);
-  transition: background-color 0.15s;
+  transition: background-color var(--dur-fast);
 
   &:hover {
     background: color-mix(in srgb, currentColor 24%, transparent);

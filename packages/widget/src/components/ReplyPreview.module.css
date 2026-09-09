@@ -5,7 +5,7 @@
   min-width: 0;
   padding-left: 8px;
   border-left: 2px solid currentColor;
-  transition: opacity 0.15s;
+  transition: opacity var(--dur-fast);
 }
 
 .clickable {

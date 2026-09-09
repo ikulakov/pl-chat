@@ -179,11 +179,11 @@ describe('MessageList', () => {
       },
     })
 
-    render(<MessageList userId={ME} />)
+    const { container } = render(<MessageList userId={ME} />)
 
     expect(screen.queryByRole('button', { name: 'Повторить' })).not.toBeInTheDocument()
     // и спиннера нет — загрузка не идёт
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-role="spinner"]')).not.toBeInTheDocument()
   })
 
   it('shows history spinner while a page is loading', () => {
@@ -197,9 +197,9 @@ describe('MessageList', () => {
       },
     })
 
-    render(<MessageList userId={ME} />)
+    const { container } = render(<MessageList userId={ME} />)
 
-    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(container.querySelector('[data-role="spinner"]')).toBeInTheDocument()
   })
 
   it('a reply to a not-loaded original renders an unavailable reply preview that is not clickable', () => {

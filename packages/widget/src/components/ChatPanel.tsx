@@ -1,18 +1,9 @@
-import { useEffect } from 'react'
-import { ERROR_ILLUSTRATION } from '../shared/assets/inlineAssets'
-import { FEATURES } from '../features'
 import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
-import { ensureEmojiIndex } from '../shared/emoji/emojiIndexStore'
+import { ERROR_ILLUSTRATION } from '../shared/assets/inlineAssets'
 import { Spinner } from '../shared/ui/Spinner'
-import {
-  selectOperator,
-  selectOperatorName,
-  selectStatus,
-  selectUserId,
-  selectViewport,
-} from '../store/selectors'
+import { isChatting, selectStatus, selectUserId, selectViewport } from '../store/selectors'
 import { AttachmentProvider } from './Attachment/AttachmentProvider'
 import chatStyles from './ChatPanel.module.css'
 import { Composer } from './Composer/Composer'
@@ -25,31 +16,15 @@ import statusStyles from './StatusScreen.module.css'
 export function ChatPanel() {
   const status = useChatStore(selectStatus)
   const userId = useChatStore(selectUserId)
-  const operator = useChatStore(selectOperator)
-  const operatorName = useChatStore(selectOperatorName)
   const viewport = useChatStore(selectViewport)
 
-  const { reconnect, loadEmojiIndex } = useChatActions()
-
-  // Индекс пака тянем один раз на вкладку и отсюда: лента и цитаты его только читают.
-  // Ждём userId: каталог отдаётся под токеном (permitAll только у /_matrix/emoji/** и
-  // /_matrix/sticker/**), а mount-эффект иначе гонится с регистрацией гостя и получает 401 —
-  // без refresh-токена его нечем починить, и вся отрисовка эмодзи молча оставалась бы
-  // выключенной до перезагрузки страницы.
-  useEffect(() => {
-    if (!FEATURES.emoji || userId === null) return
-
-    ensureEmojiIndex(loadEmojiIndex)
-  }, [loadEmojiIndex, userId])
+  const { reconnect } = useChatActions()
 
   return (
     <div className={chatStyles.panel}>
       {import.meta.env.DEV && <DevOperatorTools />}
 
-      <Header
-        name={operatorName}
-        subtitle={operator.isActive ? t('header.operatorSubtitle') : t('header.subtitle')}
-      />
+      <Header />
 
       {(status === 'idle' || status === 'connecting') && (
         <StatusScreen>
@@ -73,7 +48,7 @@ export function ChatPanel() {
         />
       )}
 
-      {(status === 'waiting' || status === 'active') && userId !== null && (
+      {isChatting(status) && userId !== null && (
         <AttachmentProvider dropZoneEnabled={viewport !== 'fullscreen'}>
           <MessageList userId={userId} />
           <Composer />

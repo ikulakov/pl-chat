@@ -23,7 +23,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background 0.15s;
+  transition: background var(--dur-fast);
   text-align: center;
 
   &:hover:not(:disabled) {

@@ -32,6 +32,7 @@ export const INITIAL_ROOM_STATE: RoomState = {
 export const INITIAL_RUNTIME_STATE: ChatRuntimeState = {
   phase: 'idle',
   error: null,
+  online: true,
   identity: null,
   cursor: null,
   room: INITIAL_ROOM_STATE,

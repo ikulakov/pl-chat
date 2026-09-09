@@ -13,7 +13,7 @@ const OPERATOR = '@operator:bank'
 function connectedWithSentMessage(): ChatRuntimeState {
   return {
     ...INITIAL_RUNTIME_STATE,
-    phase: 'connected',
+    phase: 'ready',
     identity: IDENTITY,
     cursor: 's1',
     room: {
@@ -76,7 +76,7 @@ describe('chatRuntimeReducer', () => {
       room: initialPatch(),
     })
 
-    expect(next.phase).toBe('connected')
+    expect(next.phase).toBe('ready')
     expect(next.identity).toEqual(IDENTITY)
     expect(next.cursor).toBe('s1')
     expect(next.room.timeline).toHaveLength(1)
@@ -157,7 +157,7 @@ describe('chatRuntimeReducer', () => {
     expect(synced.room).toBe(connected.room)
   })
 
-  it('connection.failed resets identity, cursor and room', () => {
+  it('session.failed resets identity, cursor and room', () => {
     const connected = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
       type: 'session.started',
       identity: IDENTITY,
@@ -165,7 +165,7 @@ describe('chatRuntimeReducer', () => {
       room: initialPatch(),
     })
 
-    const failed = chatRuntimeReducer(connected, { type: 'connection.failed', error: 'network' })
+    const failed = chatRuntimeReducer(connected, { type: 'session.failed', error: 'network' })
 
     expect(failed.phase).toBe('error')
     expect(failed.error).toBe('network')

@@ -9,11 +9,13 @@ import type { TimelineItem } from '../domain/timeline'
 import type { UploadFailure } from '../domain/uploadError'
 
 export type RuntimeAction =
-  | { type: 'connection.connecting' }
+  | { type: 'session.starting' }
   | { type: 'session.started'; identity: Identity; cursor: string; room: RoomSyncPatch }
-  | { type: 'connection.failed'; error: string }
   | { type: 'session.recovering' }
+  | { type: 'session.failed'; error: string }
   | { type: 'session.closed' }
+  | { type: 'network.lost' }
+  | { type: 'network.restored' }
   | { type: 'sync.received'; cursor: string; room?: RoomSyncPatch }
   | { type: 'message.optimisticAdded'; message: TimelineItem }
   | { type: 'message.sent'; localId: string; eventId: string }
@@ -44,8 +46,9 @@ export type RuntimeAction =
   | { type: 'card.answerFailed'; cardEventId: string }
 
 export interface ChatRuntimeState {
-  phase: ConnectionPhase
+  phase: SessionPhase
   error: string | null
+  online: boolean
   identity: Identity | null
   cursor: string | null
   room: RoomState
@@ -84,8 +87,6 @@ export interface Identity {
   roomId: string
 }
 
-// Фаза подключения к homeserver — внутреннее состояние стора
-export type ConnectionPhase = 'idle' | 'connecting' | 'recovering' | 'connected' | 'error'
+export type SessionPhase = 'idle' | 'connecting' | 'recovering' | 'ready' | 'error'
 
-// Статус диалога, который видит пользователь
-export type ChatStatus = 'idle' | 'connecting' | 'waiting' | 'active' | 'error'
+export type ChatStatus = 'idle' | 'connecting' | 'bot' | 'operator' | 'offline' | 'error'

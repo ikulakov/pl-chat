@@ -4,8 +4,6 @@ import type { MediaVerdict } from '../domain/mediaVerdict'
 import type { ReactionIndex } from '../domain/reactions'
 import type { ReadReceipt } from '../domain/receipts'
 import { countUnread } from '../domain/receipts'
-import { t } from '../i18n'
-import type { OperatorState } from '../domain/operator'
 import type { TimelineItem } from '../domain/timeline'
 import type { ChatStatus, ReplyTarget } from './state'
 import type { ChatStoreState } from './store'
@@ -27,17 +25,51 @@ export function selectStatus(state: ChatStoreState): ChatStatus {
       return 'connecting'
     case 'error':
       return 'error'
-    case 'connected':
-      return state.room.operator.isActive ? 'active' : 'waiting'
+    case 'ready':
+      if (!state.online) return 'offline'
+
+      return state.room.operator.isActive ? 'operator' : 'bot'
   }
 }
 
-export function selectOperator(state: ChatStoreState): OperatorState {
-  return state.room.operator
+/**
+ * Показывать ли ленту с композером.
+ *
+ * Исчерпывающий `switch`, а не `||`: новое значение `ChatStatus` не соберётся, пока его тут
+ * не разложат. С дизъюнкцией забытое значение молча скрыло бы всю панель.
+ */
+export function isChatting(status: ChatStatus): boolean {
+  switch (status) {
+    case 'bot':
+    case 'operator':
+    case 'offline':
+      return true
+    case 'idle':
+    case 'connecting':
+    case 'error':
+      return false
+  }
 }
 
-export function selectOperatorName(state: ChatStoreState): string {
-  return state.room.operator.displayName ?? t('header.name')
+/**
+ * Связи нет, но мы её ждём: первое подключение, восстановление сессии, обрыв при живой ленте.
+ * В `error` — `false`: попытки кончились, ждать нечего.
+ */
+export function isConnectionPending(status: ChatStatus): boolean {
+  switch (status) {
+    case 'idle':
+    case 'connecting':
+    case 'offline':
+      return true
+    case 'bot':
+    case 'operator':
+    case 'error':
+      return false
+  }
+}
+
+export function selectOperatorDisplayName(state: ChatStoreState): string | null {
+  return state.room.operator.displayName
 }
 
 export function selectUserId(state: ChatStoreState): string | null {

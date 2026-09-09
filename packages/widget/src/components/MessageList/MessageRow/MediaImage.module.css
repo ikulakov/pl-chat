@@ -64,8 +64,8 @@
   color: var(--c-text-invert);
   background: rgb(0 0 0 / 45%);
   transition:
-    background-color 0.15s,
-    opacity 0.15s;
+    background-color var(--dur-fast),
+    opacity var(--dur-fast);
 
   &:not(:disabled):hover {
     background: rgb(0 0 0 / 65%);

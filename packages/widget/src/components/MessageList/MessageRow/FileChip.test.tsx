@@ -97,14 +97,14 @@ describe('FileChip', () => {
     const upload = { file: new File([], 'doc.pdf'), pct: 40 }
     const sending: BubbleMetaData = { ...meta, sendStatus: 'sending' }
 
-    const { rerender } = render(
+    const { container, rerender } = render(
       <FileChip
         item={fileItem({ sendStatus: 'sending', upload })}
         meta={sending}
       />,
     )
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-role="spinner"]')).not.toBeInTheDocument()
 
     // upload снят редьюсером — байты доехали, пошёл PUT /send: теперь спиннер уместен
     rerender(
@@ -114,7 +114,7 @@ describe('FileChip', () => {
       />,
     )
 
-    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(container.querySelector('[data-role="spinner"]')).toBeInTheDocument()
   })
 
   it('клик по чипу скачивает оригинал файла, а не превью', async () => {

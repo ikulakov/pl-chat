@@ -39,7 +39,7 @@ function loaderHarness(
 ) {
   let state: ChatRuntimeState = {
     ...INITIAL_RUNTIME_STATE,
-    phase: 'connected',
+    phase: 'ready',
     identity: { userId: '@u:bank', roomId: ROOM_ID },
     room: { ...INITIAL_RUNTIME_STATE.room, prevBatch },
   }

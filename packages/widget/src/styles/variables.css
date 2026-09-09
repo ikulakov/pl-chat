@@ -49,6 +49,10 @@
   /* Sizes */
   --header-h: 64px;
 
+  /* Motion */
+  --dur-fast: 0.15s;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
   /* Z-index */
   --z-sticky: 1;
   --z-overlay: 10;

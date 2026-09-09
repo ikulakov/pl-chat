@@ -20,7 +20,7 @@
   font-size: 26px;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--dur-fast);
 
   &:hover,
   &:focus-visible {

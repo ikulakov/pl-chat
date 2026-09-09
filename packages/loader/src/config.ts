@@ -29,14 +29,14 @@ export function validateConfig(cfg: LoaderConfig): void {
   try {
     url = new URL(cfg.chatUrl)
   } catch {
-    throw new Error('PlChat: chatUrl is not a valid URL')
+    throw new Error('BankChat: chatUrl is not a valid URL')
   }
   const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
   if (url.protocol !== 'https:' && !isLocalhost) {
-    throw new Error('PlChat: chatUrl must use HTTPS')
+    throw new Error('BankChat: chatUrl must use HTTPS')
   }
   if (cfg.preload !== undefined && !PRELOAD_MODES.includes(cfg.preload)) {
-    throw new Error(`PlChat: preload must be one of ${PRELOAD_MODES.join(', ')}`)
+    throw new Error(`BankChat: preload must be one of ${PRELOAD_MODES.join(', ')}`)
   }
 }
 

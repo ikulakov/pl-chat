@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isSystem, type TextTimelineItem } from '../domain/timeline'
 import {
   createFakeTokenStore,
@@ -61,18 +61,28 @@ function roomWithMessage(message: TextTimelineItem): RoomState {
   }
 }
 
+// jsdom рапортует `navigator.onLine === true` всегда, и dispatchEvent('offline') его не меняет:
+// ветку «браузер знает, что связи нет» видно только через подмену геттера.
+function stubBrowserOffline(): void {
+  Object.defineProperty(navigator, 'onLine', { get: () => false, configurable: true })
+}
+
 describe('MatrixController (orchestrator)', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'onLine')
+  })
+
   it('connect dispatches connecting then session.started', async () => {
     const { controller, applied } = harness()
 
     await controller.connect()
     controller.disconnect()
 
-    expect(applied[0]).toEqual({ type: 'connection.connecting' })
+    expect(applied[0]).toEqual({ type: 'session.starting' })
     expect(applied[1]!.type).toBe('session.started')
   })
 
-  it('connect failure dispatches connection.failed', async () => {
+  it('connect failure dispatches session.failed', async () => {
     const { controller, applied } = harness(
       {},
       makeMatrixApi({
@@ -83,14 +93,14 @@ describe('MatrixController (orchestrator)', () => {
     await controller.connect()
 
     expect(applied.at(-1)).toEqual({
-      type: 'connection.failed',
+      type: 'session.failed',
       error: CONNECTION_FAILED_ERROR,
     })
   })
 
   it('does not connect when already connected', async () => {
     const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'connected' }, api)
+    const { controller } = harness({ phase: 'ready' }, api)
 
     await controller.connect()
 
@@ -114,12 +124,12 @@ describe('MatrixController (orchestrator)', () => {
     await controller.connect()
     controller.disconnect()
 
-    expect(applied[0]).toEqual({ type: 'connection.connecting' })
+    expect(applied[0]).toEqual({ type: 'session.starting' })
     expect(applied.some((action) => action.type === 'session.started')).toBe(true)
   })
 
   it('disconnect сбрасывает рантайм, поэтому повторный connect поднимает сессию заново', async () => {
-    // До сброса стора disconnect оставлял phase 'connected', и гард в connect() навсегда
+    // До сброса стора disconnect оставлял phase 'ready', и гард в connect() навсегда
     // запирал переподключение — виджет уже не поднимался.
     const { controller, getState } = harness()
 
@@ -130,7 +140,7 @@ describe('MatrixController (orchestrator)', () => {
 
     await controller.connect()
 
-    expect(getState().phase).toBe('connected')
+    expect(getState().phase).toBe('ready')
     expect(getState().identity).not.toBeNull()
     controller.disconnect()
   })
@@ -172,7 +182,7 @@ describe('MatrixController (orchestrator)', () => {
     controller.disconnect()
 
     expect(api.registerGuest).toHaveBeenCalledTimes(2)
-    expect(applied.some((action) => action.type === 'connection.failed')).toBe(false)
+    expect(applied.some((action) => action.type === 'session.failed')).toBe(false)
     expect(applied.some((action) => action.type === 'session.recovering')).toBe(true)
   })
 
@@ -191,7 +201,7 @@ describe('MatrixController (orchestrator)', () => {
     await controller.connect()
     await vi.waitFor(() =>
       expect(applied).toContainEqual({
-        type: 'connection.failed',
+        type: 'session.failed',
         error: CONNECTION_FAILED_ERROR,
       }),
     )
@@ -199,6 +209,195 @@ describe('MatrixController (orchestrator)', () => {
     expect(api.registerGuest).toHaveBeenCalledOnce()
     expect(tokens.getAccessToken()).toBeNull()
     expect(tokens.getRefreshToken()).toBeNull()
+  })
+
+  it('reports connection lost after a second sync leaves without an answer', async () => {
+    const api = makeMatrixApi()
+    let syncCalls = 0
+    vi.mocked(api.longPollSync).mockImplementation(async () => {
+      syncCalls += 1
+      // Ровно то, чем отвечает fetch, когда до сервера не дошли.
+      if (syncCalls <= 2) throw new TypeError('Failed to fetch')
+      if (syncCalls === 3) return syncResponse('s1')
+      return new Promise<never>(() => {})
+    })
+    const { controller, applied } = harness({}, api)
+
+    await controller.connect()
+    await vi.waitFor(() => expect(applied).toContainEqual({ type: 'network.restored' }))
+    controller.disconnect()
+
+    expect(
+      applied.filter(
+        (action) => action.type === 'network.lost' || action.type === 'network.restored',
+      ),
+    ).toEqual([{ type: 'network.lost' }, { type: 'network.restored' }])
+  })
+
+  it('does not blame the network when the server answers with an error', async () => {
+    // Пятисотка — это ответ: связь есть, лежит бэкенд. Баннер про соединение тут соврал бы,
+    // и «Устанавливаем соединение…» вместо честной ошибки только запутает.
+    const api = makeMatrixApi()
+    let syncCalls = 0
+    vi.mocked(api.longPollSync).mockImplementation(async () => {
+      syncCalls += 1
+      if (syncCalls <= 3) throw new MatrixError('M_UNKNOWN', 'boom', undefined, 500)
+      return new Promise<never>(() => {})
+    })
+    const { controller, applied } = harness({}, api)
+
+    await controller.connect()
+    // Не «ровно 3»: sleep замокан, петля крутится быстрее, чем waitFor успевает посмотреть.
+    await vi.waitFor(() =>
+      expect(vi.mocked(api.longPollSync).mock.calls.length).toBeGreaterThanOrEqual(3),
+    )
+    controller.disconnect()
+
+    expect(applied.some((action) => action.type === 'network.lost')).toBe(false)
+  })
+
+  it('reports connection lost on the browser offline event, without waiting for a failed sync', async () => {
+    // Ровно случай «выключил сеть в DevTools»: коннект оборван, но висящий long-poll не падает —
+    // ждать провалов запросов тут можно бесконечно, а браузер уже всё сказал.
+    const api = makeMatrixApi()
+    vi.mocked(api.longPollSync).mockImplementation(() => new Promise<never>(() => {}))
+    const { controller, applied } = harness({}, api)
+
+    await controller.connect()
+    window.dispatchEvent(new Event('offline'))
+
+    expect(applied).toContainEqual({ type: 'network.lost' })
+    controller.disconnect()
+  })
+
+  it('does not lift the banner on a sync answer that arrived after the connection died', async () => {
+    // Ответ мог уехать в сокет до обрыва: тик обработается штатно, но связи за ним уже нет.
+    const late = deferred<Awaited<ReturnType<MatrixApi['longPollSync']>>>()
+    let syncCalls = 0
+    const api = makeMatrixApi({
+      longPollSync: vi.fn(() => {
+        syncCalls += 1
+        return syncCalls === 1 ? late.promise : new Promise<never>(() => {})
+      }),
+    })
+    const { controller, applied, getState } = harness({}, api)
+
+    await controller.connect()
+    await vi.waitFor(() => expect(api.longPollSync).toHaveBeenCalledOnce())
+
+    stubBrowserOffline()
+    window.dispatchEvent(new Event('offline'))
+    late.resolve(syncResponse('late'))
+
+    // Тик дошёл до обработчика — значит статус удержал гард, а не остановленная петля.
+    await vi.waitFor(() =>
+      expect(applied).toContainEqual(expect.objectContaining({ type: 'sync.received' })),
+    )
+    expect(getState().online).toBe(false)
+    expect(applied.some((action) => action.type === 'network.restored')).toBe(false)
+    controller.disconnect()
+  })
+
+  it('announces the loss once, no matter how many signals arrive', async () => {
+    const api = makeMatrixApi()
+    vi.mocked(api.longPollSync).mockImplementation(() => new Promise<never>(() => {}))
+    const { controller, applied } = harness({}, api)
+
+    await controller.connect()
+    window.dispatchEvent(new Event('offline'))
+    window.dispatchEvent(new Event('offline'))
+
+    expect(applied.filter((action) => action.type === 'network.lost')).toHaveLength(1)
+    controller.disconnect()
+  })
+
+  it('keeps the session and restarts sync when the browser comes online', async () => {
+    // Запрос, повисший в мёртвом коннекте, сам не отвалится — рвём его рестартом, иначе
+    // возвращение связи ждало бы дедлайна long-poll'а.
+    const api = makeMatrixApi()
+    let firstSignal: AbortSignal | undefined
+    let syncCalls = 0
+    vi.mocked(api.longPollSync).mockImplementation((_since, options) => {
+      syncCalls += 1
+      if (syncCalls === 1) {
+        firstSignal = options?.signal
+        return new Promise((_resolve, reject) => {
+          firstSignal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('Restarted', 'AbortError')),
+            { once: true },
+          )
+        })
+      }
+      if (syncCalls === 2) return Promise.resolve(syncResponse('s1'))
+      return new Promise<never>(() => {})
+    })
+    const { controller, applied } = harness({}, api)
+
+    await controller.connect()
+    await vi.waitFor(() => expect(api.longPollSync).toHaveBeenCalledOnce())
+
+    window.dispatchEvent(new Event('offline'))
+    window.dispatchEvent(new Event('online'))
+
+    await vi.waitFor(() => expect(applied).toContainEqual({ type: 'network.restored' }))
+    expect(firstSignal?.aborted).toBe(true)
+    // Сессию не пересоздаём: та же комната, та же лента, тот же курсор.
+    expect(applied.filter((action) => action.type === 'session.started')).toHaveLength(1)
+    expect(api.registerGuest).toHaveBeenCalledOnce()
+    controller.disconnect()
+  })
+
+  it('stops listening to the network once the session is over', async () => {
+    const api = makeMatrixApi()
+    vi.mocked(api.longPollSync).mockImplementation(() => new Promise<never>(() => {}))
+    const { controller, applied } = harness({}, api)
+
+    await controller.connect()
+    controller.disconnect()
+    window.dispatchEvent(new Event('offline'))
+
+    // Листенер пережил бы сессию — и следующая начиналась бы с чужого вердикта о связи.
+    expect(applied.some((action) => action.type === 'network.lost')).toBe(false)
+  })
+
+  it('keeps quiet about a single sync hiccup', async () => {
+    const api = makeMatrixApi()
+    let syncCalls = 0
+    vi.mocked(api.longPollSync).mockImplementation(async () => {
+      syncCalls += 1
+      if (syncCalls === 1) throw new TypeError('Failed to fetch')
+      if (syncCalls === 2) return syncResponse('s1')
+      return new Promise<never>(() => {})
+    })
+    const { controller, applied } = harness({}, api)
+
+    await controller.connect()
+    await vi.waitFor(() =>
+      expect(applied).toContainEqual(expect.objectContaining({ cursor: 's1' })),
+    )
+    controller.disconnect()
+
+    expect(applied.some((action) => action.type === 'network.lost')).toBe(false)
+  })
+
+  it('does not blame the network when sync fails on auth', async () => {
+    const api = makeMatrixApi()
+    let syncCalls = 0
+    vi.mocked(api.longPollSync).mockImplementation(async () => {
+      syncCalls += 1
+      if (syncCalls <= 2) throw new MatrixError('M_UNKNOWN_TOKEN', 'expired')
+      return new Promise<never>(() => {})
+    })
+    const { controller, applied } = harness({}, api)
+
+    await controller.connect()
+    await vi.waitFor(() => expect(api.longPollSync).toHaveBeenCalledTimes(2))
+    controller.disconnect()
+
+    // Сервер ответил — связь есть, мертва сессия. Это лечит recovery, а не баннер про сеть.
+    expect(applied.some((action) => action.type === 'session.recovering')).toBe(true)
+    expect(applied.some((action) => action.type === 'network.lost')).toBe(false)
   })
 
   it('clears tokens when resuming a deactivated account, without re-registering a new guest', async () => {
@@ -217,7 +416,7 @@ describe('MatrixController (orchestrator)', () => {
     await controller.connect()
 
     expect(applied.at(-1)).toEqual({
-      type: 'connection.failed',
+      type: 'session.failed',
       error: CONNECTION_FAILED_ERROR,
     })
     // Deactivation must not be silently worked around by registering a fresh guest —
@@ -258,7 +457,7 @@ describe('MatrixController (orchestrator)', () => {
     controller.disconnect()
 
     expect(applied.filter((action) => action.type === 'session.started')).toHaveLength(2)
-    expect(applied.some((action) => action.type === 'connection.failed')).toBe(false)
+    expect(applied.some((action) => action.type === 'session.failed')).toBe(false)
   })
 
   it('fails connection when initial sync does not contain a support room', async () => {
@@ -272,7 +471,7 @@ describe('MatrixController (orchestrator)', () => {
     await controller.connect()
 
     expect(applied).toContainEqual({
-      type: 'connection.failed',
+      type: 'session.failed',
       error: 'Не удалось подключиться',
     })
     expect(api.longPollSync).not.toHaveBeenCalled()
@@ -280,7 +479,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('sendMessage dispatches optimisticAdded then optimisticResolved', async () => {
     const { controller, applied } = harness({
-      phase: 'connected',
+      phase: 'ready',
       identity: IDENTITY,
     })
 
@@ -296,7 +495,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('sendSticker уходит на m.sticker с content из каталога и без цитаты', async () => {
     const api = makeMatrixApi()
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendSticker({
       id: '01_1fa77',
@@ -346,7 +545,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi({
       uploadMedia: vi.fn<MatrixApi['uploadMedia']>().mockReturnValue(upload.promise),
     })
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     const sending = controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'))
     await vi.waitFor(() =>
@@ -373,7 +572,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('sendFile с replyToEventId доносит связь до отправки и очищает reply', async () => {
     const api = makeMatrixApi()
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'), {
       replyToEventId: '$parent:bank',
@@ -392,7 +591,7 @@ describe('MatrixController (orchestrator)', () => {
   it('размеры, прочитанные при выборе файла, доезжают до черновика и до события', async () => {
     // черновик знает пропорции сразу — место под превью в ленте не прыгает после загрузки
     const api = makeMatrixApi()
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendFile(makeFile('p.png', 1, 'image/png'), { dims: { w: 800, h: 600 } })
 
@@ -408,7 +607,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('sendFile отправляет один и тот же MIME в Content-Type и в info.mimetype', async () => {
     const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     // браузер часто отдаёт для .docx пустой type — заявленный тип должен браться из расширения,
     // иначе сервер отвергнет приём (заголовок сверяется с содержимым)
@@ -434,7 +633,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['uploadMedia']>()
         .mockRejectedValue(new MatrixError('M_INVALID_PARAM', 'server-side wording')),
     })
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendFile(makeFile('big.pdf', 1, 'application/pdf'))
 
@@ -455,7 +654,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError('M_UNKNOWN', 'boom')),
     })
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'))
 
@@ -469,7 +668,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi({
       getThumbnail: vi.fn<MatrixApi['getThumbnail']>().mockReturnValue(thumb.promise),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
     const mxcUrl = 'mxc://bank.ru/abc'
     const size = { width: 320, height: 240 }
 
@@ -500,7 +699,7 @@ describe('MatrixController (orchestrator)', () => {
         .mockRejectedValueOnce(new MatrixError('M_UNKNOWN', 'timeout', undefined, 500))
         .mockResolvedValue(blob),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
     const mxcUrl = 'mxc://bank.ru/abc'
     const size = { width: 320, height: 240 }
 
@@ -519,7 +718,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['getThumbnail']>()
         .mockRejectedValue(new MatrixError('M_NOT_YET_UPLOADED', 'quarantine', undefined, 504)),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
     const file = makeFile('photo.png', 1, 'image/png')
     const mxcUrl = 'mxc://bank.ru/abc'
     const size = { width: 320, height: 240 }
@@ -545,7 +744,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['downloadMedia']>()
         .mockRejectedValue(new MatrixError('M_FORBIDDEN', 'no access', undefined, 403)),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
     const file = makeFile('doc.pdf', 1, 'application/pdf')
 
     await controller.sendFile(file)
@@ -566,7 +765,7 @@ describe('MatrixController (orchestrator)', () => {
         return Promise.resolve({ content_uri: `mxc://bank.ru/file${uploaded}` })
       }),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     // потолок — 5 файлов, шестая отправка выбрасывает самую давнюю копию
     let last = makeFile('f0.pdf', 1, 'application/pdf')
@@ -590,7 +789,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['getThumbnail']>()
         .mockRejectedValue(new MatrixError('M_NOT_FOUND', 'no thumbnail', undefined, 404)),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
     const size = { width: 320, height: 240 }
 
     await controller.loadPreview('mxc://bank.ru/abc', size)
@@ -608,7 +807,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['downloadMedia']>()
         .mockRejectedValue(new MatrixError('M_NOT_FOUND', 'rejected', undefined, 404)),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendFile(makeFile('photo.png', 1, 'image/png'))
 
@@ -625,7 +824,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['downloadMedia']>()
         .mockRejectedValue(new MatrixError('M_NOT_YET_UPLOADED', 'quarantine', undefined, 504)),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
     const mxcUrl = 'mxc://bank.ru/abc'
 
     await controller.sendFile(makeFile('photo.png', 1, 'image/png'))
@@ -639,7 +838,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('смена сессии сбрасывает кэш медиа: чужие байты в новой сессии недоступны', async () => {
     const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
     const mxcUrl = 'mxc://bank.ru/abc'
     const size = { width: 320, height: 240 }
 
@@ -659,10 +858,7 @@ describe('MatrixController (orchestrator)', () => {
         return upload.promise
       }),
     })
-    const { controller, applied, getState } = harness(
-      { phase: 'connected', identity: IDENTITY },
-      api,
-    )
+    const { controller, applied, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     const sending = controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'))
     await vi.waitFor(() => expect(signal).toBeDefined())
@@ -699,7 +895,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError(errcode, message)),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     const sending = controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'))
     await vi.waitFor(() => expect(signal).toBeDefined())
@@ -730,7 +926,7 @@ describe('MatrixController (orchestrator)', () => {
         .mockRejectedValueOnce(new MatrixError('M_UNKNOWN', 'boom'))
         .mockResolvedValueOnce({ content_uri: 'mxc://bank.ru/retry' }),
     })
-    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendFile(makeFile('p.png', 1, 'image/png'), { dims: { w: 800, h: 600 } })
     const draft = getState().room.timeline.find((m) => !isSystem(m))!
@@ -751,10 +947,7 @@ describe('MatrixController (orchestrator)', () => {
         .mockRejectedValueOnce(new MatrixError('M_UNKNOWN', 'boom'))
         .mockResolvedValueOnce({ content_uri: 'mxc://bank.ru/retry' }),
     })
-    const { controller, applied, getState } = harness(
-      { phase: 'connected', identity: IDENTITY },
-      api,
-    )
+    const { controller, applied, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendFile(makeFile('doc.pdf', 1, 'application/pdf'))
     const draft = getState().room.timeline.find((m) => !isSystem(m))!
@@ -777,7 +970,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
     })
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendMessage('hi')
 
@@ -800,7 +993,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
     })
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
     const handleSyncError = (
       controller as unknown as {
         handleSyncError: (err: unknown, meta: { backoff: number }) => void
@@ -825,7 +1018,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError('M_USER_DEACTIVATED', 'disabled')),
     })
-    const { controller, applied, tokens } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied, tokens } = harness({ phase: 'ready', identity: IDENTITY }, api)
     tokens.setSession({ accessToken: 'token', refreshToken: 'refresh', userId: '@u:bank' })
 
     await controller.sendMessage('hi')
@@ -834,7 +1027,7 @@ describe('MatrixController (orchestrator)', () => {
       expect(applied).toContainEqual({ type: 'message.failed', localId: expect.any(String) }),
     )
     expect(applied).toContainEqual({
-      type: 'connection.failed',
+      type: 'session.failed',
       error: CONNECTION_FAILED_ERROR,
     })
     expect(api.registerGuest).not.toHaveBeenCalled()
@@ -847,7 +1040,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi({
       sendMessage: vi.fn<MatrixApi['sendMessage']>().mockReturnValue(send.promise),
     })
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     const promise = controller.sendMessage('hi')
     await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledOnce())
@@ -862,7 +1055,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('resendMessage dispatches retrying then optimisticResolved under the same localId', async () => {
     const { controller, applied } = harness({
-      phase: 'connected',
+      phase: 'ready',
       identity: IDENTITY,
       room: roomWithMessage(failedMessage({ txnId: 'txn-original' })),
     })
@@ -881,7 +1074,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi()
     const { controller } = harness(
       {
-        phase: 'connected',
+        phase: 'ready',
         identity: IDENTITY,
         room: roomWithMessage(failedMessage({ txnId: 'txn-original' })),
       },
@@ -900,7 +1093,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi()
     const { controller } = harness(
       {
-        phase: 'connected',
+        phase: 'ready',
         identity: IDENTITY,
         room: roomWithMessage(
           failedMessage({ txnId: 'txn-original', relation: { type: 'reply', eventId: '$parent' } }),
@@ -919,7 +1112,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('resendMessage does nothing when the failed message has no txnId', async () => {
     const { controller, dispatch } = harness({
-      phase: 'connected',
+      phase: 'ready',
       identity: IDENTITY,
       room: roomWithMessage(failedMessage()),
     })
@@ -935,7 +1128,7 @@ describe('MatrixController (orchestrator)', () => {
     })
     const { controller, applied } = harness(
       {
-        phase: 'connected',
+        phase: 'ready',
         identity: IDENTITY,
         room: roomWithMessage(failedMessage({ txnId: 'txn-original' })),
       },
@@ -949,7 +1142,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('resendMessage does nothing when the message is not failed', async () => {
     const { controller, dispatch } = harness({
-      phase: 'connected',
+      phase: 'ready',
       identity: IDENTITY,
       room: roomWithMessage(
         textItem({
@@ -972,7 +1165,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi({
       sendMessage: vi.fn<MatrixApi['sendMessage']>().mockReturnValue(send.promise),
     })
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     const promise = controller.sendMessage('hi')
     await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledOnce())
@@ -988,7 +1181,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('toggleReaction ставит реакцию оптимистично и подтверждает её серверным eventId', async () => {
     const api = makeMatrixApi()
-    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.toggleReaction('$m1', '👍')
 
@@ -1005,7 +1198,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('toggleReaction вторым вызовом снимает свою реакцию редакцией, а не шлёт вторую', async () => {
     const api = makeMatrixApi()
-    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.toggleReaction('$m1', '👍')
     await controller.toggleReaction('$m1', '👍')
@@ -1023,7 +1216,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi({
       sendReaction: vi.fn<MatrixApi['sendReaction']>().mockRejectedValue(new Error('net')),
     })
-    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.toggleReaction('$m1', '👍')
 
@@ -1034,7 +1227,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi({
       redactEvent: vi.fn<MatrixApi['redactEvent']>().mockRejectedValue(new Error('net')),
     })
-    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.toggleReaction('$m1', '👍')
     await controller.toggleReaction('$m1', '👍')
@@ -1046,7 +1239,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('toggleReaction ничего не шлёт на черновик: аннотировать нечего, серверного id ещё нет', async () => {
     const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.toggleReaction('optimistic:l1', '👍')
 
@@ -1067,7 +1260,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi({
       sendReaction: vi.fn<MatrixApi['sendReaction']>().mockReturnValue(send.promise),
     })
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     const promise = controller.toggleReaction('$m1', '👍')
     controller.disconnect()
@@ -1079,7 +1272,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('markRead moves the store marker optimistically and posts the receipt', async () => {
     const api = makeMatrixApi()
-    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.markRead('$op1')
 
@@ -1090,7 +1283,7 @@ describe('MatrixController (orchestrator)', () => {
 
   it('markRead deduplicates repeat calls for the same eventId (throttle on re-sync)', async () => {
     const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.markRead('$op1')
     await controller.markRead('$op1')
@@ -1103,7 +1296,7 @@ describe('MatrixController (orchestrator)', () => {
     const api = makeMatrixApi()
     const { controller } = harness(
       {
-        phase: 'connected',
+        phase: 'ready',
         identity: IDENTITY,
         room: {
           ...INITIAL_RUNTIME_STATE.room,
@@ -1135,7 +1328,7 @@ describe('MatrixController (orchestrator)', () => {
         .fn<MatrixApi['sendReadReceipt']>()
         .mockRejectedValue(new MatrixError('M_NOT_FOUND', 'not persisted yet')),
     })
-    const { controller, getState } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.markRead('$op1')
     expect(getState().room.readReceipts[IDENTITY.userId]).toEqual({ eventId: '$op1' })
@@ -1152,17 +1345,14 @@ describe('MatrixController (orchestrator)', () => {
         .mockRejectedValueOnce(new MatrixError('M_UNKNOWN_TOKEN', 'expired'))
         .mockResolvedValueOnce({}),
     })
-    const { controller, applied, getState } = harness(
-      { phase: 'connected', identity: IDENTITY },
-      api,
-    )
+    const { controller, applied, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.markRead('$op1')
     // маркер откатился — ближайший скан повторит POST
     expect(getState().room.readReceipts[IDENTITY.userId]).toBeUndefined()
     // auth-ошибка эскалирует восстановление сессии; ждём её завершения (phase снова connected)
     await vi.waitFor(() => expect(applied).toContainEqual({ type: 'session.recovering' }))
-    await vi.waitFor(() => expect(getState().phase).toBe('connected'))
+    await vi.waitFor(() => expect(getState().phase).toBe('ready'))
 
     await controller.markRead('$op1')
 
@@ -1177,7 +1367,7 @@ describe('MatrixController — sendCardAction (kc.adaptive.action)', () => {
 
   it('шлёт контрактные поля, требуемые бэкендом: source_event_id и m.relates_to.rel_type=m.reference', async () => {
     const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendCardAction(CARD_EVENT_ID, ACTION)
 
@@ -1199,7 +1389,7 @@ describe('MatrixController — sendCardAction (kc.adaptive.action)', () => {
   })
 
   it('успех переводит ответ в card.answering → card.answered', async () => {
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY })
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY })
 
     await controller.sendCardAction(CARD_EVENT_ID, ACTION)
 
@@ -1213,7 +1403,7 @@ describe('MatrixController — sendCardAction (kc.adaptive.action)', () => {
 
   it('второй вызов по уже отправленной/отвечённой карточке не делает HTTP-запрос', async () => {
     const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendCardAction(CARD_EVENT_ID, ACTION)
     await controller.sendCardAction(CARD_EVENT_ID, ACTION)
@@ -1226,7 +1416,7 @@ describe('MatrixController — sendCardAction (kc.adaptive.action)', () => {
     const api = makeMatrixApi({
       sendMessage: vi.fn<MatrixApi['sendMessage']>().mockReturnValue(inFlight.promise),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     const first = controller.sendCardAction(CARD_EVENT_ID, ACTION)
     await controller.sendCardAction(CARD_EVENT_ID, ACTION)
@@ -1240,7 +1430,7 @@ describe('MatrixController — sendCardAction (kc.adaptive.action)', () => {
     const api = makeMatrixApi({
       sendMessage: vi.fn<MatrixApi['sendMessage']>().mockRejectedValue(new Error('net')),
     })
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendCardAction(CARD_EVENT_ID, ACTION)
 
@@ -1253,7 +1443,7 @@ describe('MatrixController — sendCardAction (kc.adaptive.action)', () => {
         .fn<MatrixApi['sendMessage']>()
         .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
     })
-    const { controller, applied } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller, applied } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.sendCardAction(CARD_EVENT_ID, ACTION)
 
@@ -1275,7 +1465,7 @@ describe('MatrixController — подгрузка истории вверх', ()
   function connected(prevBatch: string | null, api: MatrixApi) {
     return harness(
       {
-        phase: 'connected',
+        phase: 'ready',
         identity: IDENTITY,
         room: { ...INITIAL_RUNTIME_STATE.room, prevBatch },
       },
@@ -1369,7 +1559,7 @@ describe('MatrixController.loadMedia', () => {
     const api = makeMatrixApi({
       getThumbnail: vi.fn<MatrixApi['getThumbnail']>().mockRejectedValue(mediaError(404)),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.loadPreview(MXC, SIZE)
 
@@ -1380,7 +1570,7 @@ describe('MatrixController.loadMedia', () => {
     const api = makeMatrixApi({
       getThumbnail: vi.fn<MatrixApi['getThumbnail']>().mockRejectedValue(mediaError(504)),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     // наружу уходит доменная причина: коды провода за границу matrix/ не проходят
     await expect(controller.loadPreview(MXC, SIZE)).rejects.toMatchObject({
@@ -1397,7 +1587,7 @@ describe('MatrixController.loadMedia', () => {
         .mockRejectedValueOnce(mediaError(403))
         .mockResolvedValue(new Blob(['bytes'])),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.downloadFile(MXC)
 
@@ -1411,7 +1601,7 @@ describe('MatrixController.loadMedia', () => {
         emoji: { '1f600': { nm: '1f600' }, '2764': { nm: '2764' } },
       }),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     const animations = await Promise.all([
       controller.loadEmojiAnimation('1f600', 'v1'),
@@ -1431,7 +1621,7 @@ describe('MatrixController.loadMedia', () => {
         .mockRejectedValue(new MatrixError('M_NOT_FOUND', 'no such route')),
       getEmojiAnimation: vi.fn<MatrixApi['getEmojiAnimation']>().mockResolvedValue({ nm: 'one' }),
     })
-    const { controller } = harness({ phase: 'connected', identity: IDENTITY }, api)
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await expect(controller.loadEmojiAnimation('1f600', 'v1')).resolves.toEqual({ nm: 'one' })
     expect(api.getEmojiAnimation).toHaveBeenCalledExactlyOnceWith('1f600', 'v1')

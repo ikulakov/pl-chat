@@ -71,17 +71,23 @@ export function chatRuntimeReducer(
   action: RuntimeAction,
 ): ChatRuntimeState {
   switch (action.type) {
-    case 'connection.connecting':
+    case 'session.starting':
       return { ...state, phase: 'connecting', error: null }
 
     case 'session.recovering':
       return { ...state, phase: 'recovering', error: null }
 
-    case 'connection.failed':
+    case 'session.failed':
       return { ...INITIAL_RUNTIME_STATE, phase: 'error', error: action.error }
 
     case 'session.closed':
       return INITIAL_RUNTIME_STATE
+
+    case 'network.lost':
+      return state.online ? { ...state, online: false } : state
+
+    case 'network.restored':
+      return state.online ? state : { ...state, online: true }
 
     case 'session.started': {
       const { identity, cursor, room } = action
@@ -93,8 +99,9 @@ export function chatRuntimeReducer(
 
       return {
         ...state,
-        phase: 'connected',
+        phase: 'ready',
         error: null,
+        online: true,
         identity,
         cursor,
         room: isSameRoom ? continueRoom(state.room, room) : startRoom(room),

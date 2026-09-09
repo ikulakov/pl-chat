@@ -38,7 +38,7 @@
   justify-content: center;
   margin: 12px 0;
   pointer-events: none;
-  transition: top 0.15s;
+  transition: top var(--dur-fast);
 }
 
 .dateSeparatorLabel {

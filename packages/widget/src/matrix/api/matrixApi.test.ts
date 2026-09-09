@@ -47,13 +47,44 @@ describe('createMatrixApi — форма запросов', () => {
 
   it('longPollSync: since + timeout в searchParams, abort-signal пробрасывается', async () => {
     const { transport, request } = fakeTransport()
-    const signal = new AbortController().signal
+    const abort = new AbortController()
 
-    await createMatrixApi(transport).longPollSync('s42', { signal, timeoutMs: 25_000 })
+    await createMatrixApi(transport).longPollSync('s42', {
+      signal: abort.signal,
+      timeoutMs: 25_000,
+    })
 
     const [path, init] = request.mock.calls[0]!
     expect(path).toBe('/_matrix/client/v3/sync')
-    expect(init).toEqual({ searchParams: { timeout: 25_000, since: 's42' }, signal })
+    expect(init).toMatchObject({ searchParams: { timeout: 25_000, since: 's42' } })
+
+    // Сигнал уже не тот же объект (к нему подмешан дедлайн) — проверяем поведение, а не ссылку:
+    // остановка петли по-прежнему обрывает запрос.
+    const { signal } = init as { signal: AbortSignal }
+    expect(signal.aborted).toBe(false)
+    abort.abort()
+    expect(signal.aborted).toBe(true)
+  })
+
+  it('longPollSync: зависший запрос обрывается своим дедлайном, а не ждёт ответа вечно', async () => {
+    // Без дедлайна оборванный коннект не даёт ни ответа, ни ошибки: петля висит в запросе,
+    // onError не зовётся, и потерю связи заметить нечем.
+    vi.useFakeTimers()
+    const { transport, request } = fakeTransport()
+
+    await createMatrixApi(transport).longPollSync('s42', { timeoutMs: 25_000 })
+
+    const { signal } = request.mock.calls[0]![1] as { signal: AbortSignal }
+
+    // Серверное окно ещё не истекло — ответ законно может прийти.
+    await vi.advanceTimersByTimeAsync(25_000)
+    expect(signal.aborted).toBe(false)
+
+    // Окно плюс запас на дорогу прошли: ответа не будет.
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(signal.aborted).toBe(true)
+
+    vi.useRealTimers()
   })
 
   it('initialSync: первый запрос без since, timeout=0', async () => {

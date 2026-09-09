@@ -28,6 +28,7 @@ import { sleep } from '../shared/utils/sleep'
 import type { ChatRuntimeState, RuntimeAction } from '../store/state'
 import { type MatrixApi, type ThumbnailSize } from './api/matrixApi'
 import {
+  isConnectivityError,
   isForbiddenError,
   isMatrixAuthError,
   isMediaPendingError,
@@ -62,6 +63,10 @@ export interface SendFileOptions {
 // Право на скачивание появляется, когда writer запишет привязку файла к комнате, а событие
 // в /sync может обогнать её на доли секунды — отсюда единственный отложенный повтор на 403.
 const FORBIDDEN_RETRY_DELAY_MS = 400
+
+// Сколько подряд оставшихся без ответа sync'ов считаем потерей связи. Одиночный сбой
+// ретраится через секунду и обычно проходит — баннер из-за него мигал бы на ровном месте.
+const OFFLINE_AFTER_FAILURES = 2
 
 // Сколько миниатюр держим. Вытеснение безопасно в любой момент: object-URL сам держит свой
 // blob живым, пока компонент его не освободит.
@@ -114,6 +119,11 @@ export class MatrixController implements MatrixService {
 
   private lifecycleId = 0
   private sessionRecovery: Promise<void> | null = null
+
+  // Подряд оставшиеся без ответа sync'и: порог, после которого объявляем потерю связи.
+  // Счётчик внутренний — в сторе ему делать нечего, UI знает только итог (`online`).
+  private syncFailures = 0
+  private unwatchNetwork: (() => void) | null = null
 
   private readonly uploads = new Map<string, AbortController>()
 
@@ -452,6 +462,9 @@ export class MatrixController implements MatrixService {
   private stopSessionActivity(): void {
     this.stopLoadingHistory()
 
+    this.unwatchNetwork?.()
+    this.unwatchNetwork = null
+
     for (const [localId, controller] of this.uploads) {
       controller.abort()
       // Заливку оборвали мы сами, сервер ничего не решал: причина заведомо повторяемая.
@@ -656,7 +669,7 @@ export class MatrixController implements MatrixService {
     establish: () => Promise<GuestSession>,
     onFailure: (err: unknown) => void,
   ): Promise<void> {
-    this.dispatch({ type: phase === 'recovering' ? 'session.recovering' : 'connection.connecting' })
+    this.dispatch({ type: phase === 'recovering' ? 'session.recovering' : 'session.starting' })
 
     try {
       const session = await establish()
@@ -668,20 +681,63 @@ export class MatrixController implements MatrixService {
         cursor: session.cursor,
         room: toRoomSyncPatch(session.initialRoom),
       })
+      this.syncFailures = 0
       this.syncLoop.start({
         cursor: session.cursor,
         onTick: this.handleSyncTick,
         onError: this.handleSyncError,
       })
+      this.watchNetwork()
     } catch (err) {
       if (!this.isCurrentLifecycle(lifecycleId)) return
 
       onFailure(err)
-      this.dispatch({ type: 'connection.failed', error: CONNECTION_FAILED_ERROR })
+      this.dispatch({ type: 'session.failed', error: CONNECTION_FAILED_ERROR })
     }
   }
 
+  // События браузера — быстрый, но неполный источник. `offline` он зря не шлёт, поэтому это
+  // готовый вердикт о потере: ждать падений запросов незачем, зависший long-poll их может и не
+  // дать. Обратное неверно — при полуоткрытом коннекте (уснувший Wi-Fi, отвалившийся VPN,
+  // съевший соединение прокси) интерфейс на месте и события не будет вовсе; там потерю ловит
+  // только счётчик запросов, оставшихся без ответа. `online` же ничего не доказывает (за
+  // роутером без интернета придёт тот же самый) и лишь торопит попытку — вердикт о
+  // восстановлении по-прежнему выносит успешный sync.
+  private watchNetwork(): void {
+    if (this.unwatchNetwork) return
+
+    const onOffline = () => this.markOffline()
+    const onOnline = () => this.restartSync()
+
+    window.addEventListener('offline', onOffline)
+    window.addEventListener('online', onOnline)
+
+    this.unwatchNetwork = () => {
+      window.removeEventListener('offline', onOffline)
+      window.removeEventListener('online', onOnline)
+    }
+  }
+
+  // Петлю на `offline` не останавливаем: тогда возвращение связи целиком зависело бы от
+  // события `online`, а его браузер может и не прислать (bfcache, разбуженный ноут, коннект,
+  // который формально не падал). Живая петля упирается в потолок backoff и чинится сама;
+  // `online` лишь ускоряет — рвёт запрос, который мог зависнуть в мёртвом коннекте, и
+  // возвращает задержку к базовой. Сессию и ленту при этом не трогаем.
+  private restartSync(): void {
+    const { cursor, phase } = this.getState()
+    if (phase !== 'ready' || cursor === null) return
+
+    this.syncLoop.stop()
+    this.syncLoop.start({
+      cursor,
+      onTick: this.handleSyncTick,
+      onError: this.handleSyncError,
+    })
+  }
+
   private handleSyncTick = (tick: SyncTick): void => {
+    this.markOnline()
+
     const roomId = this.getState().identity?.roomId ?? null
     const joinedRoom = roomId ? (tick.response.rooms?.join?.[roomId] ?? null) : null
 
@@ -693,9 +749,39 @@ export class MatrixController implements MatrixService {
   }
 
   private handleSyncError = (err: unknown, meta: { backoff: number }): void => {
+    // Auth-ошибка — это не потеря связи: сервер ответил, просто сессия мертва.
+    // Её лечит recovery, и баннер «нет соединения» там только соврал бы.
     if (this.handleAuthError(err, 'sync')) return
 
     console.error('[PLChat] sync error, retrying in', meta.backoff, 'ms:', err)
+
+    // Сервер ответил — связь есть, виноват бэкенд; баннер про соединение тут соврал бы.
+    if (!isConnectivityError(err)) return
+
+    this.syncFailures += 1
+    if (this.syncFailures >= OFFLINE_AFTER_FAILURES) this.markOffline()
+  }
+
+  // Потерю связи объявляем один раз: сюда ведут оба сигнала — счётчик провалов и событие
+  // браузера, и прийти они могут в любом порядке. Мнение о связи одно и живёт в сторе:
+  // своя копия здесь разъезжалась бы с ним при сбросе сессии.
+  private markOffline(): void {
+    if (!this.getState().online) return
+
+    this.dispatch({ type: 'network.lost' })
+  }
+
+  // Зовётся на каждый успешный тик, поэтому дешёвая проверка стора вместо dispatch'а:
+  // редьюсер и так вернул бы то же состояние, но devtools собирали бы пустой экшен раз в 25 секунд.
+  private markOnline(): void {
+    // Ответ мог прийти уже после того, как браузер сообщил о потере связи: снимать по нему
+    // баннер значит соврать — он приехал по коннекту, которого больше нет.
+    if (!navigator.onLine) return
+
+    this.syncFailures = 0
+    if (this.getState().online) return
+
+    this.dispatch({ type: 'network.restored' })
   }
 
   private handleAuthError(err: unknown, context: AuthErrorContext): boolean {
@@ -740,7 +826,7 @@ export class MatrixController implements MatrixService {
     this.stopSessionActivity()
     this.nextLifecycle()
     this.sessionManager.clearSession()
-    this.dispatch({ type: 'connection.failed', error: CONNECTION_FAILED_ERROR })
+    this.dispatch({ type: 'session.failed', error: CONNECTION_FAILED_ERROR })
   }
 
   private nextLifecycle(): number {
@@ -764,7 +850,7 @@ export class MatrixController implements MatrixService {
   } | null {
     const { identity, phase, room } = this.getState()
 
-    if (phase !== 'connected' || !identity) {
+    if (phase !== 'ready' || !identity) {
       return null
     }
     return { identity, room }

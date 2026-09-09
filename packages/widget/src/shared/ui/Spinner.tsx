@@ -1,4 +1,3 @@
-import { t } from '../../i18n'
 import styles from './Spinner.module.css'
 
 interface Props {
@@ -9,8 +8,8 @@ export function Spinner({ size = 'block' }: Props) {
   return (
     <span
       className={`${styles.spinner} ${styles[size]}`}
-      aria-label={t('status.loading')}
-      role="status"
+      aria-hidden="true"
+      data-role="spinner"
     />
   )
 }

@@ -15,7 +15,7 @@
   border-radius: 15px;
   background: var(--c-surface-secondary);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--dur-fast);
 
   &.own {
     background: var(--c-surface-accent-soft);

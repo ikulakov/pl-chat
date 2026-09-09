@@ -66,7 +66,7 @@ ru.json   — русский (основной, источник ключей)
 en.json   — английский
 ```
 
-Ключи — flat с точечной группировкой: `"input.placeholder"`, `"chat.menu"`, `"status.connecting"`.
+Ключи — flat с точечной группировкой: `"input.placeholder"`, `"header.botSubtitle"`, `"status.error"`.
 
 ### Добавить новый ключ
 
@@ -80,10 +80,10 @@ en.json   — английский
 import { t } from '../i18n'
 
 // простой ключ
-<p>{t('status.waiting')}</p>
+<p>{t('status.error')}</p>
 
 // с плейсхолдером
-<p>{t('chat.typing', { name: 'Оператор' })}</p>
+<p>{t('system.operatorJoinedHuman', { name: 'Оля' })}</p>
 
 ```
 

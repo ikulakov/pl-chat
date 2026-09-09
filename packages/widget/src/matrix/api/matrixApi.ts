@@ -28,6 +28,12 @@ const HISTORY_PAGE_SIZE = 50
 // Окно long-poll: сервер держит /sync до этого времени, потом отвечает пустым батчем.
 const SYNC_TIMEOUT_MS = 25_000
 
+// Запас поверх серверного окна, после которого запрос считается зависшим. Дедлайн обязателен:
+// оборванный коннект (уснувший Wi-Fi, отвалившийся VPN, съевший соединение прокси) не даёт ни
+// ответа, ни ошибки — петля висела бы в нём вечно, и заметить потерю связи было бы нечем.
+// Событие `offline` тут не спасает: интерфейс в таких случаях на месте, и браузер молчит.
+const SYNC_DEADLINE_SLACK_MS = 5_000
+
 // Дедлайн запросов эмодзи. Обязателен, потому что их промисы мемоизируются в кэшах, живущих
 // всю сессию (lottieCache, emojiBitmap, защёлка emojiIndex): зависший запрос без отказа
 // оставил бы там мёртвый промис навсегда, и повтор возвращал бы его же — ровно то, ради чего
@@ -81,12 +87,18 @@ export function createMatrixApi(transport: MatrixTransport) {
       since: string,
       options?: { signal?: AbortSignal | undefined; timeoutMs?: number },
     ): Promise<SyncResponse> {
+      const timeout = options?.timeoutMs ?? SYNC_TIMEOUT_MS
+      // Свой дедлайн на каждую попытку, поверх сигнала петли: тот означает «петлю остановили»,
+      // а этот — «ответа мы уже не дождёмся», и дальше он идёт обычной ошибкой sync'а.
+      const deadline = AbortSignal.timeout(timeout + SYNC_DEADLINE_SLACK_MS)
+      const signal = options?.signal ? AbortSignal.any([options.signal, deadline]) : deadline
+
       return transport.request(Endpoints.SYNC, {
         searchParams: {
-          timeout: options?.timeoutMs ?? SYNC_TIMEOUT_MS,
+          timeout,
           since,
         },
-        signal: options?.signal,
+        signal,
       })
     },
 

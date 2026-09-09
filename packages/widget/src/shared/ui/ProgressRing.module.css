@@ -18,5 +18,5 @@
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
-  transition: stroke-dashoffset 150ms linear;
+  transition: stroke-dashoffset var(--dur-fast) linear;
 }

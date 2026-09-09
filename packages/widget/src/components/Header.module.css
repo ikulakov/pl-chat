@@ -33,6 +33,40 @@
   white-space: nowrap;
 }
 
+.pending {
+  background: linear-gradient(
+    90deg,
+    var(--c-text-tertiary) 0%,
+    var(--c-text-tertiary) 40%,
+    var(--c-text-primary) 50%,
+    var(--c-text-tertiary) 60%,
+    var(--c-text-tertiary) 100%
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-clip: text;
+  color: transparent;
+  animation: status-shimmer 1.8s linear infinite;
+}
+
+/* Анимация живёт всё время обрыва связи — при выключенном движении её быть не должно. */
+@media (prefers-reduced-motion: reduce) {
+  .pending {
+    color: var(--c-text-tertiary);
+    background: none;
+    animation: none;
+  }
+}
+
+@keyframes status-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
 .actions {
   display: flex;
   align-items: center;
