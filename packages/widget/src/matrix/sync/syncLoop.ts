@@ -17,6 +17,10 @@ interface SyncLoopOptions {
 const INITIAL_BACKOFF_MS = 1_000
 const MAX_BACKOFF_MS = 30_000
 
+function jittered(ms: number): number {
+  return ms * (0.5 + Math.random() / 2)
+}
+
 type SyncApi = Pick<MatrixApi, 'longPollSync'>
 
 export class MatrixSyncLoop {
@@ -80,7 +84,7 @@ export class MatrixSyncLoop {
         this.onError?.(err, { since: cursor, backoff })
         if (!this.isCurrentRun(runId)) break
 
-        await sleep(backoff, abort.signal)
+        await sleep(jittered(backoff), abort.signal)
         backoff = Math.min(backoff * 2, MAX_BACKOFF_MS)
       }
     }

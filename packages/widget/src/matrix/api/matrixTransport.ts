@@ -1,3 +1,4 @@
+import { withDeadline } from '../../shared/utils/abort'
 import type { TokenSource } from '../session/types'
 import type { RefreshResponse } from '../wire/dto'
 import { Endpoints } from './endpoints'
@@ -8,6 +9,8 @@ export interface RequestOptions {
   body?: unknown
   searchParams?: Record<string, string | number>
   signal?: AbortSignal | undefined
+  /** Своё окно вместо `REQUEST_DEADLINE_MS` — для запросов, которые висят законно (long-poll). */
+  deadlineMs?: number
 }
 
 export interface UploadOptions {
@@ -24,6 +27,12 @@ export interface DownloadOptions {
 const UPLOAD_TIMEOUT_MS = 120_000
 const DOWNLOAD_TIMEOUT_MS = 60_000
 
+// Дедлайн любого JSON-запроса. Оборванный коннект (уснувший Wi-Fi, отвалившийся VPN, съевший
+// соединение прокси) не даёт ни ответа, ни ошибки: без срока `connect()` навсегда застревал бы
+// на «Подключаемся», а отправка — в «отправляется». Событие `offline` тут не помогает —
+// интерфейс на месте, и браузер молчит.
+const REQUEST_DEADLINE_MS = 30_000
+
 /**
  * HTTP-доступ к homeserver. Пути всегда относительные: виджет обращается к своему origin,
  * а до homeserver `/_matrix` доводит инфраструктура — Ingress в проде, прокси dev-сервера локально.
@@ -37,7 +46,13 @@ export class MatrixTransport {
   }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-    const response = await this.withRefresh(() => this.fetchRequest(path, options))
+    // Бюджет общий на запрос и его повтор после refresh — как у download().
+    const response = await withDeadline(
+      options.deadlineMs ?? REQUEST_DEADLINE_MS,
+      options.signal,
+      (signal) => this.withRefresh(() => this.fetchRequest(path, { ...options, signal })),
+    )
+
     return MatrixTransport.unwrapJsonResponse<T>(response)
   }
 
@@ -47,11 +62,11 @@ export class MatrixTransport {
   }
 
   async download(path: string, options: DownloadOptions = {}): Promise<Blob> {
-    // Дедлайн обязателен: зависший запрос (уснувшая сеть, прокси съел коннект) не отклонится
-    // сам, а его промис лежит в кэше превью — без отказа повтор возвращал бы тот же мёртвый
-    // промис до конца сессии. Бюджет общий на запрос и его повтор после refresh.
-    const signal = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS)
-    const response = await this.withRefresh(() => this.fetchRequest(path, { ...options, signal }))
+    // Срок щедрее обычного (файл может быть большой), но обязателен: промис download'а лежит
+    // в кэше превью, и зависший запрос без отказа возвращался бы оттуда до конца сессии.
+    const response = await withDeadline(DOWNLOAD_TIMEOUT_MS, undefined, (signal) =>
+      this.withRefresh(() => this.fetchRequest(path, { ...options, signal })),
+    )
 
     return MatrixTransport.unwrapBlobResponse(response)
   }
@@ -183,6 +198,9 @@ export class MatrixTransport {
         traceparent: MatrixTransport.makeTraceparent(),
       },
       body: JSON.stringify({ refresh_token: refreshToken }),
+      // Свой дедлайн, а не сигнал вызывающего: refresh один на всех, кто ждёт `this.refreshing`,
+      // и зависший он подвесил бы их всех.
+      signal: AbortSignal.timeout(REQUEST_DEADLINE_MS),
     })
       .then(async (res) => {
         if (!res.ok) {

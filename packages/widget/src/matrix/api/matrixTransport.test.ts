@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createFakeTokenStore } from '../../shared/testUtils/matrixFixtures'
 import { LocalStorageSessionStore } from '../session/localStorageSessionStore'
+import { isConnectivityError } from './matrixError'
 import { MatrixTransport } from './matrixTransport'
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -8,6 +9,15 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+// Ответ, который не придёт никогда: настоящий зависший коннект отклоняется только по сигналу.
+function hangingFetch(): (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> {
+  return (_input, init) =>
+    new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
 }
 
 interface FakeProgressEvent {
@@ -44,6 +54,7 @@ class FakeXhr {
 
 describe('MatrixTransport', () => {
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     localStorage.clear()
@@ -224,6 +235,65 @@ describe('MatrixTransport', () => {
       name: 'MatrixError',
       errcode: 'M_UNKNOWN_TOKEN',
     })
+  })
+
+  it('обрывает зависший запрос дедлайном, а не ждёт ответа вечно', async () => {
+    // Оборванный коннект не даёт ни ответа, ни ошибки: без срока connect() навсегда остался бы
+    // на экране «Подключаемся», а отправка — в «отправляется».
+    vi.useFakeTimers()
+    const transport = new MatrixTransport(createFakeTokenStore('access-token'))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(hangingFetch())
+
+    const pending = transport.request('/_matrix/client/v3/account/whoami')
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'TimeoutError' })
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    await rejected
+  })
+
+  it('ошибку своего дедлайна видно как потерю связи, а не как ответ сервера', async () => {
+    // Связка держится на имени DOMException: переименуют его в withDeadline — и счётчик
+    // в контроллере перестанет засчитывать такие сбои, а баннер «нет связи» молча пропадёт.
+    vi.useFakeTimers()
+    const transport = new MatrixTransport(createFakeTokenStore('access-token'))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(hangingFetch())
+
+    const failed = transport.request('/_matrix/client/v3/sync').catch((err: unknown) => err)
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(isConnectivityError(await failed)).toBe(true)
+  })
+
+  it('уважает свой deadlineMs вместо общего срока — иначе long-poll срезало бы на каждом окне', async () => {
+    vi.useFakeTimers()
+    const transport = new MatrixTransport(createFakeTokenStore('access-token'))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(hangingFetch())
+
+    let settled = false
+    const pending = transport
+      .request('/_matrix/client/v3/sync', { deadlineMs: 45_000 })
+      .catch(() => {
+        settled = true
+      })
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(settled).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(15_000)
+    await pending
+
+    expect(settled).toBe(true)
+  })
+
+  it('снимает таймер дедлайна вместе с ответом, а не даёт ему дотикать', async () => {
+    // Таймер, переживающий каждый удачный /sync, копил бы их всю сессию — раз в 25 секунд.
+    vi.useFakeTimers()
+    const transport = new MatrixTransport(createFakeTokenStore('access-token'))
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ ok: true }))
+
+    await transport.request('/_matrix/client/v3/account/whoami')
+
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('rounds upload progress to a whole percent and reports it only when it changes', async () => {
