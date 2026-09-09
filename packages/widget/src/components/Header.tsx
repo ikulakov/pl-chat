@@ -5,42 +5,35 @@ import { t } from '../i18n'
 import { IconButton } from '../shared/ui/IconButton'
 import { CloseIcon } from '../shared/ui/icons'
 import { cn } from '../shared/utils/cn'
-import {
-  isConnectionPending,
-  selectOperatorDisplayName,
-  selectStatus,
-  selectViewport,
-} from '../store/selectors'
-import type { ChatStatus } from '../store/state'
+import { selectOperatorDisplayName, selectStatusLine, selectViewport } from '../store/selectors'
+import type { StatusLine } from '../store/state'
 import styles from './Header.module.css'
 
-// В `error` строки нет: там `StatusScreen` уже всё сказал заголовком и кнопкой «Повторить».
-const STATUS_KEY: Record<ChatStatus, MessageKey | null> = {
-  idle: 'header.connecting',
+const STATUS_TEXT: Partial<Record<StatusLine, MessageKey>> = {
   connecting: 'header.connecting',
   offline: 'header.offline',
-  operator: 'header.operatorSubtitle',
   bot: 'header.botSubtitle',
-  error: null,
+  operator: 'header.operatorSubtitle',
 }
 
 export function Header() {
   const operatorName = useChatStore(selectOperatorDisplayName)
-  const status = useChatStore(selectStatus)
+  const status = useChatStore(selectStatusLine)
+  const statusText = STATUS_TEXT[status] ? t(STATUS_TEXT[status]) : ''
+  const isPendingStatus = status === 'connecting' || status === 'offline'
+
   const viewport = useChatStore(selectViewport)
   const { close } = useChatActions()
-
-  const statusKey = STATUS_KEY[status]
 
   return (
     <header className={styles.header}>
       <div className={styles.info}>
         <span className={styles.name}>{operatorName ?? t('header.name')}</span>
         <span
-          className={cn(styles.status, isConnectionPending(status) && styles.pending)}
+          className={cn(styles.status, isPendingStatus && styles.pending)}
           role="status"
         >
-          {statusKey ? t(statusKey) : ''}
+          {statusText}
         </span>
       </div>
       <div className={styles.actions}>

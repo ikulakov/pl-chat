@@ -89,4 +89,4 @@ export interface Identity {
 
 export type SessionPhase = 'idle' | 'connecting' | 'recovering' | 'ready' | 'error'
 
-export type ChatStatus = 'idle' | 'connecting' | 'bot' | 'operator' | 'offline' | 'error'
+export type StatusLine = 'connecting' | 'offline' | 'bot' | 'operator' | 'error'

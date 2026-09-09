@@ -238,7 +238,11 @@ function wake() {
 }
 
 // Сид комнаты из scenario.json.
+// MOCK_EMPTY_ROOM=1 оставляет только state-события (membership, kc.operator.current):
+// комната есть, сообщений нет — так проверяется экран приветствия в пустой ленте.
+const emptyRoom = process.env.MOCK_EMPTY_ROOM === "1";
 for (const e of scenario.seed) {
+  if (emptyRoom && !("state_key" in e)) continue;
   push(e.type, e.sender, e.content, "state_key" in e ? e.state_key : undefined);
 }
 

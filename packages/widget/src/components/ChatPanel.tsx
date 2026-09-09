@@ -2,8 +2,10 @@ import { useChatActions } from '../hooks/useChatActions'
 import { useChatStore } from '../hooks/useChatStore'
 import { t } from '../i18n'
 import { ERROR_ILLUSTRATION } from '../shared/assets/inlineAssets'
+import welcomeIllustration from '../shared/assets/welcome-illustration.webp'
+import { externalLinks } from '../shared/constants/externalLinks'
 import { Spinner } from '../shared/ui/Spinner'
-import { isChatting, selectStatus, selectUserId, selectViewport } from '../store/selectors'
+import { selectHasMessages, selectPhase, selectUserId, selectViewport } from '../store/selectors'
 import { AttachmentProvider } from './Attachment/AttachmentProvider'
 import chatStyles from './ChatPanel.module.css'
 import { Composer } from './Composer/Composer'
@@ -14,9 +16,10 @@ import { StatusScreen } from './StatusScreen'
 import statusStyles from './StatusScreen.module.css'
 
 export function ChatPanel() {
-  const status = useChatStore(selectStatus)
+  const phase = useChatStore(selectPhase)
   const userId = useChatStore(selectUserId)
   const viewport = useChatStore(selectViewport)
+  const hasMessages = useChatStore(selectHasMessages)
 
   const { reconnect } = useChatActions()
 
@@ -26,13 +29,13 @@ export function ChatPanel() {
 
       <Header />
 
-      {(status === 'idle' || status === 'connecting') && (
+      {(phase === 'idle' || phase === 'connecting' || phase === 'recovering') && (
         <StatusScreen>
           <Spinner />
         </StatusScreen>
       )}
 
-      {status === 'error' && (
+      {phase === 'error' && (
         <StatusScreen
           title={t('status.error')}
           subtitle={t('status.error.subtitle')}
@@ -48,9 +51,29 @@ export function ChatPanel() {
         />
       )}
 
-      {isChatting(status) && userId !== null && (
+      {phase === 'ready' && userId !== null && (
         <AttachmentProvider dropZoneEnabled={viewport !== 'fullscreen'}>
-          <MessageList userId={userId} />
+          {hasMessages ? (
+            <MessageList userId={userId} />
+          ) : (
+            <StatusScreen
+              title={t('status.welcome')}
+              subtitle={t('status.welcome.subtitle')}
+              illustration={welcomeIllustration}
+              caption={
+                <>
+                  <p>{t('chat.personalPolicy')}</p>
+                  <a
+                    href={externalLinks.PERSONAL_POLICY}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {t('chat.showMore')}
+                  </a>
+                </>
+              }
+            />
+          )}
           <Composer />
         </AttachmentProvider>
       )}

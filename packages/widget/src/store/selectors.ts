@@ -5,7 +5,8 @@ import type { ReactionIndex } from '../domain/reactions'
 import type { ReadReceipt } from '../domain/receipts'
 import { countUnread } from '../domain/receipts'
 import type { TimelineItem } from '../domain/timeline'
-import type { ChatStatus, ReplyTarget } from './state'
+import { isSystem } from '../domain/timeline'
+import type { ReplyTarget, SessionPhase, StatusLine } from './state'
 import type { ChatStoreState } from './store'
 
 /**
@@ -16,10 +17,13 @@ import type { ChatStoreState } from './store'
  * селектором быть не может — она живёт в useMemo компонента.
  */
 
-export function selectStatus(state: ChatStoreState): ChatStatus {
+export function selectPhase(state: ChatStoreState): SessionPhase {
+  return state.phase
+}
+
+export function selectStatusLine(state: ChatStoreState): StatusLine {
   switch (state.phase) {
     case 'idle':
-      return 'idle'
     case 'connecting':
     case 'recovering':
       return 'connecting'
@@ -29,42 +33,6 @@ export function selectStatus(state: ChatStoreState): ChatStatus {
       if (!state.online) return 'offline'
 
       return state.room.operator.isActive ? 'operator' : 'bot'
-  }
-}
-
-/**
- * Показывать ли ленту с композером.
- *
- * Исчерпывающий `switch`, а не `||`: новое значение `ChatStatus` не соберётся, пока его тут
- * не разложат. С дизъюнкцией забытое значение молча скрыло бы всю панель.
- */
-export function isChatting(status: ChatStatus): boolean {
-  switch (status) {
-    case 'bot':
-    case 'operator':
-    case 'offline':
-      return true
-    case 'idle':
-    case 'connecting':
-    case 'error':
-      return false
-  }
-}
-
-/**
- * Связи нет, но мы её ждём: первое подключение, восстановление сессии, обрыв при живой ленте.
- * В `error` — `false`: попытки кончились, ждать нечего.
- */
-export function isConnectionPending(status: ChatStatus): boolean {
-  switch (status) {
-    case 'idle':
-    case 'connecting':
-    case 'offline':
-      return true
-    case 'bot':
-    case 'operator':
-    case 'error':
-      return false
   }
 }
 
@@ -86,6 +54,10 @@ export function selectViewport(state: ChatStoreState): ViewportMode {
 
 export function selectTimeline(state: ChatStoreState): TimelineItem[] {
   return state.room.timeline
+}
+
+export function selectHasMessages(state: ChatStoreState): boolean {
+  return !state.room.timeline.every(isSystem)
 }
 
 export function selectReadReceipts(state: ChatStoreState): Record<string, ReadReceipt> {

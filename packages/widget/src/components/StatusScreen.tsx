@@ -7,9 +7,10 @@ interface Props {
   title?: string
   subtitle?: string
   action?: ReactNode
+  caption?: ReactNode
 }
 
-export function StatusScreen({ children, illustration, title, subtitle, action }: Props) {
+export function StatusScreen({ children, illustration, title, subtitle, action, caption }: Props) {
   let media: ReactNode = null
 
   if (children != null) {
@@ -30,14 +31,17 @@ export function StatusScreen({ children, illustration, title, subtitle, action }
   }
   return (
     <div className={styles.screen}>
-      {media}
-      {(title || subtitle) && (
-        <div className={styles.textBlock}>
-          {title && <p className={illustration ? styles.titleLarge : styles.title}>{title}</p>}
-          {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
-        </div>
-      )}
-      {action && <div className={styles.action}>{action}</div>}
+      <div className={styles.main}>
+        {media}
+        {(title || subtitle) && (
+          <div className={styles.textBlock}>
+            {title && <p className={illustration ? styles.titleLarge : styles.title}>{title}</p>}
+            {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
+          </div>
+        )}
+        {action && <div className={styles.action}>{action}</div>}
+      </div>
+      {caption && <div className={styles.caption}>{caption}</div>}
     </div>
   )
 }
