@@ -1,5 +1,6 @@
 import type { EmojiAnimation } from '../../domain/emoji'
 import type { ParsedMxcUrl } from '../../shared/utils/mxc'
+import type { SetPresence } from '../sync/presence'
 import { RelType } from '../wire/consts'
 import type {
   MessagesResponse,
@@ -88,7 +89,12 @@ export function createMatrixApi(transport: MatrixTransport) {
 
     longPollSync(
       since: string,
-      options?: { signal?: AbortSignal | undefined; timeoutMs?: number },
+      options?: {
+        signal?: AbortSignal | undefined
+        timeoutMs?: number
+        /** Присутствие клиента на момент запроса; без него сервер активность не бампит. */
+        setPresence?: SetPresence
+      },
     ): Promise<SyncResponse> {
       const timeout = options?.timeoutMs ?? SYNC_TIMEOUT_MS
 
@@ -96,6 +102,7 @@ export function createMatrixApi(transport: MatrixTransport) {
         searchParams: {
           timeout,
           since,
+          ...(options?.setPresence ? { set_presence: options.setPresence } : {}),
         },
         // Дедлайн на попытку поверх сигнала петли: тот означает «петлю остановили», а этот —
         // «ответа мы уже не дождёмся», и дальше он идёт обычной ошибкой sync'а.

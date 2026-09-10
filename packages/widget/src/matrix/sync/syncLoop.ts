@@ -1,6 +1,7 @@
 import { sleep } from '../../shared/utils/sleep'
 import type { MatrixApi } from '../api/matrixApi'
 import type { SyncResponse } from '../wire/dto'
+import type { SetPresence } from './presence'
 
 export interface SyncTick {
   since: string
@@ -23,8 +24,12 @@ function jittered(ms: number): number {
 
 type SyncApi = Pick<MatrixApi, 'longPollSync'>
 
+/** Присутствие на момент очередного запроса; читается заново перед каждым poll'ом. */
+type PresenceSource = () => SetPresence
+
 export class MatrixSyncLoop {
   private readonly api: SyncApi
+  private readonly getPresence: PresenceSource | null
   private isRunning = false
   // Счётчик поколений: каждый start() начинает новый run;
   // предыдущий stale run() не должен уметь остановить более новый
@@ -35,8 +40,9 @@ export class MatrixSyncLoop {
   private onError: ((error: unknown, meta: { since: string; backoff: number }) => void) | null =
     null
 
-  constructor(api: SyncApi) {
+  constructor(api: SyncApi, getPresence?: PresenceSource) {
     this.api = api
+    this.getPresence = getPresence ?? null
   }
 
   start(options: SyncLoopOptions): void {
@@ -71,7 +77,14 @@ export class MatrixSyncLoop {
       if (!cursor) break
 
       try {
-        const response = await this.api.longPollSync(cursor, { signal: abort.signal })
+        // Присутствие уезжает вместе с очередным запросом, отдельного PUT нет. Значит смена
+        // видимости вкладки доходит до сервера не позже конца текущего окна long-poll'а —
+        // рвать запрос ради этого незачем, серверный idle-таймер вчетверо длиннее окна.
+        const setPresence = this.getPresence?.()
+        const response = await this.api.longPollSync(cursor, {
+          signal: abort.signal,
+          ...(setPresence ? { setPresence } : {}),
+        })
         if (!this.isCurrentRun(runId)) break
 
         backoff = INITIAL_BACKOFF_MS

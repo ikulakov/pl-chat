@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { deferred, ROOM_ID, syncResponse } from '../../shared/testUtils/matrixFixtures'
 import type { MatrixApi } from '../api/matrixApi'
 import type { SyncResponse } from '../wire/dto'
+import { SetPresence } from './presence'
 import { MatrixSyncLoop, type SyncTick } from './syncLoop'
 
 vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
@@ -27,6 +28,28 @@ describe('MatrixSyncLoop', () => {
     expect(ticks[0]!.since).toBe('c0')
     expect(ticks[0]!.next).toBe('c1')
     expect(ticks[0]!.response.rooms?.join?.[ROOM_ID]).toBeDefined()
+  })
+
+  it('re-reads presence before every poll, so a tab going background is picked up', async () => {
+    const sent: (string | undefined)[] = []
+    const longPollSync = vi.fn<LongPoll>()
+    let presence: SetPresence = SetPresence.Online
+    const loop = new MatrixSyncLoop({ longPollSync }, () => presence)
+
+    let calls = 0
+    longPollSync.mockImplementation(async (_since, options) => {
+      sent.push(options?.setPresence)
+      calls += 1
+      presence = SetPresence.Unavailable
+      if (calls >= 2) loop.stop()
+      return syncResponse(`c${calls}`)
+    })
+
+    loop.start({ cursor: 'c0', onTick: () => {} })
+    await vi.waitFor(() => expect(sent.length).toBeGreaterThanOrEqual(2))
+    loop.stop()
+
+    expect(sent.slice(0, 2)).toEqual([SetPresence.Online, SetPresence.Unavailable])
   })
 
   it('chains the cursor: each poll uses the previous next_batch as since', async () => {
