@@ -284,16 +284,18 @@ describe('MatrixController (orchestrator)', () => {
     controller.disconnect()
   })
 
-  it('lifts the banner on a successful sync even while the browser claims to be offline', async () => {
-    // `navigator.onLine` — подсказка и врёт в обе стороны (LAN/VPN без интернета считается
-    // online, и наоборот). Ответ сервера — факт, и он сильнее: иначе при вранье браузера
-    // баннер завис бы навсегда на работающем чате.
-    const late = deferred<Awaited<ReturnType<MatrixApi['longPollSync']>>>()
+  it('ignores a stale sync response after offline and restores on the restarted sync', async () => {
+    // Ответ запроса, начатого до `offline`, больше ничего не доказывает: браузер мог отдать его
+    // уже после потери сети. Только ответ нового поколения sync снимает баннер.
+    const stale = deferred<Awaited<ReturnType<MatrixApi['longPollSync']>>>()
+    const fresh = deferred<Awaited<ReturnType<MatrixApi['longPollSync']>>>()
     let syncCalls = 0
     const api = makeMatrixApi({
       longPollSync: vi.fn(() => {
         syncCalls += 1
-        return syncCalls === 1 ? late.promise : new Promise<never>(() => {})
+        if (syncCalls === 1) return stale.promise
+        if (syncCalls === 2) return fresh.promise
+        return new Promise<never>(() => {})
       }),
     })
     const { controller, applied, getState } = harness({}, api)
@@ -303,8 +305,22 @@ describe('MatrixController (orchestrator)', () => {
 
     stubBrowserOffline()
     window.dispatchEvent(new Event('offline'))
-    late.resolve(syncResponse('late'))
 
+    await vi.waitFor(() => expect(api.longPollSync).toHaveBeenCalledTimes(2))
+    expect(applied).toContainEqual({ type: 'network.lost' })
+
+    stale.resolve(syncResponse('late'))
+    // Ждём саму промису, а не голый тик: так продолжение петли гарантированно отработает раньше.
+    await stale.promise
+
+    expect(
+      applied.some((action) => action.type === 'sync.received' && action.cursor === 'late'),
+    ).toBe(false)
+    expect(applied.some((action) => action.type === 'network.restored')).toBe(false)
+    expect(getState().online).toBe(false)
+
+    // `navigator.onLine` всё ещё false, но свежий ответ сервера — более сильное доказательство.
+    fresh.resolve(syncResponse('s1'))
     await vi.waitFor(() => expect(applied).toContainEqual({ type: 'network.restored' }))
     expect(getState().online).toBe(true)
     controller.disconnect()
@@ -327,21 +343,23 @@ describe('MatrixController (orchestrator)', () => {
     // Запрос, повисший в мёртвом коннекте, сам не отвалится — рвём его рестартом, иначе
     // возвращение связи ждало бы дедлайна long-poll'а.
     const api = makeMatrixApi()
-    let firstSignal: AbortSignal | undefined
+    const signals: AbortSignal[] = []
     let syncCalls = 0
     vi.mocked(api.longPollSync).mockImplementation((_since, options) => {
       syncCalls += 1
-      if (syncCalls === 1) {
-        firstSignal = options?.signal
+      const signal = options?.signal
+      if (signal) signals.push(signal)
+
+      if (syncCalls <= 2) {
         return new Promise((_resolve, reject) => {
-          firstSignal?.addEventListener(
+          signal?.addEventListener(
             'abort',
             () => reject(new DOMException('Restarted', 'AbortError')),
             { once: true },
           )
         })
       }
-      if (syncCalls === 2) return Promise.resolve(syncResponse('s1'))
+      if (syncCalls === 3) return Promise.resolve(syncResponse('s1'))
       return new Promise<never>(() => {})
     })
     const { controller, applied } = harness({}, api)
@@ -350,10 +368,13 @@ describe('MatrixController (orchestrator)', () => {
     await vi.waitFor(() => expect(api.longPollSync).toHaveBeenCalledOnce())
 
     window.dispatchEvent(new Event('offline'))
+    await vi.waitFor(() => expect(api.longPollSync).toHaveBeenCalledTimes(2))
+    expect(signals[0]?.aborted).toBe(true)
+
     window.dispatchEvent(new Event('online'))
 
     await vi.waitFor(() => expect(applied).toContainEqual({ type: 'network.restored' }))
-    expect(firstSignal?.aborted).toBe(true)
+    expect(signals[1]?.aborted).toBe(true)
     // Сессию не пересоздаём: та же комната, та же лента, тот же курсор.
     expect(applied.filter((action) => action.type === 'session.started')).toHaveLength(1)
     expect(api.registerGuest).toHaveBeenCalledOnce()

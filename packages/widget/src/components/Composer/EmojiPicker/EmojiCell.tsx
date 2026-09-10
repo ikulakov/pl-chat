@@ -5,6 +5,7 @@ import { useIntersectionObserver } from '../../../hooks/useIntersectionObserver'
 import type { LottieCache } from '../../../shared/lottie/lottieCache'
 import { createEmojiPlayer, loadLottiePlayer } from '../../../shared/lottie/lottiePlayer'
 import { lottiePool } from '../../../shared/lottie/lottiePool'
+import { consoleDev } from '../../../shared/utils/consoleDev'
 import { Silhouette } from '../../Silhouette/Silhouette'
 import styles from './EmojiPicker.module.css'
 
@@ -69,7 +70,7 @@ export function EmojiCell({ item, version, cache, scrollRef, onSelect }: Props) 
       .catch((err: unknown) => {
         // Не приехала анимация — ячейка остаётся кадром или силуэтом. Это рабочее состояние, а
         // не сбой экрана: пикер должен оставаться пригодным для выбора и без картинок.
-        console.error('[PLChat] emoji animation failed:', item.codepoint, err)
+        consoleDev.error('emoji animation failed', err)
       })
 
     return () => {

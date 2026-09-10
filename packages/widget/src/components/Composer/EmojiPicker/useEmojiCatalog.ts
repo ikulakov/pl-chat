@@ -7,6 +7,7 @@ import {
   writeCachedCategory,
 } from '../../../shared/emoji/emojiCatalogCache'
 import { syncPackVersion } from '../../../shared/emoji/emojiDb'
+import { consoleDev } from '../../../shared/utils/consoleDev'
 
 export type CatalogState =
   | { status: 'loading' }
@@ -96,7 +97,7 @@ export function useEmojiCatalog(): UseEmojiCatalogResult {
         })
       })
       .catch((err: unknown) => {
-        console.error('[PLChat] emoji catalog failed:', err)
+        consoleDev.error('emoji catalog failed', err)
         // Кэш уже показан — оставляем его: он старше ровно на одну версию пака, а пустая
         // панель с ошибкой полезнее не делает.
         if (alive.current && !shown.current) setState({ status: 'error' })
@@ -126,7 +127,7 @@ export function useEmojiCatalog(): UseEmojiCatalogResult {
           })
         })
         .catch((err: unknown) => {
-          console.error('[PLChat] emoji category failed:', categoryId, err)
+          consoleDev.error('emoji category failed', err)
           // Снимаем отметку: следующее пересечение сентинела попробует ещё раз.
           requested.current.delete(categoryId)
         })

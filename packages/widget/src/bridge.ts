@@ -6,6 +6,7 @@ import {
   type ChatEvent,
   type HostCommand,
 } from '@bankchat/protocol'
+import { consoleDev } from './shared/utils/consoleDev'
 
 type CommandHandler = (cmd: HostCommand) => void
 
@@ -27,12 +28,21 @@ export interface HostBridge {
 }
 
 export class IframeBridge implements HostBridge {
+  private readonly parentOrigin: string | null
   private port: MessagePort | null = null
   private handler: CommandHandler | null = null
 
   constructor() {
+    const parentOrigin = new URLSearchParams(window.location.search).get('parentOrigin')
+    if (!parentOrigin || !isAllowedParentOrigin(parentOrigin)) {
+      this.parentOrigin = null
+      consoleDev.warn('parentOrigin missing or not allowed — widget will not initialize')
+      return
+    }
+
+    this.parentOrigin = parentOrigin
     window.addEventListener('message', this.onWindowMessage)
-    this.sendReady()
+    window.parent.postMessage(makeEnvelope<ChatEvent>({ type: 'READY' }), parentOrigin)
   }
 
   setCommandHandler(handler: CommandHandler): void {
@@ -43,25 +53,13 @@ export class IframeBridge implements HostBridge {
     this.port?.postMessage(makeEnvelope(event))
   }
 
-  private sendReady(): void {
-    const parentOrigin = new URLSearchParams(window.location.search).get('parentOrigin')
-    if (!parentOrigin) {
-      console.warn(
-        '[BankChat] parentOrigin missing — widget must be loaded inside an iframe via loader.js',
-      )
-      return
-    }
-    if (!isAllowedParentOrigin(parentOrigin)) {
-      console.error(
-        `[BankChat] parentOrigin "${parentOrigin}" is not an allowed host — widget will not initialize.`,
-      )
-      return
-    }
-    window.parent.postMessage(makeEnvelope<ChatEvent>({ type: 'READY' }), parentOrigin)
-  }
-
   private onWindowMessage = (e: MessageEvent): void => {
-    if (!isAllowedParentOrigin(e.origin) || !isEnvelope(e.data) || !withinSizeLimit(e.data.msg))
+    if (
+      e.source !== window.parent ||
+      e.origin !== this.parentOrigin ||
+      !isEnvelope(e.data) ||
+      !withinSizeLimit(e.data.msg)
+    )
       return
 
     const msg = e.data.msg

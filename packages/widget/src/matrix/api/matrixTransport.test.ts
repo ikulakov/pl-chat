@@ -85,10 +85,12 @@ describe('MatrixTransport', () => {
     await transport.request('/_matrix/client/v3/send', { method: 'POST', body: {} })
 
     expect(fetchSpy).toHaveBeenCalledWith(`/_matrix/client/v3/send`, expect.anything())
-    const headers = fetchSpy.mock.calls[0]![1]!.headers as Headers
+    const requestInit = fetchSpy.mock.calls[0]![1]!
+    const headers = requestInit.headers as Headers
     expect(headers.get('Authorization')).toBe('Bearer access-token')
     expect(headers.get('Content-Type')).toBe('application/json')
     expect(headers.get('traceparent')).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+    expect(requestInit.credentials).toBe('omit')
   })
 
   it('serializes searchParams into the query string and encodes values', async () => {
@@ -125,8 +127,10 @@ describe('MatrixTransport', () => {
     // expiresAt is a fixed session TTL, not the access token's own expiry.
     expect(tokens.setTokens).toHaveBeenCalledWith('new-token', 'new-refresh')
     expect(fetchSpy.mock.calls[1]![0]).toBe(`/_matrix/client/v3/refresh`)
-    const refreshHeaders = fetchSpy.mock.calls[1]![1]!.headers as Record<string, string>
+    const refreshRequestInit = fetchSpy.mock.calls[1]![1]!
+    const refreshHeaders = refreshRequestInit.headers as Record<string, string>
     expect(refreshHeaders.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+    expect(refreshRequestInit.credentials).toBe('omit')
 
     const retryHeaders = fetchSpy.mock.calls[2]![1]!.headers as Headers
     expect(retryHeaders.get('Authorization')).toBe('Bearer new-token')

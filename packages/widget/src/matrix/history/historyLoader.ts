@@ -1,4 +1,5 @@
 import { sleep } from '../../shared/utils/sleep'
+import { consoleDev } from '../../shared/utils/consoleDev'
 import type { RuntimeAction } from '../../store/state'
 import type { MatrixApi } from '../api/matrixApi'
 import { collectCardAnswers } from '../mappers/adaptiveCard'
@@ -76,7 +77,7 @@ export class MatrixHistoryLoader {
         } catch (err) {
           if (isStale() || abort.signal.aborted) return
 
-          console.error('[PLChat] load history failed:', err)
+          consoleDev.error('load history failed', err)
 
           // Терминальная ошибка — retry бессмыслен, владелец уводит в recovery.
           if (this.onAuthError(err)) return

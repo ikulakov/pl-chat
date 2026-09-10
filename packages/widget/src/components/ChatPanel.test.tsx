@@ -115,10 +115,14 @@ describe('ChatPanel — экран приветствия', () => {
   it('оставляет композер на экране приветствия — писать можно сразу', () => {
     chatStore.setState({ ...readyState, room: INITIAL_ROOM_STATE })
 
-    render(<ChatPanel />)
+    const { container } = render(<ChatPanel />)
 
     expect(screen.getByText('Добро пожаловать в чат!')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Сообщение' })).toBeInTheDocument()
+
+    const illustration = container.querySelector<HTMLImageElement>('img:not([hidden])')
+    expect(illustration).toHaveAttribute('width', '275')
+    expect(illustration).toHaveAttribute('height', '188')
   })
 
   it('уступает место ленте, как только приходит первое сообщение', () => {
@@ -136,5 +140,37 @@ describe('ChatPanel — экран приветствия', () => {
 
     expect(screen.getByText('Здравствуйте')).toBeInTheDocument()
     expect(screen.queryByText('Добро пожаловать в чат!')).not.toBeInTheDocument()
+  })
+})
+
+describe('ChatPanel — системные состояния', () => {
+  beforeEach(() => {
+    chatStore.setState({ ...INITIAL_RUNTIME_STATE, room: INITIAL_ROOM_STATE })
+  })
+
+  it('показывает спиннер, пока сессия подключается', () => {
+    chatStore.setState({
+      phase: 'connecting',
+      online: true,
+    })
+
+    const { container } = render(<ChatPanel />)
+
+    expect(container.querySelector('[data-role="spinner"]')).toBeInTheDocument()
+  })
+
+  it('задаёт стабильный размер inline-иллюстрации ошибки', () => {
+    chatStore.setState({
+      phase: 'error',
+      online: false,
+    })
+
+    const { container } = render(<ChatPanel />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось загрузить данные')
+
+    const illustration = container.querySelector<HTMLImageElement>('img')
+    expect(illustration).toHaveAttribute('width', '296')
+    expect(illustration).toHaveAttribute('height', '148')
   })
 })

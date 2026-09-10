@@ -1,4 +1,5 @@
 import type { EmojiIndex } from '../../domain/emoji'
+import { consoleDev } from '../utils/consoleDev'
 import { readCachedEmojiIndex, writeCachedEmojiIndex } from './emojiCatalogCache'
 import { syncPackVersion } from './emojiDb'
 
@@ -47,7 +48,7 @@ export function ensureEmojiIndex(load: () => Promise<EmojiIndex>): void {
     })
     .catch((err: unknown) => {
       // Индекса нет — эмодзи останутся юникодом (или тем, что нашлось в кэше), чат работает.
-      console.error('[PLChat] emoji index failed:', err)
+      consoleDev.error('emoji index failed', err)
     })
     .finally(() => {
       loading = null

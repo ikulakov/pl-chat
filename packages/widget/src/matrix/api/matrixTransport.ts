@@ -103,7 +103,13 @@ export class MatrixTransport {
     }
     headers.set('traceparent', MatrixTransport.makeTraceparent())
 
-    return fetch(this.buildUrl(path, searchParams), { method, headers, body, signal })
+    return fetch(this.buildUrl(path, searchParams), {
+      method,
+      headers,
+      body,
+      signal,
+      credentials: 'omit',
+    })
   }
 
   private xhrUpload(path: string, file: File, options: UploadOptions): Promise<Response> {
@@ -194,6 +200,7 @@ export class MatrixTransport {
 
     this.refreshing = fetch(Endpoints.REFRESH, {
       method: 'POST',
+      credentials: 'omit',
       headers: {
         'Content-Type': 'application/json',
         traceparent: MatrixTransport.makeTraceparent(),

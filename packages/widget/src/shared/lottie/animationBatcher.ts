@@ -1,4 +1,5 @@
 import type { EmojiAnimation } from '../../domain/emoji'
+import { consoleDev } from '../utils/consoleDev'
 
 /**
  * Склейка загрузок эмодзи в пачки.
@@ -81,7 +82,7 @@ export function createBatchedLoader(
       .catch((err: unknown) => {
         failures++
         if (failures >= MAX_FAILURES) {
-          console.error('[PLChat] emoji bundle disabled after failures:', err)
+          consoleDev.error('emoji bundle disabled after failures', err)
         }
         // Пачка не приехала — это ещё не значит, что не приедут позиции: старый сервер без
         // маршрута отвечает 404 на весь `/bundle`, а не на эмодзи.

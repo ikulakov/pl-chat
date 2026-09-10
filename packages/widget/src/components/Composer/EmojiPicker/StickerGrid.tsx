@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { StickerItem, StickerPack } from '../../../domain/emoji'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { t } from '../../../i18n'
+import { consoleDev } from '../../../shared/utils/consoleDev'
 import { StickerView } from '../../Sticker/StickerView'
 import styles from './EmojiPicker.module.css'
 
@@ -30,7 +31,7 @@ export function StickerGrid({ scrollRef, onStickerSent }: Props) {
         if (alive) setPacks(loaded)
       })
       .catch((err: unknown) => {
-        console.error('[PLChat] sticker packs failed:', err)
+        consoleDev.error('sticker packs failed', err)
         if (alive) setFailed(true)
       })
 

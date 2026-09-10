@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import type { MediaTimelineItem } from '../domain/timeline'
+import { consoleDev } from '../shared/utils/consoleDev'
 import { downloadBlob } from '../shared/utils/downloadBlob'
 import { useChatActions } from './useChatActions'
 
@@ -20,7 +21,7 @@ export function useMediaDownload(item: MediaTimelineItem): MediaDownload {
     setIsLoading(true)
     downloadFile(url)
       .then((blob) => downloadBlob(blob, filename))
-      .catch((err: unknown) => console.error('[PLChat] media download failed:', err))
+      .catch((err: unknown) => consoleDev.error('media download failed', err))
       .finally(() => setIsLoading(false))
   }, [url, filename, isLoading, downloadFile])
 

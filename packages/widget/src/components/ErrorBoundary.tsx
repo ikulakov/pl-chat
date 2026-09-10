@@ -1,9 +1,8 @@
 import { Component, type ReactNode } from 'react'
-import { ERROR_ILLUSTRATION } from '../shared/assets/inlineAssets'
 import { t } from '../i18n'
+import { ERROR_ILLUSTRATION } from '../shared/assets/inlineAssets'
+import { StatusScreen, StatusScreenAction, StatusScreenImage } from '../shared/ui/StatusScreen'
 import styles from './ErrorBoundary.module.css'
-import { StatusScreen } from './StatusScreen'
-import statusStyles from './StatusScreen.module.css'
 
 interface Props {
   children: ReactNode
@@ -30,16 +29,20 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className={styles.wrapper}>
           <StatusScreen
             title={t('status.crash')}
-            subtitle={t('status.crash.subtitle')}
-            illustration={ERROR_ILLUSTRATION}
-            action={
-              <button
-                className={statusStyles.retryBtn}
-                onClick={this.reset}
-              >
-                {t('status.crash.retry')}
-              </button>
+            description={t('status.crash.subtitle')}
+            media={
+              <StatusScreenImage
+                src={ERROR_ILLUSTRATION}
+                width={296}
+                height={148}
+              />
             }
+            actions={
+              <StatusScreenAction onClick={this.reset}>
+                {t('status.crash.retry')}
+              </StatusScreenAction>
+            }
+            role="alert"
           />
         </div>
       )

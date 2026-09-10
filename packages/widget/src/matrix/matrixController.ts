@@ -18,6 +18,7 @@ import { findOwnReaction, type ReactionEntry } from '../domain/reactions'
 import { canMoveMarker } from '../domain/receipts'
 import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '../domain/timeline'
 import { isAbortError, isDeadlineError } from '../shared/utils/abort'
+import { consoleDev } from '../shared/utils/consoleDev'
 // Оба кэша медиа считают записи, а не байты: вес записи в каждом ограничен сверху
 // (миниатюра — по построению, свой файл — лимитом композера), поэтому число записей и есть
 // предсказуемый потолок памяти.
@@ -178,7 +179,7 @@ export class MatrixController implements MatrixService {
       'connecting',
       () => this.sessionManager.establishSession(),
       (err) => {
-        console.error('[PLChat] connect failed:', err)
+        consoleDev.error('connect failed', err)
 
         if (isUserDeactivatedError(err)) {
           this.sessionManager.clearSession()
@@ -705,7 +706,10 @@ export class MatrixController implements MatrixService {
   private watchNetwork(): void {
     if (this.unwatchNetwork) return
 
-    const onOffline = () => this.markOffline()
+    const onOffline = () => {
+      this.markOffline()
+      this.restartSync()
+    }
     const onOnline = () => this.restartSync()
 
     window.addEventListener('offline', onOffline)
@@ -717,11 +721,11 @@ export class MatrixController implements MatrixService {
     }
   }
 
-  // Петлю на `offline` не останавливаем: тогда возвращение связи целиком зависело бы от
-  // события `online`, а его браузер может и не прислать (bfcache, разбуженный ноут, коннект,
-  // который формально не падал). Живая петля упирается в потолок backoff и чинится сама;
-  // `online` лишь ускоряет — рвёт запрос, который мог зависнуть в мёртвом коннекте, и
-  // возвращает задержку к базовой. Сессию и ленту при этом не трогаем.
+  // На `offline` перезапускаем петлю: stop() инвалидирует поколение текущего long-poll, поэтому
+  // его поздний ответ уже не сможет снять баннер, а новый start() сохраняет самостоятельное
+  // восстановление, даже если событие `online` не придёт. На `online` тот же рестарт рвёт запрос,
+  // который мог зависнуть в мёртвом коннекте, и возвращает задержку к базовой. Сессию и ленту
+  // при этом не трогаем.
   private restartSync(): void {
     const { cursor, phase } = this.getState()
     if (phase !== 'ready' || cursor === null) return
@@ -752,7 +756,7 @@ export class MatrixController implements MatrixService {
     // Её лечит recovery, и баннер «нет соединения» там только соврал бы.
     if (this.handleAuthError(err, 'sync')) return
 
-    console.error('[PLChat] sync error, retrying in up to', meta.backoff, 'ms:', err)
+    consoleDev.error(`sync error, retrying in up to ${meta.backoff} ms`, err)
 
     // Считаем любой сбой, кроме auth. Строка в шапке отвечает на вопрос «доходят ли до нас
     // события», а не «есть ли интернет»: причину из браузера всё равно не узнать (мёртвая сеть
@@ -775,9 +779,8 @@ export class MatrixController implements MatrixService {
   }
 
   // Успешный тик — доказательство связи, и оно сильнее мнения браузера: `navigator.onLine`
-  // врёт в обе стороны (MDN прямо называет его подсказкой), а ответ сервера — факт. Поздний
-  // ответ, приехавший уже после обрыва, снимет баннер лишь до следующего запроса: петля жива,
-  // и он вернётся через секунду.
+  // врёт в обе стороны (MDN прямо называет его подсказкой), а ответ сервера — факт. Ответы
+  // поколения, работавшего до `offline`, сюда не попадут: их отсекает runId внутри syncLoop.
   //
   // Зовётся на каждый успешный тик, поэтому дешёвая проверка стора вместо dispatch'а:
   // редьюсер и так вернул бы то же состояние, но devtools собирали бы пустой экшен раз в 25 секунд.
@@ -790,7 +793,7 @@ export class MatrixController implements MatrixService {
 
   private handleAuthError(err: unknown, context: AuthErrorContext): boolean {
     if (isUserDeactivatedError(err)) {
-      console.error(`[PLChat] ${context} user deactivated:`, err)
+      consoleDev.error(`${context} user deactivated`, err)
       this.failSession()
       return true
     }
@@ -804,7 +807,7 @@ export class MatrixController implements MatrixService {
   }
 
   private recoverFromAuthError(err: unknown, context: AuthErrorContext): void {
-    console.error(`[PLChat] ${context} auth error:`, err)
+    consoleDev.error(`${context} auth error`, err)
     this.stopSessionActivity()
     this.startSessionRecovery(this.lifecycleId)
   }
@@ -816,7 +819,7 @@ export class MatrixController implements MatrixService {
       lifecycleId,
       'recovering',
       () => this.sessionManager.resetGuestSession(),
-      (err) => console.error('[PLChat] session recovery failed:', err),
+      (err) => consoleDev.error('session recovery failed', err),
     )
     this.sessionRecovery = recovery
     recovery.finally(() => {
