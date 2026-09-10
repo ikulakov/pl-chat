@@ -29,7 +29,7 @@ describe('widgetUrl', () => {
 
   it('still rejects insecure remote chatUrl during initialization', () => {
     expect(() => validateConfig({ chatUrl: 'http://chat.example.com:8080' })).toThrow(
-      'BankChat: chatUrl must use HTTPS',
+      'Plchat: chatUrl must use HTTPS',
     )
   })
 

@@ -24,19 +24,19 @@ export interface LoaderConfig extends Omit<InitConfig, 'viewport'> {
 }
 
 export function validateConfig(cfg: LoaderConfig): void {
-  if (!cfg.chatUrl) throw new Error('BankChat: chatUrl is required')
+  if (!cfg.chatUrl) throw new Error('Plchat: chatUrl is required')
   let url: URL
   try {
     url = new URL(cfg.chatUrl)
   } catch {
-    throw new Error('BankChat: chatUrl is not a valid URL')
+    throw new Error('Plchat: chatUrl is not a valid URL')
   }
   const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
   if (url.protocol !== 'https:' && !isLocalhost) {
-    throw new Error('BankChat: chatUrl must use HTTPS')
+    throw new Error('Plchat: chatUrl must use HTTPS')
   }
   if (cfg.preload !== undefined && !PRELOAD_MODES.includes(cfg.preload)) {
-    throw new Error(`BankChat: preload must be one of ${PRELOAD_MODES.join(', ')}`)
+    throw new Error(`Plchat: preload must be one of ${PRELOAD_MODES.join(', ')}`)
   }
 }
 
