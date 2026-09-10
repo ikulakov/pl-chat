@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { deferred, ROOM_ID, syncResponse } from '../../shared/testUtils/matrixFixtures'
 import type { MatrixApi } from '../api/matrixApi'
 import type { SyncResponse } from '../wire/dto'
@@ -9,7 +9,14 @@ vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 type LongPoll = MatrixApi['longPollSync']
 
+// jsdom отдаёт visibilityState только для чтения — подменяем дескриптор.
+function setVisibility(state: DocumentVisibilityState): void {
+  Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
+}
+
 describe('MatrixSyncLoop', () => {
+  afterEach(() => setVisibility('visible'))
+
   it('calls onTick with advancing cursor and the raw sync response', async () => {
     const ticks: SyncTick[] = []
     const longPollSync = vi.fn<LongPoll>()
@@ -33,18 +40,18 @@ describe('MatrixSyncLoop', () => {
   it('re-reads presence before every poll, so a tab going background is picked up', async () => {
     const sent: (string | undefined)[] = []
     const longPollSync = vi.fn<LongPoll>()
-    let presence: SetPresence = SetPresence.Online
-    const loop = new MatrixSyncLoop({ longPollSync }, () => presence)
+    const loop = new MatrixSyncLoop({ longPollSync })
 
     let calls = 0
     longPollSync.mockImplementation(async (_since, options) => {
       sent.push(options?.setPresence)
       calls += 1
-      presence = SetPresence.Unavailable
+      setVisibility('hidden')
       if (calls >= 2) loop.stop()
       return syncResponse(`c${calls}`)
     })
 
+    setVisibility('visible')
     loop.start({ cursor: 'c0', onTick: () => {} })
     await vi.waitFor(() => expect(sent.length).toBeGreaterThanOrEqual(2))
     loop.stop()

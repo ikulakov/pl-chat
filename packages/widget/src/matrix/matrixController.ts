@@ -49,7 +49,6 @@ import {
 import { toRoomSyncPatch } from './mappers/roomSync'
 import { classifyUploadError } from './mappers/uploadError'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
-import { currentPresence } from './sync/presence'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
 import { MatrixEventType } from './wire/consts'
 
@@ -153,7 +152,7 @@ export class MatrixController implements MatrixService {
 
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
-    this.syncLoop = new MatrixSyncLoop(deps.api, currentPresence)
+    this.syncLoop = new MatrixSyncLoop(deps.api)
     this.historyLoader = new MatrixHistoryLoader({
       api: deps.api,
       dispatch: deps.dispatch,
