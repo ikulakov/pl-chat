@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
-import type { ReplyStickerPreview } from '../domain/reply'
-import { t } from '../i18n'
-import { cn } from '../shared/utils/cn'
-import { EmojiText } from './Emoji/EmojiText'
+import type { ReplyStickerPreview } from '../../domain/reply'
+import { t } from '../../i18n'
+import { cn } from '../../shared/utils/cn'
+import { EmojiText } from '../Emoji/EmojiText'
 import styles from './ReplyPreview.module.css'
-import { StickerView } from './Sticker/StickerView'
+import { StickerView } from '../Sticker/StickerView'
 
 /** Со строку текста цитаты: стикер здесь — иконка, а не картинка. */
 const STICKER_PX = 16

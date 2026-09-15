@@ -1,8 +1,12 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EmojiIndex } from '../../../domain/emoji'
+import type { MessageTimelineItem } from '../../../domain/timeline'
+import { LONG_PRESS_MS } from '../../../hooks/useMessageGestures'
+import { t } from '../../../i18n'
 import { ensureEmojiIndex, resetEmojiIndex } from '../../../shared/emoji/emojiIndexStore'
 import { textItem } from '../../../shared/testUtils/matrixFixtures'
+import { TestPointerEvent, touch } from '../../../shared/testUtils/pointer'
 import { MessageRow } from './MessageRow'
 
 const BUBBLE = '[data-role="message-bubble"]'
@@ -30,9 +34,13 @@ vi.mock('../../../shared/lottie/emojiBitmap', () => ({
 }))
 
 function renderRow(body: string, replyText?: string) {
+  return renderMessage(textItem({ body }), replyText)
+}
+
+function renderMessage(message: MessageTimelineItem, replyText?: string) {
   return render(
     <MessageRow
-      message={textItem({ body })}
+      message={message}
       userId="@me:bank"
       position="single"
       readByOperator={false}
@@ -85,5 +93,61 @@ describe('MessageRow: сообщение из одних эмодзи', () => {
 
     await screen.findByAltText('😋')
     expect(container.querySelector(BUBBLE)).not.toBeNull()
+  })
+})
+
+describe('MessageRow: долгое нажатие', () => {
+  const ROW = '[data-item-id]'
+
+  beforeEach(() => {
+    vi.stubGlobal('PointerEvent', TestPointerEvent)
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  function longPress(row: Element) {
+    fireEvent.pointerDown(row, { ...touch, clientX: 200, clientY: 100 })
+    act(() => vi.advanceTimersByTime(LONG_PRESS_MS))
+    fireEvent.pointerUp(row, touch)
+  }
+
+  const triggerIn = (row: HTMLElement) =>
+    within(row).getByRole('button', { name: t('chat.action.menu') })
+
+  // Само поднятие делает CSS (:has на атрибутах триггера) — jsdom его не считает, поэтому
+  // проверяем признаки, по которым оно срабатывает.
+  it('долгое нажатие открывает меню с подложкой — признак, по которому ряд поднимается', () => {
+    const { container } = renderMessage(textItem({ body: 'вопрос' }))
+    const row = container.querySelector<HTMLElement>(ROW)!
+
+    longPress(row)
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(triggerIn(row)).toHaveAttribute('data-backdrop')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(triggerIn(row)).not.toHaveAttribute('data-backdrop')
+  })
+
+  it('не открывает меню долгим нажатием, если в нём нечего показать', () => {
+    // без текста нечего копировать и цитировать, повтор — только у своего упавшего
+    const { container } = renderMessage(textItem({ body: '  ' }))
+    const row = container.querySelector<HTMLElement>(ROW)!
+
+    longPress(row)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(triggerIn(row)).not.toHaveAttribute('data-popup-open')
+  })
+
+  it('открытие кнопкой «…» обходится без подложки — ряд не поднимается', () => {
+    const { container } = renderMessage(textItem({ body: 'вопрос' }))
+    const row = container.querySelector<HTMLElement>(ROW)!
+
+    fireEvent.click(triggerIn(row))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(triggerIn(row)).toHaveAttribute('data-popup-open')
+    expect(triggerIn(row)).not.toHaveAttribute('data-backdrop')
   })
 })

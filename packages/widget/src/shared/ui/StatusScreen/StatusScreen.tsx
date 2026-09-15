@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, ImgHTMLAttributes, ReactNode, Ref } from 'react'
 import { cn } from '../../utils/cn'
+import { Spinner } from '../Spinner'
 import styles from './StatusScreen.module.css'
 
 export interface StatusScreenProps extends Omit<
@@ -85,20 +86,28 @@ export function StatusScreenImage({
 
 export interface StatusScreenActionProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   ref?: Ref<HTMLButtonElement>
+  loading?: boolean
 }
 
 export function StatusScreenAction({
   ref,
   type = 'button',
+  loading = false,
   className,
+  onClick,
+  children,
   ...rest
 }: StatusScreenActionProps) {
   return (
     <button
+      {...rest}
       ref={ref}
       type={type}
       className={cn(styles.actionButton, className)}
-      {...rest}
-    />
+      aria-disabled={loading || undefined}
+      onClick={loading ? undefined : onClick}
+    >
+      {loading ? <Spinner size="icon" /> : children}
+    </button>
   )
 }

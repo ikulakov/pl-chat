@@ -1,12 +1,13 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { readOwnEventIds } from '../../domain/receipts'
 import { isSystem } from '../../domain/timeline'
 import { useChatScroll } from '../../hooks/useChatScroll'
 import { useChatStore } from '../../hooks/useChatStore'
 import { useLoadMoreHistory } from '../../hooks/useLoadMoreHistory'
 import { useSendReadReceipts } from '../../hooks/useSendReadReceipts'
-import { cn } from '../../shared/utils/cn'
+import { registerTimelineScroll } from '../../shared/timeline/timelineScroll'
 import { Spinner } from '../../shared/ui/Spinner'
+import { cn } from '../../shared/utils/cn'
 import {
   selectIsOpen,
   selectReactions,
@@ -59,6 +60,9 @@ export function MessageList({ userId }: Props) {
   })
 
   useSendReadReceipts({ timeline, isOpen, containerRef: messagesListRef })
+
+  // отдаём прокрутку к сообщению наружу
+  useEffect(() => registerTimelineScroll(scrollToItem), [scrollToItem])
 
   return (
     <div className={styles.wrap}>

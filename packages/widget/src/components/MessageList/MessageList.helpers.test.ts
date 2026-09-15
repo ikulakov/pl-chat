@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { TextTimelineItem } from '../../domain/timeline'
 import { t } from '../../i18n'
-import { fileItem, noticeItem, systemItem, textItem } from '../../shared/testUtils/matrixFixtures'
+import {
+  fileItem,
+  noticeItem,
+  stickerItem,
+  systemItem,
+  textItem,
+} from '../../shared/testUtils/matrixFixtures'
 import { getPosition, getReplyPreview, indexMessagesByEventId } from './MessageList.helpers'
 
 function message(sender: string): TextTimelineItem {
@@ -108,6 +114,23 @@ describe('getReplyPreview', () => {
       author: t('chat.reply.operator'),
       text: 'doc.pdf',
       targetId: 'p1',
+    })
+  })
+
+  it('цитата на стикер — подпись «Стикер» и сам стикер, а не его эмодзи', () => {
+    const parent = stickerItem({ localId: 'p1', eventId: '$parent', body: '🐥' })
+
+    const preview = getReplyPreview({
+      index: indexMessagesByEventId([parent, reply('$parent')]),
+      message: reply('$parent'),
+      userId: USER,
+    })
+
+    expect(preview).toEqual({
+      author: t('chat.reply.operator'),
+      text: t('chat.reply.sticker'),
+      targetId: 'p1',
+      sticker: { mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx', body: '🐥', format: 'image' },
     })
   })
 

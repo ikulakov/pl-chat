@@ -3,16 +3,16 @@ import type { MediaVerdict, MediaVerdictEntry } from '../domain/mediaVerdict'
 import type { OperatorState } from '../domain/operator'
 import type { ReactionDelta, ReactionEntry, ReactionIndex } from '../domain/reactions'
 import type { ReadReceipt } from '../domain/receipts'
-import type { ReplyStickerPreview } from '../domain/reply'
+import type { ReplyTarget } from '../domain/reply'
 import type { RoomSyncPatch } from '../domain/roomSync'
 import type { TimelineItem } from '../domain/timeline'
-import type { UploadFailure } from '../domain/uploadError'
+import type { UploadFailure } from '../domain/mediaFailure'
 
 export type RuntimeAction =
   | { type: 'session.starting' }
   | { type: 'session.started'; identity: Identity; cursor: string; room: RoomSyncPatch }
   | { type: 'session.recovering' }
-  | { type: 'session.failed'; error: string }
+  | { type: 'session.failed' }
   | { type: 'session.closed' }
   | { type: 'network.lost' }
   | { type: 'network.restored' }
@@ -47,7 +47,6 @@ export type RuntimeAction =
 
 export interface ChatRuntimeState {
   phase: SessionPhase
-  error: string | null
   online: boolean
   identity: Identity | null
   cursor: string | null
@@ -74,19 +73,18 @@ export interface RoomState {
   isLoadingHistory: boolean
 }
 
-export interface ReplyTarget {
-  eventId: string
-  sender: string
-  body: string
-  /** Оригинал — стикер: превью в композере рисует его самого, а не подпись шрифтом. */
-  sticker?: ReplyStickerPreview
-}
-
 export interface Identity {
   userId: string
   roomId: string
 }
 
-export type SessionPhase = 'idle' | 'connecting' | 'recovering' | 'ready' | 'error'
+/**
+ * - `connecting` — первое подключение: регистрация и initial sync
+ * - `retrying` — повтор по кнопке с экрана ошибки
+ * - `recovering` — сессия умерла на ходу (auth-ошибка), тихо поднимаем новую без участия пользователя
+ */
+export type SessionPhase = 'idle' | 'connecting' | 'retrying' | 'recovering' | 'ready' | 'error'
 
-export type StatusLine = 'connecting' | 'offline' | 'bot' | 'operator' | 'error'
+export type PanelView = 'loading' | 'error' | 'chat'
+
+export type HeaderStatus = 'connecting' | 'offline' | 'bot' | 'operator' | 'error'

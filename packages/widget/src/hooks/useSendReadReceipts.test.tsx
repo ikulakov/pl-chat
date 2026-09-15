@@ -1,7 +1,8 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TimelineItem } from '../domain/timeline'
-import { RECEIPT_ID_ATTR, SCAN_THROTTLE_MS, useSendReadReceipts } from './useSendReadReceipts'
+import { RECEIPT_ID_ATTR } from '../shared/timeline/domAttributes'
+import { SCAN_THROTTLE_MS, useSendReadReceipts } from './useSendReadReceipts'
 
 const { markRead } = vi.hoisted(() => ({ markRead: vi.fn() }))
 vi.mock('./useChatActions', () => ({ useChatActions: () => ({ markRead }) }))

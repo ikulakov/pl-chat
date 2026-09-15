@@ -26,7 +26,8 @@ describe('useAttachmentState', () => {
 
     expect(result.current.pending).toMatchObject({
       file: expect.any(File),
-      error: 'Формат файла не поддерживается',
+      // код, а не текст: переводит превью при рендере
+      error: 'badType',
     })
 
     act(() => result.current.send())

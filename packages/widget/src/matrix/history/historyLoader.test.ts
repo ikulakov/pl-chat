@@ -8,7 +8,7 @@ import {
 } from '../../shared/testUtils/matrixFixtures'
 import { chatRuntimeReducer } from '../../store/reducer'
 import type { ChatRuntimeState, RuntimeAction } from '../../store/state'
-import { INITIAL_RUNTIME_STATE } from '../../store/store'
+import { INITIAL_RUNTIME_STATE } from '../../store/initialState'
 import type { MatrixApi } from '../api/matrixApi'
 import { MatrixError } from '../api/matrixError'
 import type { ClientEvent } from '../wire/types'

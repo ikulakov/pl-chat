@@ -10,12 +10,12 @@ import {
   syncResponse,
   textItem,
 } from '../shared/testUtils/matrixFixtures'
+import { INITIAL_RUNTIME_STATE } from '../store/initialState'
 import { chatRuntimeReducer } from '../store/reducer'
 import type { ChatRuntimeState, Identity, RoomState, RuntimeAction } from '../store/state'
-import { INITIAL_RUNTIME_STATE } from '../store/store'
 import type { MatrixApi } from './api/matrixApi'
 import { MatrixError } from './api/matrixError'
-import { CONNECTION_FAILED_ERROR, MatrixController } from './matrixController'
+import { MatrixController } from './matrixController'
 import { MatrixSessionManager } from './session/sessionManager'
 
 vi.mock('../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
@@ -34,7 +34,12 @@ function harness(initial: Partial<ChatRuntimeState> = {}, api: MatrixApi = makeM
     state = chatRuntimeReducer(state, action)
   })
   const sessionManager = new MatrixSessionManager(api, tokens)
-  const controller = new MatrixController({ dispatch, getState: () => state, api, sessionManager })
+  const controller = new MatrixController({
+    dispatch,
+    getState: () => state,
+    api,
+    sessionManager,
+  })
 
   return { controller, dispatch, applied, tokens, getState: () => state }
 }
@@ -92,10 +97,7 @@ describe('MatrixController (orchestrator)', () => {
 
     await controller.connect()
 
-    expect(applied.at(-1)).toEqual({
-      type: 'session.failed',
-      error: CONNECTION_FAILED_ERROR,
-    })
+    expect(applied.at(-1)).toEqual({ type: 'session.failed' })
   })
 
   it('does not connect when already connected', async () => {
@@ -119,7 +121,7 @@ describe('MatrixController (orchestrator)', () => {
   it('reconnect (connect from error phase) re-establishes the session', async () => {
     // Это ровно тот guard, на который опирается кнопка reconnect в UI: connect()
     // должен пропускать вызов из phase 'error', а не только из 'idle'.
-    const { controller, applied } = harness({ phase: 'error', error: 'Не удалось подключиться' })
+    const { controller, applied } = harness({ phase: 'error' })
 
     await controller.connect()
     controller.disconnect()
@@ -199,12 +201,7 @@ describe('MatrixController (orchestrator)', () => {
     const { controller, applied, tokens } = harness({}, api)
 
     await controller.connect()
-    await vi.waitFor(() =>
-      expect(applied).toContainEqual({
-        type: 'session.failed',
-        error: CONNECTION_FAILED_ERROR,
-      }),
-    )
+    await vi.waitFor(() => expect(applied).toContainEqual({ type: 'session.failed' }))
 
     expect(api.registerGuest).toHaveBeenCalledOnce()
     expect(tokens.getAccessToken()).toBeNull()
@@ -448,10 +445,7 @@ describe('MatrixController (orchestrator)', () => {
 
     await controller.connect()
 
-    expect(applied.at(-1)).toEqual({
-      type: 'session.failed',
-      error: CONNECTION_FAILED_ERROR,
-    })
+    expect(applied.at(-1)).toEqual({ type: 'session.failed' })
     // Deactivation must not be silently worked around by registering a fresh guest —
     // that would defeat the server-side block.
     expect(api.registerGuest).not.toHaveBeenCalled()
@@ -503,10 +497,7 @@ describe('MatrixController (orchestrator)', () => {
 
     await controller.connect()
 
-    expect(applied).toContainEqual({
-      type: 'session.failed',
-      error: 'Не удалось подключиться',
-    })
+    expect(applied).toContainEqual({ type: 'session.failed' })
     expect(api.longPollSync).not.toHaveBeenCalled()
   })
 
@@ -1059,10 +1050,7 @@ describe('MatrixController (orchestrator)', () => {
     await vi.waitFor(() =>
       expect(applied).toContainEqual({ type: 'message.failed', localId: expect.any(String) }),
     )
-    expect(applied).toContainEqual({
-      type: 'session.failed',
-      error: CONNECTION_FAILED_ERROR,
-    })
+    expect(applied).toContainEqual({ type: 'session.failed' })
     expect(api.registerGuest).not.toHaveBeenCalled()
     expect(tokens.getAccessToken()).toBeNull()
     expect(tokens.getRefreshToken()).toBeNull()

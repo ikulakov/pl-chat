@@ -5,13 +5,10 @@
 }
 
 .text {
-  max-width: 428px;
-  padding: 8px 16px;
-  border-radius: var(--radius-lg);
-  background: var(--c-surface-tertiary);
+  padding: 0px 12px;
   color: var(--c-text-tertiary);
   font-size: 14px;
-  line-height: 14px;
+  line-height: 17px;
   text-align: center;
   overflow-wrap: anywhere;
 }

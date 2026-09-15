@@ -1,5 +1,3 @@
-import { t } from '../../i18n'
-
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
@@ -18,7 +16,10 @@ export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 /** Значение атрибута accept для <input type=file> */
 export const FILE_ACCEPT = ALLOWED_EXTENSIONS.map((ext) => `.${ext}`).join(',')
 
-export type FileValidation = { ok: true } | { ok: false; message: string }
+/** Код, а не текст: результат лежит в состоянии вложения, переводит рендер. */
+export type FileRejection = 'badType' | 'tooLarge'
+
+export type FileValidation = { ok: true } | { ok: false; reason: FileRejection }
 
 export function getFileExtension(filename: string): string {
   const dot = filename.lastIndexOf('.')
@@ -33,10 +34,10 @@ export function validateFile(file: File, maxBytes = MAX_FILE_SIZE_BYTES): FileVa
   const ext = getFileExtension(file.name)
 
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    return { ok: false, message: t('composer.upload.badType') }
+    return { ok: false, reason: 'badType' }
   }
   if (file.size > maxBytes) {
-    return { ok: false, message: t('composer.upload.tooLarge') }
+    return { ok: false, reason: 'tooLarge' }
   }
   return { ok: true }
 }

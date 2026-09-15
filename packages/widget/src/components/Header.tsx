@@ -5,22 +5,22 @@ import { t } from '../i18n'
 import { IconButton } from '../shared/ui/IconButton'
 import { CloseIcon } from '../shared/ui/icons'
 import { cn } from '../shared/utils/cn'
-import { selectOperatorDisplayName, selectStatusLine, selectViewport } from '../store/selectors'
-import type { StatusLine } from '../store/state'
+import { selectHeaderStatus, selectOperatorDisplayName, selectViewport } from '../store/selectors'
+import type { HeaderStatus } from '../store/state'
 import styles from './Header.module.css'
 
-const STATUS_TEXT: Partial<Record<StatusLine, MessageKey>> = {
+const STATUS_TEXT: Record<HeaderStatus, MessageKey> = {
   connecting: 'header.connecting',
   offline: 'header.offline',
   bot: 'header.botSubtitle',
   operator: 'header.operatorSubtitle',
+  error: 'header.noConnection',
 }
 
 export function Header() {
   const operatorName = useChatStore(selectOperatorDisplayName)
-  const status = useChatStore(selectStatusLine)
-  const statusText = STATUS_TEXT[status] ? t(STATUS_TEXT[status]) : ''
-  const isPendingStatus = status === 'connecting' || status === 'offline'
+  const status = useChatStore(selectHeaderStatus)
+  const showShimmer = status === 'connecting' || status === 'offline'
 
   const viewport = useChatStore(selectViewport)
   const { close } = useChatActions()
@@ -30,10 +30,10 @@ export function Header() {
       <div className={styles.info}>
         <span className={styles.name}>{operatorName ?? t('header.name')}</span>
         <span
-          className={cn(styles.status, isPendingStatus && styles.pending)}
+          className={cn(styles.status, showShimmer && styles.shimmer)}
           role="status"
         >
-          {statusText}
+          {t(STATUS_TEXT[status])}
         </span>
       </div>
       <div className={styles.actions}>

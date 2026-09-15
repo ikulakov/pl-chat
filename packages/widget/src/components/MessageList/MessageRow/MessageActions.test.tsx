@@ -130,7 +130,7 @@ describe('MessageActions', () => {
     expect(replyTo).toHaveBeenCalledExactlyOnceWith({
       eventId: '$m1',
       sender: '@operator:bank',
-      body: 'hello',
+      quote: { kind: 'text', text: 'hello' },
     })
   })
 
@@ -177,7 +177,7 @@ describe('MessageActions', () => {
     expect(replyTo).toHaveBeenCalledExactlyOnceWith({
       eventId: '$m1',
       sender: '@operator:bank',
-      body: 'doc.pdf',
+      quote: { kind: 'text', text: 'doc.pdf' },
     })
   })
 
@@ -196,7 +196,7 @@ describe('MessageActions', () => {
     expect(replyTo).toHaveBeenCalledExactlyOnceWith({
       eventId: '$m1',
       sender: '@operator:bank',
-      body: 'договор на подпись',
+      quote: { kind: 'text', text: 'договор на подпись' },
     })
   })
 

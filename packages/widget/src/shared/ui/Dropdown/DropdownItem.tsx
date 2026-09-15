@@ -16,9 +16,11 @@ export function DropdownItem({ onSelect, icon, children }: Props) {
       type="button"
       role="menuitem"
       className={styles.item}
-      onClick={() => {
+      onClick={(event) => {
         onSelect()
-        close()
+        // detail — число кликов: у мыши ≥ 1, у Enter/Space 0. С клавиатуры фокус возвращаем на
+        // триггер, мышью — нет, иначе :focus-within оставил бы «…» видимым после закрытия.
+        close({ returnFocus: event.detail === 0 })
       }}
     >
       {icon}

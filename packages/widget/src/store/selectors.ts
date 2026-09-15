@@ -4,9 +4,10 @@ import type { MediaVerdict } from '../domain/mediaVerdict'
 import type { ReactionIndex } from '../domain/reactions'
 import type { ReadReceipt } from '../domain/receipts'
 import { countUnread } from '../domain/receipts'
+import type { ReplyTarget } from '../domain/reply'
 import type { TimelineItem } from '../domain/timeline'
 import { isSystem } from '../domain/timeline'
-import type { ReplyTarget, SessionPhase, StatusLine } from './state'
+import type { HeaderStatus, PanelView, SessionPhase } from './state'
 import type { ChatStoreState } from './store'
 
 /**
@@ -21,10 +22,11 @@ export function selectPhase(state: ChatStoreState): SessionPhase {
   return state.phase
 }
 
-export function selectStatusLine(state: ChatStoreState): StatusLine {
+export function selectHeaderStatus(state: ChatStoreState): HeaderStatus {
   switch (state.phase) {
     case 'idle':
     case 'connecting':
+    case 'retrying':
     case 'recovering':
       return 'connecting'
     case 'error':
@@ -33,6 +35,20 @@ export function selectStatusLine(state: ChatStoreState): StatusLine {
       if (!state.online) return 'offline'
 
       return state.room.operator.isActive ? 'operator' : 'bot'
+  }
+}
+
+export function selectPanelView(state: ChatStoreState): PanelView {
+  switch (state.phase) {
+    case 'idle':
+    case 'connecting':
+    case 'recovering':
+      return 'loading'
+    case 'retrying':
+    case 'error':
+      return 'error'
+    case 'ready':
+      return 'chat'
   }
 }
 

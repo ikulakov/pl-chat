@@ -6,20 +6,28 @@ import welcomeIllustration from '../shared/assets/welcome-illustration.webp'
 import { externalLinks } from '../shared/constants/externalLinks'
 import { Spinner } from '../shared/ui/Spinner'
 import { StatusScreen, StatusScreenAction, StatusScreenImage } from '../shared/ui/StatusScreen'
-import { selectHasMessages, selectPhase, selectUserId, selectViewport } from '../store/selectors'
+import { ToastOutlet } from '../shared/ui/Toast'
+import {
+  selectHasMessages,
+  selectPanelView,
+  selectPhase,
+  selectUserId,
+  selectViewport,
+} from '../store/selectors'
 import { AttachmentProvider } from './Attachment/AttachmentProvider'
 import chatStyles from './ChatPanel.module.css'
 import { Composer } from './Composer/Composer'
 import { DevOperatorTools } from './dev/DevOperatorTools'
+import { ErrorBoundary } from './ErrorBoundary'
 import { Header } from './Header'
 import { MessageList } from './MessageList/MessageList'
 
 export function ChatPanel() {
+  const view = useChatStore(selectPanelView)
   const phase = useChatStore(selectPhase)
   const userId = useChatStore(selectUserId)
   const viewport = useChatStore(selectViewport)
   const hasMessages = useChatStore(selectHasMessages)
-  const isSessionPending = phase === 'idle' || phase === 'connecting' || phase === 'recovering'
 
   const { reconnect } = useChatActions()
 
@@ -29,58 +37,67 @@ export function ChatPanel() {
 
       <Header />
 
-      {isSessionPending && <StatusScreen media={<Spinner />} />}
+      <ErrorBoundary>
+        {view === 'loading' && <StatusScreen media={<Spinner delayed />} />}
 
-      {phase === 'error' && (
-        <StatusScreen
-          title={t('status.error')}
-          description={t('status.error.subtitle')}
-          media={
-            <StatusScreenImage
-              src={ERROR_ILLUSTRATION}
-              width={296}
-              height={148}
-            />
-          }
-          actions={
-            <StatusScreenAction onClick={reconnect}>{t('status.error.retry')}</StatusScreenAction>
-          }
-          role="alert"
-        />
-      )}
+        {view === 'error' && (
+          <StatusScreen
+            title={t('status.error')}
+            description={t('status.error.subtitle')}
+            media={
+              <StatusScreenImage
+                src={ERROR_ILLUSTRATION}
+                width={296}
+                height={148}
+              />
+            }
+            actions={
+              <StatusScreenAction
+                loading={phase === 'retrying'}
+                onClick={reconnect}
+              >
+                {t('status.error.retry')}
+              </StatusScreenAction>
+            }
+            role="alert"
+          />
+        )}
 
-      {phase === 'ready' && userId !== null && (
-        <AttachmentProvider dropZoneEnabled={viewport !== 'fullscreen'}>
-          {hasMessages ? (
-            <MessageList userId={userId} />
-          ) : (
-            <StatusScreen
-              title={t('status.welcome')}
-              description={t('status.welcome.subtitle')}
-              media={
-                <StatusScreenImage
-                  src={welcomeIllustration}
-                  width={275}
-                  height={188}
-                />
-              }
-              footer={
-                <>
-                  <p>{t('chat.personalPolicy')}</p>
-                  <a
-                    href={externalLinks.PERSONAL_POLICY}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {t('chat.showMore')}
-                  </a>
-                </>
-              }
-            />
-          )}
-          <Composer />
-        </AttachmentProvider>
-      )}
+        {view === 'chat' && (
+          <AttachmentProvider dropZoneEnabled={viewport !== 'fullscreen'}>
+            {hasMessages && userId ? (
+              <MessageList userId={userId} />
+            ) : (
+              <StatusScreen
+                title={t('status.welcome')}
+                description={t('status.welcome.subtitle')}
+                media={
+                  <StatusScreenImage
+                    src={welcomeIllustration}
+                    width={275}
+                    height={188}
+                  />
+                }
+                footer={
+                  <>
+                    <p>{t('chat.personalPolicy')}</p>
+                    <a
+                      href={externalLinks.PERSONAL_POLICY}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {t('chat.showMore')}
+                    </a>
+                  </>
+                }
+              />
+            )}
+            <Composer />
+
+            <ToastOutlet />
+          </AttachmentProvider>
+        )}
+      </ErrorBoundary>
     </div>
   )
 }

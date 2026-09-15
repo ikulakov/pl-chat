@@ -1,6 +1,6 @@
 import type { SystemMessageKey } from '../i18n'
 import type { AdaptiveCardPayload } from './adaptiveCards'
-import type { UploadFailure } from './uploadError'
+import type { UploadFailure } from './mediaFailure'
 
 export type SendStatus = 'sending' | 'sent' | 'failed'
 

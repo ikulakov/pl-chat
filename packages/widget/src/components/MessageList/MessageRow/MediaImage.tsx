@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ImageTimelineItem } from '../../../domain/timeline'
-import { isRetryableFailure, type UploadFailure } from '../../../domain/uploadError'
+import { isRetryableFailure, type UploadFailure } from '../../../domain/mediaFailure'
 import { useMediaSource } from './useMediaSource'
 import { t } from '../../../i18n'
 import { pickThumbnailSize } from './thumbnailSize'

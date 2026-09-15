@@ -7,25 +7,24 @@
   --c-text-invert: #fff;
   --c-text-invert-dim: rgba(255, 255, 255, 0.6);
   --c-error: #ea2c45;
+  --c-error-strong: #c51e37;
+  --c-link: #287cba;
 
   /* Surfaces */
   --c-surface-primary: #fff;
   --c-surface-secondary: #f3f4f6;
   --c-surface-secondary-hover: #e8e9eb;
   --c-surface-tertiary: #f9f9fa;
-  /* Colorfull/Surface/Secondary/Standard/blue-normal — подложка своей реакции */
-  --c-surface-accent-soft: #edf6fd;
-  /* Figma: Base/Surface/Tertiary/neutral-pressed — фон активной вкладки пикера.
-     Тот же цвет в Figma зовётся ещё Base/Border/Standard/neutral-normal (разделитель). */
   --c-surface-tertiary-pressed: #e8eaed;
+  --c-surface-accent-soft: #edf6fd;
   --c-surface-contrast: #222;
-  --c-surface-purple: #35165c;
+  --c-surface-error: #fff3f0;
 
   /* Borders */
   --c-border: #f3f4f6;
   --c-scrollbar: #e2e4e6;
-  --c-neutral: #dedfe1;
   --c-error-border: #f7d7cf;
+  --c-error-border-soft: #fae1db;
 
   /* Оттенок подложки иконки (адаптируется к currentColor) */
   --c-icon-tint: color-mix(in srgb, currentColor 12%, transparent);
@@ -33,22 +32,20 @@
   /* Accent */
   --c-orange: #ff7f32;
   --c-lime: #ade307;
-  --c-purple-light: #ba93fd;
   --c-purple: #6a2cb5;
+  --c-neutral: #dedfe1;
 
   /* Typography */
   --font: 'Onest Variable', system-ui, sans-serif;
 
   /* Radius */
+  --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
 
   /* Shadows */
-  --shadow-popover: 0px 16px 56px 0px rgba(0, 0, 0, 0.2);
-
-  /* Sizes */
-  --header-h: 64px;
+  --shadow-floating: 0px 10px 26px 0px rgba(0, 0, 0, 0.1);
 
   /* Motion */
   --dur-fast: 0.15s;
@@ -57,5 +54,7 @@
   /* Z-index */
   --z-sticky: 1;
   --z-overlay: 10;
-  --z-dropdown: 100;
+  --z-floating-backdrop: 98;
+  --z-floating-anchor: 99;
+  --z-floating: 100;
 }

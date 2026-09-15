@@ -1,6 +1,6 @@
-import { t } from '../i18n'
 import { parseMxcUrl } from '../shared/utils/mxc'
 import { toStickerFormat, type StickerFormat } from './emoji'
+import { isOptimistic } from './optimistic'
 import { isMedia, isSticker, type MessageTimelineItem } from './timeline'
 
 /**
@@ -16,21 +16,38 @@ export interface ReplyStickerPreview {
   format: StickerFormat
 }
 
-export function replyAuthorLabel(sender: string, userId: string | null): string {
-  return sender === userId ? t('chat.reply.you') : t('chat.reply.operator')
+/**
+ * Что цитировать. Дескриптор, а не готовая строка: цель ответа лежит в сторе, и переведённая
+ * подпись «Стикер» не пережила бы смену локали. Переводит рендер.
+ */
+export type ReplyQuote =
+  // текст сообщения или имя файла без подписи
+  | { kind: 'text'; text: string }
+  // превью нет, если у стикера не разобрался mxc — тогда цитата только подписью
+  | { kind: 'sticker'; preview?: ReplyStickerPreview }
+
+export interface ReplyTarget {
+  eventId: string
+  sender: string
+  quote: ReplyQuote
 }
 
-export const replyText = (item: MessageTimelineItem): string =>
-  isSticker(item)
-    ? t('chat.reply.sticker')
-    : item.content.body.trim() || (isMedia(item) ? item.content.filename : '')
+/** `undefined` — цитировать нечего: у сообщения нет ни текста, ни имени файла. */
+export function replyQuoteOf(item: MessageTimelineItem): ReplyQuote | undefined {
+  if (isSticker(item)) {
+    const preview = replyStickerOf(item)
+    return preview ? { kind: 'sticker', preview } : { kind: 'sticker' }
+  }
 
-/** `undefined` и для не-стикера, и для стикера без разбираемого `mxc:` — цитата тогда текстовая. */
-export function replyStickerOf(item: MessageTimelineItem): ReplyStickerPreview | undefined {
-  if (!isSticker(item)) return undefined
+  const text = item.content.body.trim() || (isMedia(item) ? item.content.filename : '')
+  return text === '' ? undefined : { kind: 'text', text }
+}
+
+function replyStickerOf(item: MessageTimelineItem): ReplyStickerPreview | undefined {
+  if (!isSticker(item)) return
 
   const mediaId = parseMxcUrl(item.content.url)?.mediaId
-  if (!mediaId) return undefined
+  if (!mediaId) return
 
   return {
     mediaId,
@@ -41,3 +58,17 @@ export function replyStickerOf(item: MessageTimelineItem): ReplyStickerPreview |
 
 export const replyEventIdOf = (item: MessageTimelineItem): string | undefined =>
   item.relation?.type === 'reply' ? item.relation.eventId : undefined
+
+/**
+ * Цель ответа, или `undefined`, если ответить на сообщение нельзя: у черновика ещё нет события
+ * на сервере, а у сообщения без текста и имени файла нечего цитировать. Один источник правды
+ * для пункта меню и для свайпа.
+ */
+export function replyTargetOf(item: MessageTimelineItem): ReplyTarget | undefined {
+  if (isOptimistic(item.eventId)) return
+
+  const quote = replyQuoteOf(item)
+  if (!quote) return
+
+  return { eventId: item.eventId, sender: item.sender, quote }
+}

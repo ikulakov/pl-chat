@@ -1,13 +1,8 @@
-import {
-  replyAuthorLabel,
-  replyEventIdOf,
-  replyStickerOf,
-  replyText,
-  type ReplyStickerPreview,
-} from '../../domain/reply'
+import { replyEventIdOf, replyQuoteOf, type ReplyStickerPreview } from '../../domain/reply'
 import { isSystem, type MessageTimelineItem, type TimelineItem } from '../../domain/timeline'
 import { t } from '../../i18n'
 import { formatDateLabel, startOfDay } from '../../shared/utils/formatDate'
+import { replyAuthorLabel, replyQuoteView } from '../ReplyPreview/ReplyPreview.helpers'
 import type { BubblePosition } from './MessageRow/MessageBubble'
 
 interface DayGroup {
@@ -84,19 +79,16 @@ export function getReplyPreview({
 
   // цитата резолвится только из загруженной ленты
   const parent = index.get(parentId)
-  const text = parent ? replyText(parent) : ''
+  const quote = parent ? replyQuoteOf(parent) : undefined
 
   // нечего показать (отредактированное/вычищенное сообщение) — то же, что не загруженное
-  if (!parent || text === '') {
+  if (!parent || !quote) {
     return { text: t('chat.reply.unavailable') }
   }
 
-  const sticker = replyStickerOf(parent)
-
   return {
     author: replyAuthorLabel(parent.sender, userId),
-    text,
     targetId: parent.localId,
-    ...(sticker ? { sticker } : {}),
+    ...replyQuoteView(quote),
   }
 }

@@ -36,6 +36,24 @@ describe('resolveContainerStyle — host appearance overrides', () => {
     expect(style.zIndex).toBe('100')
   })
 
+  // Панель не должна выходить за верх невысокого вьюпорта (1080p при масштабе 150% = 720px):
+  // потолок высоты считается от того же offsetY, что и inset, иначе они разъедутся.
+  it('caps docked height by the viewport minus the bottom offset', () => {
+    expect(resolveContainerStyle('docked').maxHeight).toBe('calc(100dvh - 96px)')
+    expect(resolveContainerStyle('docked', { offsetY: 40 }).maxHeight).toBe('calc(100dvh - 56px)')
+    expect(resolveContainerStyle('fullscreen', { offsetY: 40 }).maxHeight).toBeUndefined()
+  })
+
+  // Потолок ужимает панель под вьюпорт, но не до щели. Отступ снизу при этом не уступает:
+  // в docked нет своей кнопки закрытия, и кнопку хоста перекрывать нельзя.
+  it('stops shrinking at the floor and keeps the bottom offset for the host button', () => {
+    const docked = resolveContainerStyle('docked', { offsetY: 120 })
+
+    expect(docked.minHeight).toBe('452px')
+    expect(docked.inset).toBe('auto 17px 120px auto')
+    expect(resolveContainerStyle('fullscreen').minHeight).toBeUndefined()
+  })
+
   // Размер, скругление и тень принадлежат виджету и в API не выносятся.
   it("keeps the panel's own look out of the semantic API", () => {
     const style = resolveContainerStyle('docked')

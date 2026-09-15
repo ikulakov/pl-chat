@@ -1,5 +1,6 @@
 import type { CardAction, CardAnswer } from '../../../domain/adaptiveCards'
 import { t } from '../../../i18n'
+import { Tooltip } from '../../../shared/ui/Tooltip'
 import { cn } from '../../../shared/utils/cn'
 import styles from './CardActions.module.css'
 
@@ -21,15 +22,23 @@ export function CardActions({ actions, answer, onSelect }: Props) {
         const isChosen = answer?.actionId === action.id
 
         return (
-          <button
+          <Tooltip
             key={action.id}
-            type="button"
-            className={cn(styles.chip, isChosen && answer?.status === 'sent' && styles.chosen)}
-            disabled={disabled}
-            onClick={() => onSelect(action)}
+            label={action.title}
+            truncatedOnly
           >
-            {action.title}
-          </button>
+            {(tooltipProps) => (
+              <button
+                type="button"
+                className={cn(styles.chip, isChosen && answer?.status === 'sent' && styles.chosen)}
+                disabled={disabled}
+                onClick={() => onSelect(action)}
+                {...tooltipProps}
+              >
+                {action.title}
+              </button>
+            )}
+          </Tooltip>
         )
       })}
 

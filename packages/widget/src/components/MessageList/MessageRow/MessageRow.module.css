@@ -24,6 +24,22 @@
     margin-top: 12px;
   }
 
+  /* Вертикальную прокрутку отдаём браузеру, горизонтальная протяжка — свайп для ответа. */
+  touch-action: pan-y pinch-zoom;
+
+  /* Меню открыто долгим нажатием: ряд поднимается над размытой подложкой и остаётся чётким.
+     Признак — атрибут, который Dropdown ставит на свой триггер, поэтому своего состояния у ряда
+     нет. Кнопка «…» открывает меню без подложки и ряд не поднимает. */
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- Firefox 114–120 без :has(): ряд размоется вместе с фоном, меню при этом работает */
+  &:has([data-role='message-actions-trigger'][data-backdrop]) {
+    position: relative;
+    z-index: var(--z-floating-anchor);
+  }
+
+  &.swiping {
+    position: relative;
+  }
+
   &:hover [data-role='message-actions-trigger'],
   &:focus-within [data-role='message-actions-trigger'],
   &:has([data-role='message-actions-trigger'][aria-expanded='true'])
@@ -31,6 +47,35 @@
     opacity: 1;
     pointer-events: auto;
   }
+
+  @media (hover: none) {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+
+    & [data-role='message-actions-trigger'] {
+      visibility: hidden;
+    }
+  }
+}
+
+/* Подсказка свайпа ждёт за правым краем ряда и въезжает вместе с ним; прозрачность и масштаб
+   ведёт --swipe-progress, который хук пишет прямо в стиль ряда. */
+.swipeHint {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--c-surface-secondary);
+  color: var(--c-text-tertiary);
+  opacity: var(--swipe-progress, 0);
+  transform: translateY(-50%) scale(calc(0.6 + 0.4 * var(--swipe-progress, 0)));
+  pointer-events: none;
 }
 
 .content {

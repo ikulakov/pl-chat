@@ -1,11 +1,10 @@
 import { useEffect, useEffectEvent } from 'react'
 import type { TimelineItem } from '../domain/timeline'
+import { RECEIPT_ID_ATTR } from '../shared/timeline/domAttributes'
 import { trailingThrottle } from '../shared/utils/trailingThrottle'
 import { useChatActions } from './useChatActions'
 
 export const SCAN_THROTTLE_MS = 500
-
-export const RECEIPT_ID_ATTR = 'data-receipt-id'
 
 interface UseSendReadReceiptsParams {
   timeline: TimelineItem[]

@@ -1,36 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import { t } from '../i18n'
 import { fileItem, stickerItem, textItem } from '../shared/testUtils/matrixFixtures'
-import { replyStickerOf, replyText } from './reply'
+import { replyQuoteOf, replyTargetOf } from './reply'
 
-describe('replyText', () => {
+describe('replyQuoteOf', () => {
   it('обычное сообщение цитируется своим текстом', () => {
-    expect(replyText(textItem({ body: 'вопрос' }))).toBe('вопрос')
+    expect(replyQuoteOf(textItem({ body: 'вопрос' }))).toEqual({ kind: 'text', text: 'вопрос' })
   })
 
   it('файл без подписи цитируется именем файла', () => {
-    expect(replyText(fileItem({ body: '' }))).toBe('doc.pdf')
+    expect(replyQuoteOf(fileItem({ body: '' }))).toEqual({ kind: 'text', text: 'doc.pdf' })
   })
 
-  it('стикер цитируется подписью «Стикер», а не своим эмодзи', () => {
-    expect(replyText(stickerItem({ body: '🐥' }))).toBe(t('chat.reply.sticker'))
-  })
-})
-
-describe('replyStickerOf', () => {
-  it('у стикера отдаёт данные для отрисовки', () => {
-    expect(replyStickerOf(stickerItem({ body: '🐥' }))).toEqual({
-      mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
-      body: '🐥',
-      format: 'image',
+  it('стикер — описание, а не готовая подпись: перевод делается при рендере', () => {
+    expect(replyQuoteOf(stickerItem({ body: '🐥' }))).toEqual({
+      kind: 'sticker',
+      preview: { mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx', body: '🐥', format: 'image' },
     })
   })
 
-  it('у не-стикера — ничего', () => {
-    expect(replyStickerOf(textItem({ body: 'вопрос' }))).toBeUndefined()
+  it('стикер без разбираемого mxc всё равно цитируется — без превью', () => {
+    expect(replyQuoteOf(stickerItem({ url: '' }))).toEqual({ kind: 'sticker' })
   })
 
-  it('черновик без загруженных байтов не даёт превью: mxc-адреса ещё нет', () => {
-    expect(replyStickerOf(stickerItem({ url: '' }))).toBeUndefined()
+  it('сообщение без текста цитировать нечем', () => {
+    expect(replyQuoteOf(textItem({ body: '  ' }))).toBeUndefined()
+  })
+})
+
+describe('replyTargetOf', () => {
+  it('на черновик ответить нельзя: события на сервере ещё нет', () => {
+    expect(replyTargetOf(textItem({ eventId: 'optimistic:abc', body: 'вопрос' }))).toBeUndefined()
   })
 })

@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FEATURES } from '../../features'
 import { t } from '../../i18n'
 import { makeFile } from '../../shared/testUtils/matrixFixtures'
-import { chatStore, INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '../../store/store'
+import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '../../store/initialState'
+import { chatStore } from '../../store/store'
 import { AttachmentProvider } from '../Attachment/AttachmentProvider'
 import { Composer } from './Composer'
 import { MAX_MESSAGE_LENGTH } from './MessageTextarea'
@@ -189,7 +190,11 @@ describe('Composer — семантика отправки', () => {
         identity: { userId: ME, roomId: '!r:bank' },
         room: {
           ...INITIAL_ROOM_STATE,
-          replyTarget: { eventId: '$parent:bank', sender, body: 'исходное сообщение' },
+          replyTarget: {
+            eventId: '$parent:bank',
+            sender,
+            quote: { kind: 'text', text: 'исходное сообщение' },
+          },
         },
       })
     }

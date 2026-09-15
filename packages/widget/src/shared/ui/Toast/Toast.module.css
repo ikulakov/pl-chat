@@ -1,0 +1,39 @@
+.viewport {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  left: 16px;
+  z-index: var(--z-floating);
+  display: flex;
+  justify-content: flex-end;
+  /* пустой регион висит поверх шапки: клики по ней должны проходить насквозь */
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 12px 20px;
+  border: 1px solid var(--c-error-border-soft);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface-error);
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--c-error-strong);
+  /* наведение ставит автоскрытие на паузу, поэтому указатель нужен именно плашке */
+  pointer-events: auto;
+}
+
+/* тост-кнопка: ведёт к сообщению, из-за которого всплыл. Сбрасываем то, что приносит button */
+.clickable {
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.icon {
+  flex-shrink: 0;
+}

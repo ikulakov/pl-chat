@@ -1,5 +1,8 @@
-/** Вердикт проверки файла (kc.media.status), терминален: ready или rejected — без промежутков. */
-export type MediaVerdict = { status: 'ready' } | { status: 'rejected' }
+import { parseMxcUrl } from '../shared/utils/mxc'
+import type { MediaTimelineItem, TimelineItem } from './timeline'
+import { isMedia } from './timeline'
+
+export type MediaVerdict = { status: 'ready' | 'rejected' }
 
 export interface MediaVerdictEntry {
   mediaId: string
@@ -7,8 +10,8 @@ export interface MediaVerdictEntry {
 }
 
 /**
- * Мерджит вердикты по mediaId. Терминален — уже известный вердикт не перезаписываем
- * (повторная доставка страницы истории/дубль события не должны дребезжать).
+ * Добавляет новые вердикты по mediaId. Вердикт окончательный, поэтому уже известный
+ * не перезаписываем: повтор со страницей истории или дубль события не должен его менять.
  */
 export function applyMediaVerdicts(
   existing: Record<string, MediaVerdict>,
@@ -29,4 +32,37 @@ export function applyMediaVerdicts(
   }
 
   return result
+}
+
+/** Впервые отклонённые файлы: не было в `prev`, в `next` — rejected. */
+export function pickFirstRejected(
+  prev: Record<string, MediaVerdict>,
+  next: Record<string, MediaVerdict>,
+  incoming: MediaVerdictEntry[],
+): string[] {
+  if (prev === next) return []
+
+  const rejected = new Set<string>()
+
+  for (const { mediaId } of incoming) {
+    if (!prev[mediaId] && next[mediaId]?.status === 'rejected') rejected.add(mediaId)
+  }
+
+  return [...rejected]
+}
+
+/** Первое сообщение клиента в ленте с одним из отклоненных файлов; файлы оператора пропускаем. */
+export function findOwnMedia(
+  timeline: TimelineItem[],
+  mediaIds: string[],
+  userId: string,
+): MediaTimelineItem | undefined {
+  const mediaIdSet = new Set(mediaIds)
+
+  return timeline
+    .filter(isMedia)
+    .find(
+      (item) =>
+        item.sender === userId && mediaIdSet.has(parseMxcUrl(item.content.url)?.mediaId ?? ''),
+    )
 }

@@ -3,8 +3,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: var(--header-h);
-  padding: 0 16px 0 20px;
+  height: 64px;
+  padding: 0 16px;
   background: var(--c-surface-primary);
   border-bottom: 1px solid var(--c-border);
 }
@@ -33,7 +33,7 @@
   white-space: nowrap;
 }
 
-.pending {
+.shimmer {
   background: linear-gradient(
     90deg,
     var(--c-text-tertiary) 0%,
@@ -51,7 +51,7 @@
 
 /* Анимация живёт всё время обрыва связи — при выключенном движении её быть не должно. */
 @media (prefers-reduced-motion: reduce) {
-  .pending {
+  .shimmer {
     color: var(--c-text-tertiary);
     background: none;
     animation: none;

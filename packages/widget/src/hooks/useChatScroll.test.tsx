@@ -4,7 +4,7 @@ import { FakeIntersectionObserver } from '../../test.setup'
 import type { TimelineItem } from '../domain/timeline'
 import { textItem } from '../shared/testUtils/matrixFixtures'
 import { useChatScroll } from './useChatScroll'
-import { ITEM_ID_ATTR } from './useLoadMoreHistory'
+import { ITEM_ID_ATTR } from '../shared/timeline/domAttributes'
 
 const ME = '@me:bank'
 const OPERATOR = '@op:bank'

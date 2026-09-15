@@ -12,7 +12,7 @@ import type {
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService, SendFileOptions } from './matrix/matrixController'
 import type { ThumbnailSize } from './matrix/api/matrixApi'
-import type { ReplyTarget } from './store/state'
+import type { ReplyTarget } from './domain/reply'
 import { chatStore } from './store/store'
 
 export interface ChatActions {

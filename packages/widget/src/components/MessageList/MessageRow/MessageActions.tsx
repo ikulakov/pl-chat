@@ -1,43 +1,38 @@
+import type { Ref } from 'react'
 import { isOptimistic } from '../../../domain/optimistic'
 import type { ReactionSummary } from '../../../domain/reactions'
-import { replyStickerOf, replyText } from '../../../domain/reply'
+import { replyTargetOf } from '../../../domain/reply'
 import { isMedia, type MessageTimelineItem } from '../../../domain/timeline'
 import { FEATURES } from '../../../features'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { t } from '../../../i18n'
-import { copyText } from '../../../shared/utils/clipboard'
-import { Dropdown, DropdownItem } from '../../../shared/ui/Dropdown'
+import { Dropdown, type DropdownHandle, DropdownItem } from '../../../shared/ui/Dropdown'
 import { IconButton } from '../../../shared/ui/IconButton'
 import { CopyIcon, MoreIcon, ReplyIcon, RetryIcon } from '../../../shared/ui/icons'
+import { copyText } from '../../../shared/utils/clipboard'
 import { ReactionPicker } from './ReactionPicker'
 
 interface Props {
+  ref?: Ref<DropdownHandle>
   message: MessageTimelineItem
   isOwn: boolean
   reactions: ReactionSummary[]
 }
 
-export function MessageActions({ message, isOwn, reactions }: Props) {
+export function MessageActions({ ref, message, isOwn, reactions }: Props) {
   const { resendMessage, replyTo, toggleReaction } = useChatActions()
 
-  const reply = replyText(message)
-  const replySticker = replyStickerOf(message)
-
+  const replyTarget = replyTargetOf(message)
   const uploadFailed = isMedia(message) && message.upload?.error
+
   const canRetry = isOwn && message.sendStatus === 'failed' && !uploadFailed
-  // Реакция и ответ адресуют событие на сервере — у черновика его ещё нет.
-  const isSent = !isOptimistic(message.eventId)
-  const canReact = FEATURES.reactions && isSent
-  const canReply = isSent && reply !== ''
+  const canReact = FEATURES.reactions && !isOptimistic(message.eventId)
+  const canReply = replyTarget !== undefined
   const canCopy = message.content.body.trim() !== ''
 
-  // canReact включает не пункт меню, а надстройку `above` — поэтому в условие доступности
-  // триггера он входит только вместе с ней. Иначе у сообщения без текста и без повтора
-  // (карточка с пустым body, файл без подписи) «…» открывал бы пустую коробку меню.
   const hasMenuItems = canRetry || canReply || canCopy
   const disabled = !(hasMenuItems || canReact)
 
-  // undefined, а не пустой фрагмент: Dropdown по нему решает, рисовать ли коробку меню.
   const menuItems = hasMenuItems ? (
     <>
       {canRetry && (
@@ -52,14 +47,7 @@ export function MessageActions({ message, isOwn, reactions }: Props) {
       {canReply && (
         <DropdownItem
           icon={<ReplyIcon />}
-          onSelect={() =>
-            replyTo({
-              eventId: message.eventId,
-              sender: message.sender,
-              body: reply,
-              ...(replySticker ? { sticker: replySticker } : {}),
-            })
-          }
+          onSelect={() => replyTo(replyTarget)}
         >
           {t('chat.action.reply')}
         </DropdownItem>
@@ -78,6 +66,7 @@ export function MessageActions({ message, isOwn, reactions }: Props) {
 
   return (
     <Dropdown
+      ref={ref}
       above={
         canReact ? (
           <ReactionPicker

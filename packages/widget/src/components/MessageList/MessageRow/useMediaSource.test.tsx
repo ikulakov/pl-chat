@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MediaUnavailableError } from '../../../domain/mediaError'
+import { MediaUnavailableError } from '../../../domain/mediaFailure'
 import { chatStore } from '../../../store/store'
 import { useMediaSource } from './useMediaSource'
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { toMediaFailure } from '../../../domain/mediaError'
+import { toMediaFailure } from '../../../domain/mediaFailure'
 import type { ThumbnailSize } from '../../../matrix/api/matrixApi'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { useChatStore } from '../../../hooks/useChatStore'

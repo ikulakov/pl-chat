@@ -1,24 +1,27 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef, type ReactNode } from 'react'
 import { aggregateReactions, type ReactionEntry } from '../../../domain/reactions'
-import type { ReplyStickerPreview } from '../../../domain/reply'
+import { replyTargetOf, type ReplyStickerPreview } from '../../../domain/reply'
 import { type MessageTimelineItem } from '../../../domain/timeline'
 import { FEATURES } from '../../../features'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { useEmojiSegments } from '../../../hooks/useEmojiSegments'
-import { ITEM_ID_ATTR } from '../../../hooks/useLoadMoreHistory'
-import { RECEIPT_ID_ATTR } from '../../../hooks/useSendReadReceipts'
+import { useMessageGestures } from '../../../hooks/useMessageGestures'
+import { ITEM_ID_ATTR, RECEIPT_ID_ATTR } from '../../../shared/timeline/domAttributes'
+import type { DropdownHandle } from '../../../shared/ui/Dropdown'
+import { ReplyIcon } from '../../../shared/ui/icons'
+import { assertNever } from '../../../shared/utils/assertNever'
 import { cn } from '../../../shared/utils/cn'
-import { ReplyPreview } from '../../ReplyPreview'
+import { ReplyPreview } from '../../ReplyPreview/ReplyPreview'
 import { AdaptiveCardActions } from './AdaptiveCardActions'
 import type { BubbleMetaData } from './BubbleMeta'
 import { EmojiMessage } from './EmojiMessage'
-import { StickerMessage } from './StickerMessage'
 import { FileChip } from './FileChip'
 import { ImageMessage } from './ImageMessage'
 import { MessageActions } from './MessageActions'
 import { MessageBubble, type BubblePosition } from './MessageBubble'
 import styles from './MessageRow.module.css'
 import { ReactionBar } from './ReactionBar'
+import { StickerMessage } from './StickerMessage'
 import { TextContent } from './TextContent'
 
 interface Props {
@@ -47,9 +50,19 @@ export const MessageRow = memo(
     replyTargetId,
     onReplyClick,
   }: Props) => {
-    const { toggleReaction } = useChatActions()
     const isOwn = message.sender === userId
     const isGroupStart = position === 'single' || position === 'first'
+    const replyTarget = replyTargetOf(message)
+    const { replyTo, toggleReaction } = useChatActions()
+
+    const rowRef = useRef<HTMLDivElement>(null)
+    const dropdownRef = useRef<DropdownHandle>(null)
+
+    const { isSwiping } = useMessageGestures(rowRef, {
+      onLongPress: () =>
+        rowRef.current && dropdownRef.current?.open({ anchor: rowRef.current, backdrop: true }),
+      onSwipe: replyTarget ? () => replyTo(replyTarget) : undefined,
+    })
 
     const { segments, layout, version } = useEmojiSegments(
       message.kind === 'text' ? message.content.body : '',
@@ -62,13 +75,6 @@ export const MessageRow = memo(
       [reactions, userId],
     )
 
-    const meta: BubbleMetaData = {
-      ts: message.ts,
-      own: isOwn,
-      sendStatus: message.sendStatus,
-      isRead: readByOperator,
-    }
-
     const reply = replyText ? (
       <ReplyPreview
         author={replyAuthor}
@@ -77,11 +83,6 @@ export const MessageRow = memo(
         onClick={replyTargetId ? () => onReplyClick(replyTargetId) : undefined}
       />
     ) : undefined
-
-    // Сообщение из одних эмодзи рисуется крупно и без плашки. С цитатой и с реакциями так
-    // нельзя: их не на чем показать, поэтому такое сообщение остаётся обычным баблом со
-    // строчными эмодзи.
-    const emojiOnlyLayout = layout !== 'inline' && !reply && summaries.length === 0 ? layout : null
 
     // Один узел на все ветки: реакции одинаково нужны и пузырю, и картинке, и стикеру.
     const reactionBar =
@@ -92,66 +93,121 @@ export const MessageRow = memo(
         />
       ) : undefined
 
+    // Сообщение из одних эмодзи рисуется крупно и без плашки. С цитатой и с реакциями так
+    // нельзя: их не на чем показать, поэтому такое сообщение остаётся обычным баблом со
+    // строчными эмодзи.
+    const emojiOnlyLayout = layout !== 'inline' && !reply && !reactionBar ? layout : null
+
+    const bubbleProps = {
+      type: isOwn ? 'user' : 'operator',
+      position,
+      reply,
+      reactions: reactionBar,
+    } as const
+
+    const meta: BubbleMetaData = {
+      ts: message.ts,
+      own: isOwn,
+      sendStatus: message.sendStatus,
+      isRead: readByOperator,
+    }
+
+    const renderContent = (): ReactNode => {
+      switch (message.kind) {
+        case 'sticker':
+          return (
+            <StickerMessage
+              item={message}
+              meta={meta}
+              reactions={reactionBar}
+            />
+          )
+        case 'image':
+          return (
+            <ImageMessage
+              item={message}
+              meta={meta}
+              reply={reply}
+              reactions={reactionBar}
+            />
+          )
+        case 'file':
+          return (
+            <div className={styles.content}>
+              <MessageBubble {...bubbleProps}>
+                <FileChip
+                  item={message}
+                  meta={meta}
+                />
+              </MessageBubble>
+            </div>
+          )
+        case 'text':
+          return emojiOnlyLayout ? (
+            <EmojiMessage
+              segments={segments}
+              layout={emojiOnlyLayout}
+              version={version}
+              meta={meta}
+            />
+          ) : (
+            <div className={styles.content}>
+              <MessageBubble {...bubbleProps}>
+                <TextContent
+                  text={message.content.body}
+                  meta={meta}
+                />
+              </MessageBubble>
+            </div>
+          )
+        case 'adaptiveCard':
+          return (
+            <div className={styles.content}>
+              <MessageBubble {...bubbleProps}>
+                <TextContent
+                  text={message.content.body}
+                  meta={meta}
+                />
+              </MessageBubble>
+              <AdaptiveCardActions item={message} />
+            </div>
+          )
+        default:
+          return assertNever(message)
+      }
+    }
+
     return (
       <div
-        className={cn(styles.messageRow, isOwn && styles.own, isGroupStart && styles.groupStart)}
+        ref={rowRef}
+        className={cn(
+          styles.messageRow,
+          isOwn && styles.own,
+          isGroupStart && styles.groupStart,
+          isSwiping && styles.swiping,
+        )}
         // Маркер для учета прочитанных сообщений клиентом
         {...{ [RECEIPT_ID_ATTR]: !isOwn ? message.eventId : undefined }}
         // Якорь удержания позиции при подгрузке истории
         {...{ [ITEM_ID_ATTR]: message.localId }}
       >
         <MessageActions
+          ref={dropdownRef}
           message={message}
           isOwn={isOwn}
           reactions={summaries}
         />
 
-        {/* Стикер — до пузыря: тернарник внутри него заканчивается catch-all'ом TextContent,
-            и без этой ветки стикер отрисовался бы своей эмодзи-подписью вместо картинки. */}
-        {message.kind === 'sticker' ? (
-          <StickerMessage
-            item={message}
-            meta={meta}
-            reactions={reactionBar}
-          />
-        ) : message.kind === 'image' ? (
-          <ImageMessage
-            item={message}
-            meta={meta}
-            reply={reply}
-            reactions={reactionBar}
-          />
-        ) : emojiOnlyLayout ? (
-          <EmojiMessage
-            segments={segments}
-            layout={emojiOnlyLayout}
-            version={version}
-            meta={meta}
-          />
-        ) : (
-          <div className={styles.content}>
-            <MessageBubble
-              type={isOwn ? 'user' : 'operator'}
-              position={position}
-              reply={reply}
-              reactions={reactionBar}
-            >
-              {message.kind === 'file' ? (
-                <FileChip
-                  item={message}
-                  meta={meta}
-                />
-              ) : (
-                <TextContent
-                  text={message.content.body}
-                  meta={meta}
-                />
-              )}
-            </MessageBubble>
-
-            {message.kind === 'adaptiveCard' && <AdaptiveCardActions item={message} />}
-          </div>
+        {isSwiping && (
+          <span
+            className={styles.swipeHint}
+            aria-hidden="true"
+          >
+            <ReplyIcon />
+          </span>
         )}
+
+        {renderContent()}
       </div>
     )
   },

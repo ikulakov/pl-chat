@@ -9,7 +9,7 @@
 }
 
 .link {
-  color: inherit;
+  color: var(--c-link);
   text-decoration: underline;
   overflow-wrap: anywhere;
 }

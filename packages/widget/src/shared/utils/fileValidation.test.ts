@@ -12,15 +12,19 @@ describe('validateFile', () => {
   })
 
   it('rejects non-whitelisted extensions (.doc, .exe, archives)', () => {
-    expect(validateFile(file('legacy.doc', 1024)).ok).toBe(false)
-    expect(validateFile(file('evil.exe', 1024)).ok).toBe(false)
-    expect(validateFile(file('a.zip', 1024)).ok).toBe(false)
-    expect(validateFile(file('noext', 1024)).ok).toBe(false)
+    const badType = { ok: false, reason: 'badType' }
+
+    expect(validateFile(file('legacy.doc', 1024))).toEqual(badType)
+    expect(validateFile(file('evil.exe', 1024))).toEqual(badType)
+    expect(validateFile(file('a.zip', 1024))).toEqual(badType)
+    expect(validateFile(file('noext', 1024))).toEqual(badType)
   })
 
   it('rejects files over the size limit', () => {
-    const res = validateFile(file('big.pdf', 11 * 1024 * 1024))
-    expect(res.ok).toBe(false)
+    expect(validateFile(file('big.pdf', 11 * 1024 * 1024))).toEqual({
+      ok: false,
+      reason: 'tooLarge',
+    })
   })
 
   it('flags previewable images for raster formats, not documents', () => {

@@ -21,7 +21,7 @@
 .field {
   display: flex;
   align-items: flex-start;
-  background: var(--c-surface-primary);
+  background: var(--c-surface-secondary);
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
 
@@ -56,8 +56,8 @@
 }
 
 .sendBtn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-sm);
 }
 

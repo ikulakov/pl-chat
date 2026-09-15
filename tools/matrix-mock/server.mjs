@@ -486,7 +486,7 @@ const CARD_THREE = {
   actions: [
     { type: "Action.Submit", id: "one", title: "Вариант 1", data: { option: 1 } },
     { type: "Action.Submit", id: "two", title: "Вариант 2", data: { option: 2 } },
-    { type: "Action.Submit", id: "three", title: "Вариант 3", data: { option: 3 } },
+    { type: "Action.Submit", id: "three", title: "Связаться с оператором через чат или запросить звонок ", data: { option: 3 } },
   ],
 };
 const CARD_OPENURL = {

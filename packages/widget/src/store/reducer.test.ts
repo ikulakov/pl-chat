@@ -4,7 +4,7 @@ import type { RoomSyncPatch } from '../domain/roomSync'
 import type { TextTimelineItem } from '../domain/timeline'
 import { chatRuntimeReducer } from './reducer'
 import type { ChatRuntimeState, Identity } from './state'
-import { INITIAL_RUNTIME_STATE } from './store'
+import { INITIAL_RUNTIME_STATE } from './initialState'
 
 const IDENTITY: Identity = { userId: '@user:bank', roomId: '!room:bank' }
 const OPERATOR = '@operator:bank'
@@ -83,6 +83,18 @@ describe('chatRuntimeReducer', () => {
     expect(next.room.operator).toEqual({ isActive: true, id: OPERATOR_ID, displayName: 'Support' })
   })
 
+  // Повтором считается только старт сразу после отказа: на нём экран ошибки остаётся с загрузкой
+  // на кнопке. После закрытой сессии это первое подключение, и экран ошибки там был бы ложью.
+  it('session.starting after a failure is a retry, after a closed session is a fresh start', () => {
+    const failed = chatRuntimeReducer(INITIAL_RUNTIME_STATE, { type: 'session.failed' })
+
+    expect(chatRuntimeReducer(failed, { type: 'session.starting' }).phase).toBe('retrying')
+
+    const closed = chatRuntimeReducer(failed, { type: 'session.closed' })
+
+    expect(chatRuntimeReducer(closed, { type: 'session.starting' }).phase).toBe('connecting')
+  })
+
   it('resets room state when a new session starts in a different room', () => {
     const connected = chatRuntimeReducer(INITIAL_RUNTIME_STATE, {
       type: 'session.started',
@@ -119,7 +131,7 @@ describe('chatRuntimeReducer', () => {
     })
     const withTarget = chatRuntimeReducer(connected, {
       type: 'reply.targeted',
-      target: { eventId: '$parent', sender: OPERATOR, body: 'исходное' },
+      target: { eventId: '$parent', sender: OPERATOR, quote: { kind: 'text', text: 'исходное' } },
     })
 
     const sameRoom = chatRuntimeReducer(withTarget, {
@@ -138,7 +150,7 @@ describe('chatRuntimeReducer', () => {
     expect(sameRoom.room.replyTarget).toEqual({
       eventId: '$parent',
       sender: OPERATOR,
-      body: 'исходное',
+      quote: { kind: 'text', text: 'исходное' },
     })
     expect(newRoom.room.replyTarget).toBeNull()
   })
@@ -165,10 +177,9 @@ describe('chatRuntimeReducer', () => {
       room: initialPatch(),
     })
 
-    const failed = chatRuntimeReducer(connected, { type: 'session.failed', error: 'network' })
+    const failed = chatRuntimeReducer(connected, { type: 'session.failed' })
 
     expect(failed.phase).toBe('error')
-    expect(failed.error).toBe('network')
     expect(failed.identity).toBeNull()
     expect(failed.cursor).toBeNull()
     expect(failed.room.timeline).toHaveLength(0)
@@ -194,12 +205,9 @@ describe('chatRuntimeReducer', () => {
       cursor: 's1',
       room: initialPatch(),
     })
-    const withError = { ...connected, error: 'expired' }
-
-    const recovering = chatRuntimeReducer(withError, { type: 'session.recovering' })
+    const recovering = chatRuntimeReducer(connected, { type: 'session.recovering' })
 
     expect(recovering.phase).toBe('recovering')
-    expect(recovering.error).toBeNull()
     expect(recovering.identity).toEqual(IDENTITY)
     expect(recovering.cursor).toBe('s1')
     expect(recovering.room).toBe(connected.room)

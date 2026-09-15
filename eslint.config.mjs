@@ -57,6 +57,30 @@ export default tseslint.config(
     },
   },
 
+  // Перевод — только при показе. Строка из t() в сторе или в доменной структуре не переживёт
+  // смену языка, поэтому данные несут дескриптор (ключ, код причины), а переводит UI.
+  // Отдельное правило (@typescript-eslint/…), а не второй no-restricted-imports: в flat config
+  // одноимённое правило для тех же файлов перетёрло бы границу ACL выше.
+  {
+    files: ['packages/widget/src/{domain,store,matrix}/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/i18n', '**/i18n/**'],
+              allowTypeImports: true,
+              message:
+                'domain, store и matrix не переводят: храни ключ или код причины, t() вызывай в UI при рендере.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // widget only
   {
     files: ['packages/widget/src/**/*.{ts,tsx}'],

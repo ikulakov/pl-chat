@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { replyAuthorLabel } from '../../domain/reply'
 import { FEATURES } from '../../features'
 import { useChatActions } from '../../hooks/useChatActions'
 import { useChatStore } from '../../hooks/useChatStore'
@@ -9,7 +8,8 @@ import { CloseIcon, FailedIcon, SendIcon } from '../../shared/ui/icons'
 import { cn } from '../../shared/utils/cn'
 import { selectReplyTarget, selectUserId } from '../../store/selectors'
 import { useAttachment } from '../Attachment/AttachmentContext'
-import { ReplyPreview } from '../ReplyPreview'
+import { ReplyPreview } from '../ReplyPreview/ReplyPreview'
+import { replyAuthorLabel, replyQuoteView } from '../ReplyPreview/ReplyPreview.helpers'
 import { AttachmentPreview } from './AttachmentPreview'
 import styles from './Composer.module.css'
 import { EmojiPickerButton } from './EmojiPicker/EmojiPickerButton'
@@ -78,8 +78,7 @@ export function Composer() {
           <div className={styles.replyPreview}>
             <ReplyPreview
               author={replyAuthorLabel(replyTarget.sender, userId)}
-              text={replyTarget.body}
-              sticker={replyTarget.sticker}
+              {...replyQuoteView(replyTarget.quote)}
             />
           </div>
           <IconButton

@@ -1,15 +1,13 @@
-import type { Dimensions, Position, TriggerRect } from './types'
-
 // отступ меню от триггера и минимальный зазор до края вьюпорта (iframe чата маленький)
 export const GAP = 4
 export const VIEWPORT_MARGIN = 8
 
 // Чистое позиционирование меню по rect триггера с коллизией к краям вьюпорта.
 export function computeDropdownPosition(
-  trigger: TriggerRect,
-  menu: Dimensions,
-  viewport: Dimensions,
-): Position {
+  trigger: Pick<DOMRect, 'top' | 'bottom' | 'left' | 'right'>,
+  menu: Pick<DOMRect, 'width' | 'height'>,
+  viewport: Pick<DOMRect, 'width' | 'height'>,
+): { top: number; left: number } {
   // по вертикали: по умолчанию под триггером; если не влезает — над ним;
   // если и там тесно — прижимаем к нижнему краю с отступом
   let top = trigger.bottom + GAP

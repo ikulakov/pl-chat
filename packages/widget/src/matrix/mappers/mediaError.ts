@@ -1,4 +1,4 @@
-import type { MediaFailure } from '../../domain/mediaError'
+import type { MediaFailure } from '../../domain/mediaFailure'
 import { isMediaPendingError, isNotFoundError } from '../api/matrixError'
 
 /**

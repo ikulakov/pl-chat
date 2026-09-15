@@ -1,11 +1,9 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import type { TimelineItem } from '../domain/timeline'
+import { ITEM_ID_ATTR } from '../shared/timeline/domAttributes'
 import { selectIsLoadingHistory } from '../store/selectors'
 import { useChatActions } from './useChatActions'
 import { useChatStore } from './useChatStore'
-
-// Метка ряда ленты — по ней ищется якорь удержания позиции (вешают MessageRow и SystemMessage).
-export const ITEM_ID_ATTR = 'data-item-id'
 
 // Допуск на дробные scrollTop/округления у краёв.
 const SCROLL_EDGE_EPS_PX = 4

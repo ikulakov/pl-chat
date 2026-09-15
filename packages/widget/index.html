@@ -1,34 +1,51 @@
 <!doctype html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BankChat Widget</title>
-    <style>
-      /* Инлайн: работает до загрузки JS, перехватывает белый экран */
-      #root:empty {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PlChat Widget</title>
+  <link rel="preload" as="image" href="/src/shared/assets/welcome-illustration.webp" />
+  <style>
+    /* Инлайн: работает до загрузки JS, перехватывает белый экран */
+    #root:empty {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #root:empty::before {
+      content: '';
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--c-surface-secondary, #f3f4f6);
+      border-top-color: var(--c-surface-contrast, #222);
+      border-radius: 50%;
+      opacity: 0;
+      animation:
+        root-spinner-appear 0s 300ms forwards,
+        root-spinner-spin 0.75s linear infinite;
+    }
+
+    @keyframes root-spinner-appear {
+      to {
+        opacity: 1;
       }
-      #root:empty::before {
-        content: '';
-        width: 32px;
-        height: 32px;
-        border: 3px solid #e9e0f7;
-        border-top-color: #6c3fc5;
-        border-radius: 50%;
-        animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes root-spinner-spin {
+      to {
+        transform: rotate(360deg);
       }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

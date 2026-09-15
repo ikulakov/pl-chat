@@ -7,7 +7,7 @@ import type {
   StickerItem,
   StickerPack,
 } from '../domain/emoji'
-import { MediaUnavailableError } from '../domain/mediaError'
+import { MediaUnavailableError } from '../domain/mediaFailure'
 import {
   createOptimisticMediaMessage,
   createOptimisticStickerMessage,
@@ -17,11 +17,9 @@ import {
 import { findOwnReaction, type ReactionEntry } from '../domain/reactions'
 import { canMoveMarker } from '../domain/receipts'
 import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '../domain/timeline'
+import { createBatchedLoader } from '../shared/lottie/animationBatcher'
 import { isAbortError, isDeadlineError } from '../shared/utils/abort'
 import { consoleDev } from '../shared/utils/consoleDev'
-// Оба кэша медиа считают записи, а не байты: вес записи в каждом ограничен сверху
-// (миниатюра — по построению, свой файл — лимитом композера), поэтому число записей и есть
-// предсказуемый потолок памяти.
 import { evictOldest } from '../shared/utils/evictOldest'
 import type { ImageDimensions } from '../shared/utils/imageDimensions'
 import { parseMxcUrl, type ParsedMxcUrl } from '../shared/utils/mxc'
@@ -36,7 +34,6 @@ import {
   isUserDeactivatedError,
   type AuthErrorContext,
 } from './api/matrixError'
-import { createBatchedLoader } from '../shared/lottie/animationBatcher'
 import { MatrixHistoryLoader } from './history/historyLoader'
 import { toEmojiCatalog, toEmojiCategory, toEmojiIndex, toStickerPacks } from './mappers/emoji'
 import { classifyMediaError } from './mappers/mediaError'
@@ -51,8 +48,6 @@ import { classifyUploadError } from './mappers/uploadError'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
 import { MatrixEventType } from './wire/consts'
-
-export const CONNECTION_FAILED_ERROR = 'Не удалось подключиться'
 
 export interface SendFileOptions {
   caption?: string | undefined
@@ -692,7 +687,7 @@ export class MatrixController implements MatrixService {
       if (!this.isCurrentLifecycle(lifecycleId)) return
 
       onFailure(err)
-      this.dispatch({ type: 'session.failed', error: CONNECTION_FAILED_ERROR })
+      this.dispatch({ type: 'session.failed' })
     }
   }
 
@@ -833,7 +828,7 @@ export class MatrixController implements MatrixService {
     this.stopSessionActivity()
     this.nextLifecycle()
     this.sessionManager.clearSession()
-    this.dispatch({ type: 'session.failed', error: CONNECTION_FAILED_ERROR })
+    this.dispatch({ type: 'session.failed' })
   }
 
   private nextLifecycle(): number {

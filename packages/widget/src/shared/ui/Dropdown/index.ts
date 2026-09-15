@@ -1,3 +1,3 @@
 export { Dropdown } from './Dropdown'
 export { DropdownItem } from './DropdownItem'
-export type { DropdownTriggerProps } from './types'
+export type { DropdownHandle } from './types'

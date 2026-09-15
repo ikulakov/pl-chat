@@ -30,35 +30,37 @@ const DOCKED_LOOK: Style = {
   borderRadius: '20px',
   boxShadow: '0px 0px 56px 0px rgba(0,0,0,0.1)',
 }
+const DOCKED_TOP_GAP_PX = 16
+
+const DOCKED_MIN_HEIGHT_PX = 452
 
 const DOCKED_TRANSITION = 'opacity 0.18s ease, transform 0.18s cubic-bezier(0.4, 0, 0.2, 1)'
 
 const FULLSCREEN_LOOK: Style = {
   width: '100%',
-  // 100dvh не сжимается при открытии экранной клавиатуры на iOS; ручной пин к
-  // visualViewport сознательно не делаем — см. rules/frontend.md, «Клавиатура».
+  // 100dvh не сжимается при открытии экранной клавиатуры на iOS
   height: '100dvh',
   borderRadius: '0px',
   boxShadow: 'none',
 }
 
-// Источники inset — по одному на режим. В docked он считается из appearance, во
-// fullscreen фиксирован: corner/offset там сознательно не применяются (см.
-// resolveContainerStyle). Позиция задаётся шорткатом, а не longhand'ами, — иначе
-// render оставлял бы «залипшие» top/right от предыдущего режима.
-
-// `collapsed` — тот же угол, но без отступов: из этой точки панель разворачивается.
-function resolveDockedInset(appearance: PanelAppearance, collapsed = false): string {
-  const x = collapsed ? 0 : (appearance.offsetX ?? DEFAULTS.offsetX)
-  const y = collapsed ? 0 : (appearance.offsetY ?? DEFAULTS.offsetY)
-
-  return (appearance.corner ?? DEFAULTS.corner) === 'bottom-left'
-    ? `auto auto ${y}px ${x}px`
-    : `auto ${x}px ${y}px auto`
-}
-
 // bottom:auto, а не inset:0 — иначе bottom:0 конкурировал бы с height:100dvh.
 const FULLSCREEN_INSET = '0 0 auto 0'
+
+function resolveDockedInset(appearance: PanelAppearance, collapsed = false): string {
+  const x = collapsed ? '0px' : `${appearance.offsetX ?? DEFAULTS.offsetX}px`
+  const y = collapsed ? '0px' : `${appearance.offsetY ?? DEFAULTS.offsetY}px`
+
+  return (appearance.corner ?? DEFAULTS.corner) === 'bottom-left'
+    ? `auto auto ${y} ${x}`
+    : `auto ${x} ${y} auto`
+}
+
+function resolveDockedMaxHeight(appearance: PanelAppearance): string {
+  const y = appearance.offsetY ?? DEFAULTS.offsetY
+
+  return `calc(100dvh - ${y + DOCKED_TOP_GAP_PX}px)`
+}
 
 function resolveZIndex(appearance: PanelAppearance): string {
   return String(appearance.zIndex ?? DEFAULTS.zIndex)
@@ -80,6 +82,8 @@ export function resolveContainerStyle(mode: ViewportMode, appearance: PanelAppea
   return {
     ...BASE_STYLE,
     ...DOCKED_LOOK,
+    maxHeight: resolveDockedMaxHeight(appearance),
+    minHeight: `${DOCKED_MIN_HEIGHT_PX}px`,
     zIndex: resolveZIndex(appearance),
     transition: DOCKED_TRANSITION,
     inset: resolveDockedInset(appearance),

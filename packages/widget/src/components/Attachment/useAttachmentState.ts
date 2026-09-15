@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useChatActions } from '../../hooks/useChatActions'
-import { isPreviewableImage, validateFile } from '../../shared/utils/fileValidation'
+import {
+  isPreviewableImage,
+  validateFile,
+  type FileRejection,
+} from '../../shared/utils/fileValidation'
 import { readImageDimensions, type ImageDimensions } from '../../shared/utils/imageDimensions'
 
 export interface PendingAttachment {
   file: File
   previewUrl?: string
   /** отбраковка при выборе (формат, размер): файл виден в композере, но отправить нельзя */
-  error?: string
+  error?: FileRejection
   /** декодирование картинки, начатое при выборе; у обычных файлов размеров нет */
   dimsPromise?: Promise<ImageDimensions | null>
 }
@@ -43,7 +47,7 @@ export function useAttachmentState(): FileAttachment {
     setPending({
       file,
       ...(isImage ? { previewUrl: URL.createObjectURL(file) } : {}),
-      ...(result.ok ? {} : { error: result.message }),
+      ...(result.ok ? {} : { error: result.reason }),
       ...(isImage && result.ok ? { dimsPromise: readImageDimensions(file) } : {}),
     })
   }, [])

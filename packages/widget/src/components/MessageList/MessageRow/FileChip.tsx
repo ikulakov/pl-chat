@@ -1,5 +1,5 @@
 import type { FileTimelineItem } from '../../../domain/timeline'
-import { isRetryableFailure, type UploadFailure } from '../../../domain/uploadError'
+import { isRetryableFailure, type UploadFailure } from '../../../domain/mediaFailure'
 import { useChatActions } from '../../../hooks/useChatActions'
 import { useChatStore } from '../../../hooks/useChatStore'
 import { useMediaDownload } from '../../../hooks/useMediaDownload'

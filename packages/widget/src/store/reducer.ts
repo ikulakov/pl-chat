@@ -13,7 +13,7 @@ import type { MessageTimelineItem, TimelineItem } from '../domain/timeline'
 import { isMedia, isSystem } from '../domain/timeline'
 import { assertNever } from '../shared/utils/assertNever'
 import type { ChatRuntimeState, RoomState, RuntimeAction } from './state'
-import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from './store'
+import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from './initialState'
 
 function updateRoom(state: ChatRuntimeState, patch: Partial<RoomState>): ChatRuntimeState {
   return { ...state, room: { ...state.room, ...patch } }
@@ -71,14 +71,16 @@ export function chatRuntimeReducer(
   action: RuntimeAction,
 ): ChatRuntimeState {
   switch (action.type) {
-    case 'session.starting':
-      return { ...state, phase: 'connecting', error: null }
+    case 'session.starting': {
+      const isRetry = state.phase === 'error'
+      return { ...state, phase: isRetry ? 'retrying' : 'connecting' }
+    }
 
     case 'session.recovering':
-      return { ...state, phase: 'recovering', error: null }
+      return { ...state, phase: 'recovering' }
 
     case 'session.failed':
-      return { ...INITIAL_RUNTIME_STATE, phase: 'error', error: action.error }
+      return { ...INITIAL_RUNTIME_STATE, phase: 'error' }
 
     case 'session.closed':
       return INITIAL_RUNTIME_STATE
@@ -100,7 +102,6 @@ export function chatRuntimeReducer(
       return {
         ...state,
         phase: 'ready',
-        error: null,
         online: true,
         identity,
         cursor,

@@ -1,14 +1,32 @@
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { t } from '../i18n'
 import { systemItem, textItem } from '../shared/testUtils/matrixFixtures'
-import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE, chatStore } from '../store/store'
+import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '../store/initialState'
+import { chatStore } from '../store/store'
 import { ChatPanel } from './ChatPanel'
+import type * as MessageListModule from './MessageList/MessageList'
 
 // Панель тянет за собой ленту и композер, которым нужен живой ChatController —
 // в этом тесте нас интересует только подпись в шапке.
+const reconnect = vi.hoisted(() => vi.fn())
+// Переключатель падения ленты: в остальных тестах она рендерится как есть.
+const listCrash = vi.hoisted(() => ({ enabled: false }))
+
+vi.mock('./MessageList/MessageList', async (importOriginal) => {
+  const actual = await importOriginal<typeof MessageListModule>()
+
+  return {
+    MessageList: (props: Parameters<typeof actual.MessageList>[0]) => {
+      if (listCrash.enabled) throw new Error('boom')
+      return <actual.MessageList {...props} />
+    },
+  }
+})
+
 vi.mock('../hooks/useChatActions', () => ({
   useChatActions: () => ({
-    reconnect: vi.fn(),
+    reconnect,
     loadEmojiIndex: vi.fn(),
     resendMessage: vi.fn(),
     markRead: vi.fn(),
@@ -148,17 +166,6 @@ describe('ChatPanel — системные состояния', () => {
     chatStore.setState({ ...INITIAL_RUNTIME_STATE, room: INITIAL_ROOM_STATE })
   })
 
-  it('показывает спиннер, пока сессия подключается', () => {
-    chatStore.setState({
-      phase: 'connecting',
-      online: true,
-    })
-
-    const { container } = render(<ChatPanel />)
-
-    expect(container.querySelector('[data-role="spinner"]')).toBeInTheDocument()
-  })
-
   it('задаёт стабильный размер inline-иллюстрации ошибки', () => {
     chatStore.setState({
       phase: 'error',
@@ -172,5 +179,97 @@ describe('ChatPanel — системные состояния', () => {
     const illustration = container.querySelector<HTMLImageElement>('img')
     expect(illustration).toHaveAttribute('width', '296')
     expect(illustration).toHaveAttribute('height', '148')
+  })
+})
+
+describe('ChatPanel — повтор с экрана ошибки', () => {
+  const retryButton = () => screen.getByRole('button', { name: t('status.error.retry') })
+
+  beforeEach(() => {
+    chatStore.setState({
+      ...INITIAL_RUNTIME_STATE,
+      room: INITIAL_ROOM_STATE,
+      phase: 'error',
+    })
+    // как настоящий connect: фаза уходит в ожидание синхронно, ещё до первого запроса
+    reconnect.mockImplementation(() => chatStore.setState({ phase: 'retrying' }))
+  })
+
+  it('оставляет экран ошибки на месте и показывает загрузку на кнопке', () => {
+    const { container } = render(<ChatPanel />)
+    // ссылку берём до нажатия: на время попытки подпись заменяет спиннер, и имени у кнопки нет
+    const button = retryButton()
+
+    fireEvent.click(button)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось загрузить данные')
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+
+    // спиннер сессии по центру не подменяет экран
+    expect(container.querySelectorAll('[data-role="spinner"]')).toHaveLength(1)
+    expect(button).toContainElement(container.querySelector('[data-role="spinner"]'))
+
+    // повторное нажатие во время попытки второй попытки не запускает
+    fireEvent.click(button)
+    expect(reconnect).toHaveBeenCalledOnce()
+  })
+
+  it('после нового отказа снова делает кнопку активной', () => {
+    render(<ChatPanel />)
+
+    fireEvent.click(retryButton())
+    act(() => chatStore.setState({ phase: 'error' }))
+
+    expect(screen.getByText('Не удалось загрузить данные')).toBeInTheDocument()
+    expect(retryButton()).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('уступает место чату, когда сессия поднялась', () => {
+    render(<ChatPanel />)
+
+    fireEvent.click(retryButton())
+    act(() =>
+      chatStore.setState({
+        phase: 'ready',
+        identity: { userId: '@me:bank', roomId: '!r:bank' },
+      }),
+    )
+
+    // по заголовку, а не по role="alert": у чата свой такой регион, для тостов
+    expect(screen.queryByText('Не удалось загрузить данные')).not.toBeInTheDocument()
+    expect(screen.getByText('Добро пожаловать в чат!')).toBeInTheDocument()
+  })
+})
+
+describe('ChatPanel — падение тела панели', () => {
+  beforeEach(() => {
+    listCrash.enabled = false
+  })
+
+  // На мобильном полноэкранная панель закрывает кнопку хоста: без шапки из упавшего чата не выйти.
+  it('оставляет шапку с кнопкой закрытия, когда падает лента', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    listCrash.enabled = true
+    chatStore.setState({
+      ...INITIAL_RUNTIME_STATE,
+      phase: 'ready',
+      viewport: 'fullscreen',
+      identity: { userId: '@me:bank', roomId: '!r:bank' },
+      room: {
+        ...INITIAL_ROOM_STATE,
+        timeline: [
+          textItem({ localId: 'm1', eventId: 'm1', ts: Date.now(), body: 'Здравствуйте' }),
+        ],
+      },
+    })
+
+    render(<ChatPanel />)
+
+    expect(screen.getByText(t('status.crash'))).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: t('chat.close') })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeInTheDocument()
+
+    listCrash.enabled = false
+    vi.mocked(console.error).mockRestore()
   })
 })
