@@ -79,6 +79,12 @@ function CategorySection({
   if (category.items === null) {
     return (
       <PendingSection
+        // Перемонтирование на смену версии пака обязательно: наблюдатель секции не
+        // отключается после срабатывания, а `IntersectionObserver` не повторяет колбэк, пока
+        // пересечение не изменилось. Без нового ключа секция, состав которой обнулился вместе
+        // с версией, не попросила бы его снова — и осталась бы пустой до тех пор, пока
+        // пользователь не прокрутит её из вида и обратно.
+        key={version}
         category={category}
         scrollRef={scrollRef}
         onLoadCategory={onLoadCategory}
