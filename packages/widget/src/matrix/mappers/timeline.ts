@@ -1,4 +1,5 @@
 import { isAdaptiveCardPayload } from '@/domain/adaptiveCards'
+import { toStickerFormat } from '@/domain/emoji'
 import type { SystemLabel, TimelineItem, TimelineRelation } from '@/domain/timeline'
 import type * as Matrix from '../wire'
 import { parseMxcUrl } from '@/shared/utils/mxc'
@@ -149,6 +150,7 @@ function roomMessageToItem(event: Matrix.RoomMessageEvent): TimelineItem | undef
 function createStickerItem(event: Matrix.StickerEvent): TimelineItem {
   const { body, url, info } = event.content
   const mediaId = parseMxcUrl(url)?.mediaId
+  const mimetype = info?.mimetype ?? 'application/octet-stream'
 
   return {
     kind: 'sticker',
@@ -156,13 +158,14 @@ function createStickerItem(event: Matrix.StickerEvent): TimelineItem {
     content: {
       body,
       url,
-      bytesUrl: mediaId ? Endpoints.STICKER_BYTES({ mediaId }) : null,
       info: {
-        mimetype: info?.mimetype ?? 'application/octet-stream',
+        mimetype,
         size: info?.size ?? 0,
         ...(info?.w !== undefined ? { w: info.w } : {}),
         ...(info?.h !== undefined ? { h: info.h } : {}),
       },
+      format: toStickerFormat(mimetype),
+      media: mediaId ? { mediaId, bytesUrl: Endpoints.STICKER_BYTES({ mediaId }) } : null,
     },
   }
 }

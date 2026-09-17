@@ -1,6 +1,4 @@
-import { toStickerFormat } from '@/domain/emoji'
 import type { StickerTimelineItem } from '@/domain/timeline'
-import { parseMxcUrl } from '@/shared/utils/mxc'
 import type { ReactNode } from 'react'
 import { StickerView } from '../../Sticker/StickerView'
 import { BubbleMeta, type BubbleMetaData } from './BubbleMeta'
@@ -25,19 +23,13 @@ const SIZE_PX = 185
  * размером, так что лента не дёргается.
  */
 export function StickerMessage({ item, meta, reactions }: Props) {
-  const { bytesUrl } = item.content
-  const mediaId = parseMxcUrl(item.content.url)?.mediaId
+  const { media, body, format } = item.content
 
   return (
     <div className={styles.stickerMessage}>
-      {mediaId && bytesUrl && (
+      {media && (
         <StickerView
-          sticker={{
-            mediaId,
-            bytesUrl,
-            body: item.content.body,
-            format: toStickerFormat(item.content.info.mimetype),
-          }}
+          sticker={{ ...media, body, format }}
           size={SIZE_PX}
         />
       )}

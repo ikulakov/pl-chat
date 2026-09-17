@@ -1,7 +1,6 @@
-import { parseMxcUrl } from '@/shared/utils/mxc'
-import { toStickerFormat, type StickerFormat } from './emoji'
+import type { StickerFormat } from './emoji'
 import { isOptimistic } from './optimistic'
-import { isMedia, isSticker, type MessageTimelineItem } from './timeline'
+import { isMedia, isSticker, type MessageTimelineItem, type StickerMedia } from './timeline'
 
 /**
  * Чем показать стикер в цитате.
@@ -10,11 +9,9 @@ import { isMedia, isSticker, type MessageTimelineItem } from './timeline'
  * с картинками ленты оно рисуется системным шрифтом и выглядит чужеродно. Поэтому в цитате
  * показываем сам стикер, а текстом идёт подпись «Стикер».
  */
-export interface ReplyStickerPreview {
-  mediaId: string
+export interface ReplyStickerPreview extends StickerMedia {
   body: string
   format: StickerFormat
-  bytesUrl: string
 }
 
 /**
@@ -47,16 +44,8 @@ export function replyQuoteOf(item: MessageTimelineItem): ReplyQuote | undefined 
 function replyStickerOf(item: MessageTimelineItem): ReplyStickerPreview | undefined {
   if (!isSticker(item)) return
 
-  const { bytesUrl } = item.content
-  const mediaId = parseMxcUrl(item.content.url)?.mediaId
-  if (!mediaId || !bytesUrl) return
-
-  return {
-    mediaId,
-    body: item.content.body,
-    format: toStickerFormat(item.content.info.mimetype),
-    bytesUrl,
-  }
+  const { media, body, format } = item.content
+  return media ? { ...media, body, format } : undefined
 }
 
 export const replyEventIdOf = (item: MessageTimelineItem): string | undefined =>

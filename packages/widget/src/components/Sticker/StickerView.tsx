@@ -1,4 +1,5 @@
 import type { StickerFormat } from '@/domain/emoji'
+import type { StickerMedia } from '@/domain/timeline'
 import { useChatActions } from '@/hooks/useChatActions'
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
 import { getAnimationCache } from '@/shared/lottie/animationCache'
@@ -9,11 +10,12 @@ import { useEffect, useRef, useState } from 'react'
 import { Silhouette } from '../Silhouette/Silhouette'
 import styles from './Sticker.module.css'
 
-export interface StickerViewData {
-  /** Ключ кэша анимации и аргумент загрузчика — не адрес. */
-  mediaId: string
-  /** Адрес байтов, готовый: собирают мапперы, компонент маршрутов не знает. */
-  bytesUrl: string
+/**
+ * Что нужно показу стикера, откуда бы он ни пришёл: из каталога пикера (`StickerItem`), из
+ * события ленты (`StickerTimelineItem`) или из цитаты (`ReplyStickerPreview`). Все три кладутся
+ * сюда структурно — адреса собирают мапперы, компонент маршрутов homeserver'а не знает.
+ */
+export interface StickerViewData extends StickerMedia {
   /** Эмодзи-подпись: она же доступное имя. */
   body: string
   format: StickerFormat

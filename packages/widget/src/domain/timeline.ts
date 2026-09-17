@@ -1,5 +1,6 @@
 import type { SystemMessageKey } from '@/i18n'
 import type { AdaptiveCardPayload } from './adaptiveCards'
+import type { StickerFormat } from './emoji'
 import type { UploadFailure } from './mediaFailure'
 
 export type SendStatus = 'sending' | 'sent' | 'failed'
@@ -78,10 +79,23 @@ export interface StickerTimelineItem extends BaseTimelineItem {
     /** Эмодзи-подпись: показываем как alt и как текст цитаты. */
     body: string
     url: string
-    /** Адрес байтов для показа; null — mxc не разобрался, показывать нечего. */
-    bytesUrl: string | null
     info: MediaInfo
+    /** Рендиция, выведенная из `info.mimetype` один раз при разборе события. */
+    format: StickerFormat
+    /**
+     * Чем показать стикер. Оба поля приходят из одного `url`, поэтому лежат вместе: «mediaId
+     * есть, а адреса нет» — состояние невозможное, и гард на него должен быть один.
+     * null — mxc не разобрался, показывать нечего.
+     */
+    media: StickerMedia | null
   }
+}
+
+export interface StickerMedia {
+  /** Ключ кэша анимации и аргумент загрузчика Lottie — не адрес. */
+  mediaId: string
+  /** Адрес байтов: отдаётся без токена, поэтому идёт прямо в `src`. */
+  bytesUrl: string
 }
 
 export interface AdaptiveCardTimelineItem extends BaseTimelineItem {

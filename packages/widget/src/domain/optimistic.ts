@@ -83,8 +83,9 @@ export function createOptimisticStickerMessage({
       content: {
         body: sticker.body,
         url: sticker.url,
-        bytesUrl: sticker.bytesUrl,
         info: { ...sticker.info, size: sticker.info.size ?? 0 },
+        format: sticker.format,
+        media: { mediaId: sticker.mediaId, bytesUrl: sticker.bytesUrl },
       },
     },
   })

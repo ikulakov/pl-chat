@@ -1,4 +1,5 @@
 import type { AdaptiveCardPayload } from '@/domain/adaptiveCards'
+import { toStickerFormat } from '@/domain/emoji'
 import type {
   AdaptiveCardTimelineItem,
   FileTimelineItem,
@@ -11,6 +12,7 @@ import type {
 import type { MatrixApi } from '@/matrix/api/matrixApi'
 import type { SessionInit } from '@/matrix/session/types'
 import type * as Matrix from '@/matrix/wire'
+import { parseMxcUrl } from '@/shared/utils/mxc'
 import { MatrixEventType, MediaScanStatus, MsgType, OperatorStatus } from '@/matrix/wire/consts'
 import { vi } from 'vitest'
 
@@ -42,6 +44,8 @@ export function stickerItem(
   } = {},
 ): StickerTimelineItem {
   const { body, mimetype, url, ...rest } = overrides
+  const mxc = url ?? 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx'
+  const mediaId = parseMxcUrl(mxc)?.mediaId
   return {
     kind: 'sticker',
     localId: 'st1',
@@ -52,9 +56,10 @@ export function stickerItem(
     ...rest,
     content: {
       body: body ?? '🩷',
-      url: url ?? 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
-      bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
+      url: mxc,
       info: { mimetype: mimetype ?? 'image/webp', size: 4096, w: 512, h: 512 },
+      format: toStickerFormat(mimetype ?? 'image/webp'),
+      media: mediaId ? { mediaId, bytesUrl: `/_matrix/sticker/${mediaId}` } : null,
     },
   }
 }

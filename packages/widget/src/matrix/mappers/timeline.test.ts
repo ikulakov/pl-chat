@@ -231,8 +231,12 @@ describe('timelineEventsToItems — варианты контента', () => {
         content: {
           body: '🩷',
           url: 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
-          bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
           info: { mimetype: 'video/webm', size: 43488, w: 512, h: 512 },
+          format: 'video',
+          media: {
+            mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
+            bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
+          },
         },
       })
     })
@@ -253,7 +257,7 @@ describe('timelineEventsToItems — варианты контента', () => {
       } as unknown as Matrix.ClientEvent
 
       expect(timelineEventsToItems([bare])[0]).toMatchObject({
-        content: { info: { mimetype: 'application/octet-stream', size: 0 } },
+        content: { info: { mimetype: 'application/octet-stream', size: 0 }, format: 'image' },
       })
     })
   })
