@@ -1,6 +1,7 @@
-// отступ меню от триггера и минимальный зазор до края вьюпорта (iframe чата маленький)
+import { VIEWPORT_MARGIN } from '../floating/viewport'
+
+// отступ меню от триггера
 export const GAP = 4
-export const VIEWPORT_MARGIN = 8
 
 // Чистое позиционирование меню по rect триггера с коллизией к краям вьюпорта.
 export function computeDropdownPosition(

@@ -1,7 +1,8 @@
+import { VIEWPORT_MARGIN } from '../floating/viewport'
+
 // зазор между триггером и тултипом; курсор проходит его насквозь, поэтому закрытие идёт с
 // задержкой (CLOSE_DELAY_MS) — иначе тултип исчезал бы на полпути к нему
 export const GAP = 6
-export const VIEWPORT_MARGIN = 8
 // стрелка не должна заезжать на скругление угла
 export const ARROW_INSET = 12
 

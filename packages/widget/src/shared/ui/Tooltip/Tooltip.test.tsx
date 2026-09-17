@@ -1,17 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { TestPointerEvent } from '../../testUtils/pointer'
 import { Tooltip } from './Tooltip'
-
-// В jsdom нет PointerEvent: без него fireEvent шлёт голый Event без pointerType, и тултип
-// молча игнорирует наведение — тесты проходили бы вхолостую.
-class TestPointerEvent extends MouseEvent {
-  readonly pointerType: string
-
-  constructor(type: string, init: PointerEventInit = {}) {
-    super(type, init)
-    this.pointerType = init.pointerType ?? ''
-  }
-}
 
 const mouse = { pointerType: 'mouse' }
 

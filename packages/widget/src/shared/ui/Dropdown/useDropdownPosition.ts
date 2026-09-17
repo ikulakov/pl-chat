@@ -1,4 +1,5 @@
 import { type RefObject, useLayoutEffect, useState } from 'react'
+import { readViewport } from '../floating/viewport'
 import { computeDropdownPosition } from './computeDropdownPosition'
 
 interface Params {
@@ -29,10 +30,11 @@ export function useDropdownPosition({
     if (!anchor || !layer) return
 
     setPosition(
-      computeDropdownPosition(anchor.getBoundingClientRect(), layer.getBoundingClientRect(), {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      }),
+      computeDropdownPosition(
+        anchor.getBoundingClientRect(),
+        layer.getBoundingClientRect(),
+        readViewport(),
+      ),
     )
 
     // следующее открытие снова начнётся со скрытого, неизмеренного слоя

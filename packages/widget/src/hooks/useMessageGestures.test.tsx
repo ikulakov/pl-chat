@@ -101,12 +101,14 @@ describe('useMessageGestures', () => {
     expect(onLongPress).not.toHaveBeenCalled()
   })
 
-  it('свайп влево за порог включает ответ, недотянутый — нет', () => {
+  it('свайп влево за порог включает ответ, недотянутый — нет, но и click не пропускает', () => {
     const onSwipe = vi.fn()
+    const onClick = vi.fn()
     const { getByTestId } = render(
       <Harness
         onLongPress={() => {}}
         onSwipe={onSwipe}
+        onClick={onClick}
       />,
     )
     const row = getByTestId('row')
@@ -114,7 +116,9 @@ describe('useMessageGestures', () => {
     press(row)
     fireEvent.pointerMove(row, { ...touch, clientX: 200 - SWIPE_TRIGGER_PX / 2, clientY: 100 })
     fireEvent.pointerUp(row, touch)
+    fireEvent.click(row)
     expect(onSwipe).not.toHaveBeenCalled()
+    expect(onClick).not.toHaveBeenCalled()
 
     press(row)
     fireEvent.pointerMove(row, { ...touch, clientX: 200 - SWIPE_TRIGGER_PX - 4, clientY: 100 })

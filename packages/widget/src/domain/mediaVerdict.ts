@@ -59,10 +59,10 @@ export function findOwnMedia(
 ): MediaTimelineItem | undefined {
   const mediaIdSet = new Set(mediaIds)
 
-  return timeline
-    .filter(isMedia)
-    .find(
-      (item) =>
-        item.sender === userId && mediaIdSet.has(parseMxcUrl(item.content.url)?.mediaId ?? ''),
-    )
+  return timeline.find((item): item is MediaTimelineItem => {
+    if (!isMedia(item) || item.sender !== userId) return false
+
+    const mediaId = parseMxcUrl(item.content.url)?.mediaId
+    return !!mediaId && mediaIdSet.has(mediaId)
+  })
 }

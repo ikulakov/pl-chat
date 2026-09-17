@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ARROW_INSET, GAP, VIEWPORT_MARGIN, computeTooltipPosition } from './computeTooltipPosition'
+import { VIEWPORT_MARGIN } from '../floating/viewport'
+import { ARROW_INSET, GAP, computeTooltipPosition } from './computeTooltipPosition'
 
 const VIEWPORT = { width: 400, height: 600 }
 const TOOLTIP = { width: 120, height: 22 }

@@ -40,8 +40,7 @@ export function useMessageGestures(
 ): { isSwiping: boolean } {
   const [isSwiping, setIsSwiping] = useState(false)
   const fireLongPress = useEffectEvent(() => options.onLongPress())
-  const canSwipe = useEffectEvent(() => options.onSwipe !== undefined)
-  const fireSwipe = useEffectEvent(() => options.onSwipe?.())
+  const getOnSwipe = useEffectEvent(() => options.onSwipe)
 
   useEffect(() => {
     const el = ref.current
@@ -101,7 +100,7 @@ export function useMessageGestures(
 
         clearTimeout(pressTimer)
         // Решаем один раз, на выходе из «стоячей» зоны: только влево и только если можно ответить.
-        if (dx >= 0 || !canSwipe()) {
+        if (dx >= 0 || !getOnSwipe()) {
           pointerId = null
           return
         }
@@ -123,9 +122,11 @@ export function useMessageGestures(
       if (!swiping) return
 
       swiping = false
+      // Любая протяжка — уже не тап: иначе недотянутый свайп по ссылке, файлу или реакции
+      // завершился бы click'ом, который браузер ещё может синтезировать.
+      swallowClick = true
       if (event.type === 'pointerup' && offset >= SWIPE_TRIGGER_PX) {
-        swallowClick = true
-        fireSwipe()
+        getOnSwipe()?.()
       }
       settle()
     }

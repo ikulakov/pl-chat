@@ -92,6 +92,12 @@ describe('findOwnMedia', () => {
     expect(findOwnMedia(timeline, ['theirs'], '@me:bank.ru')).toBeUndefined()
   })
 
+  it('черновик вложения без url не совпадает даже с пустым mediaId', () => {
+    const draft = mediaItem('@me:bank.ru', '')
+
+    expect(findOwnMedia([draft], [''], '@me:bank.ru')).toBeUndefined()
+  })
+
   it('из нескольких вердиктов берёт первый свой файл в ленте', () => {
     expect(findOwnMedia(timeline, ['theirs', 'mine'], '@me:bank.ru')?.localId).toBe(
       'local-mxc://bank.ru/mine',

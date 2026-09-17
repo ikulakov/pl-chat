@@ -2,6 +2,7 @@ import type { Ref } from 'react'
 
 export interface DropdownTriggerProps {
   ref: Ref<HTMLButtonElement>
+  disabled: boolean
   onClick: () => void
   'aria-haspopup': 'menu'
   'aria-expanded': boolean
@@ -19,12 +20,12 @@ export interface DropdownOpenOptions {
 export interface DropdownCloseOptions {
   /**
    * Вернуть фокус на триггер (по умолчанию да). Нет — когда фокус уже у цели (внешний клик,
-   * прокрутка) или пункт выбран мышью: `:focus-within` оставил бы кнопку «…» видимой.
+   * прокрутка). После выбора пункта фокус возвращается всегда, каким бы указателем его ни выбрали.
    */
   returnFocus?: boolean
 }
 
-/** Открытие не с триггера — например, долгим нажатием на сообщение. При недоступном триггере — no-op. */
+/** Открытие не с триггера — например, долгим нажатием на сообщение. При `disabled` — no-op. */
 export interface DropdownHandle {
   open: (options?: DropdownOpenOptions) => void
 }

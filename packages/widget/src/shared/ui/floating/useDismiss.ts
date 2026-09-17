@@ -31,6 +31,7 @@ export function useDismiss(
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') dismiss('escape')
     }
+    // Фаза захвата обязательна: скроллится лента сообщений, а не window, и всплытия оттуда нет.
     const onScroll = () => dismiss('scroll')
 
     document.addEventListener('pointerdown', onPointerDown)

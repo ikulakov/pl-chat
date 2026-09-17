@@ -8,7 +8,9 @@ import type {
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../../utils/cn'
-import { resolveRoot } from '../../utils/resolveRoot'
+import { resolvePortalContainer } from '../floating/portal'
+import { useDismiss } from '../floating/useDismiss'
+import { readViewport } from '../floating/viewport'
 import type { TooltipPlacement } from './computeTooltipPosition'
 import { computeTooltipPosition } from './computeTooltipPosition'
 import { isInDelayGroup, markTooltipClosed, markTooltipOpened } from './delayGroup'
@@ -52,7 +54,7 @@ export function Tooltip({ label, truncatedOnly = false, children }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   // до первого замера тултип скрыт (visibility), чтобы не мигнуть в углу 0,0
   const [placement, setPlacement] = useState<TooltipPlacement | null>(null)
-  const [container, setContainer] = useState<Element | ShadowRoot | null>(null)
+  const [container, setContainer] = useState<HTMLElement | ShadowRoot | null>(null)
   // зеркало isOpen для колбэков со стабильной ссылкой: им нужно знать, был ли показ,
   // а пересоздавать их на каждое открытие незачем
   const isOpenRef = useRef(false)
@@ -87,8 +89,7 @@ export function Tooltip({ label, truncatedOnly = false, children }: Props) {
         // (ресайз панели, догрузка шрифта)
         if (truncatedOnly && trigger.scrollWidth <= trigger.clientWidth) return
 
-        const root = resolveRoot(trigger)
-        setContainer(root instanceof ShadowRoot ? root : root.body)
+        setContainer(resolvePortalContainer(trigger))
         setPlacement(null)
         markTooltipOpened(close)
         isOpenRef.current = true
@@ -119,36 +120,17 @@ export function Tooltip({ label, truncatedOnly = false, children }: Props) {
     const tooltip = tooltipRef.current
     if (!trigger || !tooltip) return
 
-    // clientWidth документа, а не innerWidth окна: второй считает вместе с полосой прокрутки,
-    // и у правого края тултип вылезал бы под неё
-    const viewport = document.documentElement
-
     setPlacement(
-      computeTooltipPosition(trigger.getBoundingClientRect(), tooltip.getBoundingClientRect(), {
-        width: viewport.clientWidth,
-        height: viewport.clientHeight,
-      }),
+      computeTooltipPosition(
+        trigger.getBoundingClientRect(),
+        tooltip.getBoundingClientRect(),
+        readViewport(),
+      ),
     )
   }, [isOpen])
 
-  useEffect(() => {
-    if (!isOpen) return
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close()
-    }
-    // прокрутка уводит триггер из-под тултипа. Фаза захвата обязательна: скроллится лента
-    // сообщений, а не window, и всплытия scroll-события оттуда не будет.
-    const onScroll = () => close()
-
-    document.addEventListener('keydown', onKeyDown)
-    window.addEventListener('scroll', onScroll, true)
-
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('scroll', onScroll, true)
-    }
-  }, [isOpen, close])
+  // нажатие на триггер закрывает само (onPointerDown), нажатие на тултип — нет: он наводимый
+  useDismiss(isOpen, [triggerRef, tooltipRef], close)
 
   useEffect(
     () => () => {

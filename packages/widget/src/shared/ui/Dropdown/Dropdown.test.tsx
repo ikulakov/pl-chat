@@ -116,23 +116,17 @@ describe('Dropdown a11y', () => {
     expect(trigger).not.toHaveFocus()
   })
 
-  // detail — число кликов: у мыши ≥ 1, у Enter/Space на кнопке 0
-  it('выбор пункта мышью не возвращает фокус на триггер — иначе «…» остался бы видимым', () => {
+  // detail — число кликов: у мыши ≥ 1, у Enter/Space 0. Скринридер в режиме обзора шлёт клик
+  // с detail ≥ 1, поэтому различать их нельзя: иначе его фокус падал бы в body.
+  it.each([
+    ['мышью', 1],
+    ['с клавиатуры', 0],
+  ])('выбор пункта %s возвращает фокус на триггер', (_, detail) => {
     renderDropdown()
     const trigger = screen.getByRole('button', { name: 'menu' })
     fireEvent.click(trigger)
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'one' }), { detail: 1 })
-
-    expect(trigger).not.toHaveFocus()
-  })
-
-  it('выбор пункта с клавиатуры возвращает фокус на триггер', () => {
-    renderDropdown()
-    const trigger = screen.getByRole('button', { name: 'menu' })
-    fireEvent.click(trigger)
-
-    fireEvent.click(screen.getByRole('menuitem', { name: 'one' }), { detail: 0 })
+    fireEvent.click(screen.getByRole('menuitem', { name: 'one' }), { detail })
 
     expect(trigger).toHaveFocus()
   })
@@ -299,20 +293,13 @@ describe('Dropdown — края контракта', () => {
     expect(screen.getByRole('button', { name: 'menu' })).not.toHaveAttribute('data-backdrop')
   })
 
-  it('open() при недоступном триггере ничего не открывает', () => {
+  it('disabled: open() ничего не открывает, а триггер получает disabled', () => {
     const handle = createRef<DropdownHandle>()
     render(
       <Dropdown
         ref={handle}
-        trigger={(props) => (
-          <button
-            {...props}
-            type="button"
-            disabled
-          >
-            menu
-          </button>
-        )}
+        disabled
+        trigger={trigger}
       >
         <DropdownItem onSelect={() => {}}>one</DropdownItem>
       </Dropdown>,
@@ -320,6 +307,7 @@ describe('Dropdown — края контракта', () => {
 
     act(() => handle.current?.open({ backdrop: true }))
 
+    expect(screen.getByRole('button', { name: 'menu' })).toBeDisabled()
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(document.querySelector('[class*="backdrop"]')).not.toBeInTheDocument()
   })

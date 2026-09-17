@@ -10,7 +10,8 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { t } from '../../../i18n'
-import { resolveRoot } from '../../utils/resolveRoot'
+import { resolvePortalContainer } from '../floating/portal'
+import { useDismiss } from '../floating/useDismiss'
 import { DropdownContext } from './context'
 import styles from './Dropdown.module.css'
 import { handleMenuKeyDown } from './menuKeyboard'
@@ -20,12 +21,13 @@ import type {
   DropdownOpenOptions,
   DropdownTriggerProps,
 } from './types'
-import { useDismiss } from './useDismiss'
 import { useDropdownPosition } from './useDropdownPosition'
 
 interface Props {
   ref?: Ref<DropdownHandle> | undefined
   trigger: (props: DropdownTriggerProps) => ReactNode
+  /** Меню не открывается никаким путём: ни кликом, ни через `open()`. Уходит и в триггер. */
+  disabled?: boolean | undefined
   /** Своя всплывашка над меню (панель реакций): живёт в том же слое и закрывается вместе с ним. */
   above?: ReactNode
   /**
@@ -35,9 +37,9 @@ interface Props {
   children?: ReactNode
 }
 
-export function Dropdown({ ref, trigger, above, children }: Props) {
+export function Dropdown({ ref, trigger, disabled = false, above, children }: Props) {
   const [isOpen, setIsOpen] = useState(false)
-  const [container, setContainer] = useState<Element | ShadowRoot | null>(null)
+  const [container, setContainer] = useState<HTMLElement | ShadowRoot | null>(null)
   const [withBackdrop, setWithBackdrop] = useState(false)
 
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -46,18 +48,21 @@ export function Dropdown({ ref, trigger, above, children }: Props) {
   // Относительно чего ставить слой: триггер или то, что передали в open() снаружи.
   const anchorRef = useRef<HTMLElement | null>(null)
 
-  const open = ({ anchor, backdrop = false }: DropdownOpenOptions = {}) => {
-    // Открытый слой не переоткрываем: позиция посчитана под прежний якорь, а подложка появилась бы
-    // без нового открытия — посреди уже идущего взаимодействия. Недоступная кнопка закрывает меню
-    // для всех путей открытия, а не только для клика: иначе каждый внешний вызов дублировал бы проверку.
-    if (isOpen || triggerRef.current?.disabled) return
+  // Стабильная между рендерами, пока не сменились isOpen/disabled: иначе хэндл ниже пересоздавался
+  // бы на каждый рендер ряда ленты.
+  const open = useCallback(
+    ({ anchor, backdrop = false }: DropdownOpenOptions = {}) => {
+      // Открытый слой не переоткрываем: позиция посчитана под прежний якорь, а подложка появилась
+      // бы без нового открытия — посреди уже идущего взаимодействия.
+      if (isOpen || disabled) return
 
-    const root = resolveRoot(triggerRef.current)
-    anchorRef.current = anchor ?? null
-    setContainer(root instanceof ShadowRoot ? root : root.body)
-    setWithBackdrop(backdrop)
-    setIsOpen(true)
-  }
+      anchorRef.current = anchor ?? null
+      setContainer(resolvePortalContainer(triggerRef.current))
+      setWithBackdrop(backdrop)
+      setIsOpen(true)
+    },
+    [isOpen, disabled],
+  )
 
   // Фокус возвращаем прямо здесь, а не эффектом после закрытия: тогда решение «возвращать или
   // нет» принимает тот, кто закрывает, и его не нужно хранить до следующего рендера.
@@ -66,7 +71,7 @@ export function Dropdown({ ref, trigger, above, children }: Props) {
     setIsOpen(false)
   }, [])
 
-  useImperativeHandle(ref, () => ({ open }))
+  useImperativeHandle(ref, () => ({ open }), [open])
 
   const position = useDropdownPosition({ isOpen, anchorRef, triggerRef, layerRef })
 
@@ -84,12 +89,14 @@ export function Dropdown({ ref, trigger, above, children }: Props) {
   )
 
   const contextValue = useMemo(() => ({ close }), [close])
-  const hasItems = Children.toArray(children).length > 0
+  // нужен только открытому слою, а закрытый Dropdown стоит в каждом ряду ленты
+  const hasItems = isOpen && Children.toArray(children).length > 0
 
   return (
     <>
       {trigger({
         ref: triggerRef,
+        disabled,
         onClick: isOpen ? () => close() : () => open(),
         // eslint-disable-next-line i18next/no-literal-string -- ARIA-роль, не UI-текст
         'aria-haspopup': 'menu',

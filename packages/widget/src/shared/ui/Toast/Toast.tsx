@@ -15,6 +15,9 @@ interface Props {
  * Одна плашка. Уходит сама, крестика нет. Клик, если он задан, только срезает путь — например
  * ведёт к сообщению в ленте. Поэтому всё, что тост сообщает, должно дублироваться состоянием
  * в ленте: плашка может истечь раньше, чем до неё дотянутся.
+ *
+ * Escape тост не закрывает: фокуса на нём обычно нет, а document-листенер съедал бы Escape,
+ * адресованный открытому меню или тултипу, — закрывалось бы и то, и другое.
  */
 export function Toast({ toast }: Props) {
   const [isHovered, setIsHovered] = useState(false)
@@ -49,18 +52,6 @@ export function Toast({ toast }: Props) {
       remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - startedAt))
     }
   }, [isPaused, toast.id])
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') dismissToast(toast.id)
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [toast.id])
 
   const content = (
     <>

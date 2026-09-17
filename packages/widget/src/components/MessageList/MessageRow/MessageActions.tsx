@@ -79,6 +79,7 @@ export function MessageActions({ ref, message, isOwn, reactions }: Props) {
   return (
     <Dropdown
       ref={ref}
+      disabled={disabled}
       above={
         canReact ? (
           <ReactionPicker
@@ -94,7 +95,6 @@ export function MessageActions({ ref, message, isOwn, reactions }: Props) {
           size="md"
           data-role="message-actions-trigger"
           aria-label={t('chat.action.menu')}
-          disabled={disabled}
         >
           <MoreIcon size={18} />
         </IconButton>
