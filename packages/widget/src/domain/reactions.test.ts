@@ -65,7 +65,10 @@ describe('confirmReaction', () => {
       key: '👍',
     })
 
-    const confirmed = confirmReaction(optimistic, '$m1', 'optimistic:l1', '$r1')
+    const confirmed = confirmReaction(optimistic, '$m1', {
+      draft: 'optimistic:l1',
+      confirmed: '$r1',
+    })
 
     expect(confirmed['$m1']).toEqual([{ eventId: '$r1', sender: ME, key: '👍' }])
   })
@@ -73,7 +76,9 @@ describe('confirmReaction', () => {
   it('ничего не делает, если эхо из /sync уже подменило запись', () => {
     const echoed = addReaction({}, '$m1', { eventId: '$r1', sender: ME, key: '👍' })
 
-    expect(confirmReaction(echoed, '$m1', 'optimistic:l1', '$r1')).toBe(echoed)
+    expect(confirmReaction(echoed, '$m1', { draft: 'optimistic:l1', confirmed: '$r1' })).toBe(
+      echoed,
+    )
   })
 })
 

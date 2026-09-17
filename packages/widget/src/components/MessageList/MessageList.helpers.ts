@@ -1,3 +1,4 @@
+import type { UserId } from '@/domain/ids'
 import { replyEventIdOf, replyQuoteOf, type ReplyStickerPreview } from '@/domain/reply'
 import { isSystem, type MessageTimelineItem, type TimelineItem } from '@/domain/timeline'
 import { t } from '@/i18n'
@@ -66,7 +67,7 @@ export interface ReplyPreviewData {
 interface GetReplyPreviewParams {
   index: Map<string, MessageTimelineItem>
   message: MessageTimelineItem
-  userId: string
+  userId: UserId
 }
 
 export function getReplyPreview({

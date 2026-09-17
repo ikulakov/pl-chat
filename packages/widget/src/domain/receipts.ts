@@ -1,25 +1,26 @@
+import type { EventId, UserId } from './ids'
 import { isOptimistic } from './optimistic'
 import { isSystem, type TimelineItem } from './timeline'
 
 /** Закладка участника: до какого события он дочитал. */
 export interface ReadReceipt {
-  eventId: string
+  eventId: EventId
 }
 
 /** Сырая пара из m.receipt — ещё не прошедшая гард монотонности. */
 export interface ReadMarker {
-  userId: string
-  eventId: string
+  userId: UserId
+  eventId: EventId
 }
 
 // Применяет маркеры прочтения из sync к закладкам участников.
 // canMoveMarker не даёт откатить свою закладку назад: markRead двигает её сразу, а эхо из sync приходит с опозданием.
 // Ничего не сдвинулось — возвращаем existing как есть
 export function applyReadMarkers(
-  existing: Record<string, ReadReceipt>,
+  existing: Record<UserId, ReadReceipt>,
   markers: ReadMarker[],
   timeline: TimelineItem[],
-): Record<string, ReadReceipt> {
+): Record<UserId, ReadReceipt> {
   let result = existing
   for (const { userId, eventId } of markers) {
     if (!canMoveMarker(timeline, result[userId]?.eventId ?? null, eventId)) continue
@@ -34,8 +35,8 @@ export function applyReadMarkers(
 // Учитываем только id при скролле вниз + отсекаем повторные id
 export function canMoveMarker(
   timeline: TimelineItem[],
-  marker: string | null,
-  eventId: string,
+  marker: EventId | null,
+  eventId: EventId,
 ): boolean {
   if (marker === null) return true
   if (marker === eventId) return false
@@ -55,10 +56,10 @@ export function canMoveMarker(
 // Каждый участник держит одну закладку «дочитал до такого-то события» (она указывает на НАШЕ сообщение).
 // Берём чужие закладки → находим самую дальнюю в ленте → всё наше до неё включительно прочитано.
 export function readOwnEventIds(
-  readReceipts: Record<string, ReadReceipt>,
+  readReceipts: Record<UserId, ReadReceipt>,
   timeline: TimelineItem[],
-  ownUserId: string,
-): Set<string> {
+  ownUserId: UserId,
+): Set<EventId> {
   const readUpToIds = new Set(
     Object.entries(readReceipts)
       .filter(([userId]) => userId !== ownUserId)
@@ -66,7 +67,7 @@ export function readOwnEventIds(
   )
   const lastReadIndex = timeline.findLastIndex((item) => readUpToIds.has(item.eventId))
 
-  const readIds = new Set<string>()
+  const readIds = new Set<EventId>()
   for (let i = 0; i <= lastReadIndex; i++) {
     const item = timeline[i]!
     if (isSystem(item) || item.sender !== ownUserId || isOptimistic(item.eventId)) continue
@@ -80,9 +81,9 @@ export function readOwnEventIds(
 // Счётчик непрочитанных: чужие сообщения после собственного read-маркера.
 // Если маркера нет или он не найден — считаем непрочитанными все сообщения.
 export function countUnread(
-  readReceipts: Record<string, ReadReceipt>,
+  readReceipts: Record<UserId, ReadReceipt>,
   timeline: TimelineItem[],
-  ownUserId: string,
+  ownUserId: UserId,
 ): number {
   const marker = readReceipts[ownUserId]?.eventId
   const markerIndex = marker ? timeline.findIndex((item) => item.eventId === marker) : -1

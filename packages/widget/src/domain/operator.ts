@@ -1,5 +1,7 @@
+import type { UserId } from './ids'
+
 export interface OperatorState {
   isActive: boolean
-  id: string | null
+  id: UserId | null
   displayName: string | null
 }

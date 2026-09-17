@@ -1,3 +1,4 @@
+import type { LocalId, UserId } from '@/domain/ids'
 import { aggregateReactions, type ReactionEntry } from '@/domain/reactions'
 import { replyTargetOf, type ReplyStickerPreview } from '@/domain/reply'
 import { type MessageTimelineItem } from '@/domain/timeline'
@@ -26,7 +27,7 @@ import { TextContent } from './TextContent'
 
 interface Props {
   message: MessageTimelineItem
-  userId: string
+  userId: UserId
   position: BubblePosition
   readByOperator: boolean
   reactions: ReactionEntry[] | undefined
@@ -34,7 +35,7 @@ interface Props {
   replyText: string | undefined
   replySticker: ReplyStickerPreview | undefined
   replyTargetId: string | undefined
-  onReplyClick: (localId: string) => void
+  onReplyClick: (localId: LocalId) => void
 }
 
 export const MessageRow = memo(

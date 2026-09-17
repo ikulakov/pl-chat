@@ -2,6 +2,8 @@ import type { HostCommand } from '@bankchat/protocol'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HostBridge } from './bridge'
 import { ChatController } from './chatController'
+import type { CatalogService } from './matrix/catalog/matrixCatalog'
+import type { MatrixClient } from './matrix/createMatrixClient'
 import type { MatrixService } from './matrix/matrixController'
 import { chatStore } from './store/store'
 
@@ -31,6 +33,11 @@ function makeMatrix(): MatrixService {
     loadMoreHistory: vi.fn().mockResolvedValue(undefined),
     stopLoadingHistory: vi.fn(),
     loadPreview: vi.fn().mockResolvedValue(new Blob()),
+  }
+}
+
+function makeCatalog(): CatalogService {
+  return {
     loadEmojiCatalog: vi.fn().mockResolvedValue({ version: '1', categories: [] }),
     loadEmojiCategory: vi.fn().mockResolvedValue({ id: '', title: '', count: 0, items: [] }),
     loadEmojiIndex: vi.fn().mockResolvedValue({ version: '1', codepointByChar: new Map() }),
@@ -39,6 +46,8 @@ function makeMatrix(): MatrixService {
     loadStickerAnimation: vi.fn().mockResolvedValue({}),
   }
 }
+
+const client = (matrix: MatrixService): MatrixClient => ({ matrix, catalog: makeCatalog() })
 
 beforeEach(() => {
   chatStore.getState().closePanel()
@@ -50,7 +59,7 @@ describe('ChatController — panel commands', () => {
   it('OPEN when closed: opens panel, emits OPENED, connects', () => {
     const bridge = makeBridge()
     const matrix = makeMatrix()
-    new ChatController(bridge, matrix)
+    new ChatController(bridge, client(matrix))
 
     sendCommand(bridge, { type: 'OPEN' })
 
@@ -62,7 +71,7 @@ describe('ChatController — panel commands', () => {
   it('OPEN idempotency: second call does nothing', () => {
     const bridge = makeBridge()
     const matrix = makeMatrix()
-    new ChatController(bridge, matrix)
+    new ChatController(bridge, client(matrix))
     sendCommand(bridge, { type: 'OPEN' })
     vi.mocked(bridge.send).mockClear()
     vi.mocked(matrix.connect).mockClear()
@@ -75,7 +84,7 @@ describe('ChatController — panel commands', () => {
 
   it('CLOSE when open: closes panel and emits CLOSED', () => {
     const bridge = makeBridge()
-    new ChatController(bridge, makeMatrix())
+    new ChatController(bridge, client(makeMatrix()))
     sendCommand(bridge, { type: 'OPEN' })
     vi.mocked(bridge.send).mockClear()
 
@@ -87,7 +96,7 @@ describe('ChatController — panel commands', () => {
 
   it('CLOSE idempotency: no-op when already closed', () => {
     const bridge = makeBridge()
-    new ChatController(bridge, makeMatrix())
+    new ChatController(bridge, client(makeMatrix()))
 
     sendCommand(bridge, { type: 'CLOSE' })
 
@@ -96,7 +105,7 @@ describe('ChatController — panel commands', () => {
 
   it('TOGGLE opens then closes', () => {
     const bridge = makeBridge()
-    new ChatController(bridge, makeMatrix())
+    new ChatController(bridge, client(makeMatrix()))
 
     sendCommand(bridge, { type: 'TOGGLE' })
     expect(chatStore.getState().isOpen).toBe(true)
@@ -109,7 +118,7 @@ describe('ChatController — panel commands', () => {
   // должен уметь закрыть себя сам (кнопка в Header), не только по команде CLOSE/TOGGLE.
   it('close() can be called directly by the widget itself, not just via a host command', () => {
     const bridge = makeBridge()
-    const controller = new ChatController(bridge, makeMatrix())
+    const controller = new ChatController(bridge, client(makeMatrix()))
     sendCommand(bridge, { type: 'OPEN' })
     vi.mocked(bridge.send).mockClear()
 
@@ -125,7 +134,7 @@ describe('ChatController — panel commands', () => {
 describe('ChatController — viewport mode', () => {
   it('INIT with viewport payload stores it', () => {
     const bridge = makeBridge()
-    new ChatController(bridge, makeMatrix())
+    new ChatController(bridge, client(makeMatrix()))
 
     sendCommand(bridge, { type: 'INIT', payload: { viewport: 'fullscreen' } })
 
@@ -134,7 +143,7 @@ describe('ChatController — viewport mode', () => {
 
   it('INIT without viewport payload keeps the current value', () => {
     const bridge = makeBridge()
-    new ChatController(bridge, makeMatrix())
+    new ChatController(bridge, client(makeMatrix()))
     chatStore.getState().setViewport('fullscreen')
 
     sendCommand(bridge, { type: 'INIT', payload: {} })
@@ -144,7 +153,7 @@ describe('ChatController — viewport mode', () => {
 
   it('SET_VIEWPORT updates the mode after INIT (resize/orientation change)', () => {
     const bridge = makeBridge()
-    new ChatController(bridge, makeMatrix())
+    new ChatController(bridge, client(makeMatrix()))
     sendCommand(bridge, { type: 'INIT', payload: { viewport: 'docked' } })
 
     sendCommand(bridge, { type: 'SET_VIEWPORT', payload: { mode: 'fullscreen' } })
@@ -159,14 +168,14 @@ describe('ChatController — wiring', () => {
   it('registers a command handler on the bridge during construction', () => {
     const bridge = makeBridge()
 
-    new ChatController(bridge, makeMatrix())
+    new ChatController(bridge, client(makeMatrix()))
 
     expect(bridge.setCommandHandler).toHaveBeenCalledOnce()
   })
 
   it('sendMessage / reconnect delegate to the backend', () => {
     const matrix = makeMatrix()
-    const controller = new ChatController(makeBridge(), matrix)
+    const controller = new ChatController(makeBridge(), client(matrix))
 
     void controller.sendMessage('hi')
     controller.reconnect()
@@ -177,7 +186,7 @@ describe('ChatController — wiring', () => {
 
   it('sendCardAction delegates to the backend', () => {
     const matrix = makeMatrix()
-    const controller = new ChatController(makeBridge(), matrix)
+    const controller = new ChatController(makeBridge(), client(matrix))
     const action = { id: 'confirm', title: 'Подтвердить', data: { action: 'confirm' } }
 
     void controller.sendCardAction('$card', action)
@@ -188,7 +197,7 @@ describe('ChatController — wiring', () => {
   // actions раздаётся как стабильная ссылка (не геттер, пересоздающий объект) —
   // на этом держится безопасность деструктуризации и deps в useChatActions.
   it('exposes actions as a stable reference', () => {
-    const controller = new ChatController(makeBridge(), makeMatrix())
+    const controller = new ChatController(makeBridge(), client(makeMatrix()))
 
     expect(controller.actions).toBe(controller.actions)
   })

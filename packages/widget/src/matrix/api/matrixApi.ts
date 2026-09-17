@@ -1,4 +1,5 @@
 import type { EmojiAnimation } from '@/domain/emoji'
+import type { EventId, MediaId, RoomId, TxnId } from '@/domain/ids'
 import type { ThumbnailSize } from '@/domain/media'
 import type { ParsedMxcUrl } from '@/shared/utils/mxc'
 import type { SetPresence } from '../sync/presence'
@@ -31,24 +32,24 @@ const EMOJI_TIMEOUT_MS = 30_000
 const emojiDeadline = () => AbortSignal.timeout(EMOJI_TIMEOUT_MS)
 
 interface SendMessageParams {
-  roomId: string
-  txnId: string
+  roomId: RoomId
+  txnId: TxnId
   /** `m.room.message` для текста и медиа, `m.sticker` для стикера. */
   eventType: string
   content: Matrix.OutgoingContent
 }
 
 interface SendReactionParams {
-  roomId: string
-  txnId: string
-  targetEventId: string
+  roomId: RoomId
+  txnId: TxnId
+  targetEventId: EventId
   key: string
 }
 
 interface RedactEventParams {
-  roomId: string
-  txnId: string
-  eventId: string
+  roomId: RoomId
+  txnId: TxnId
+  eventId: EventId
 }
 
 export function createMatrixApi(transport: MatrixTransport) {
@@ -92,7 +93,7 @@ export function createMatrixApi(transport: MatrixTransport) {
     },
 
     getRoomHistory(
-      roomId: string,
+      roomId: RoomId,
       from: string,
       signal?: AbortSignal,
     ): Promise<Matrix.MessagesResponse> {
@@ -215,11 +216,11 @@ export function createMatrixApi(transport: MatrixTransport) {
      * `Content-Encoding: gzip`, браузер разжимает сам. Дедлайн обязателен — промис оседает
      * в кэше на всю сессию.
      */
-    getStickerAnimation(mediaId: string): Promise<EmojiAnimation> {
+    getStickerAnimation(mediaId: MediaId): Promise<EmojiAnimation> {
       return transport.request(Endpoints.STICKER_BYTES({ mediaId }), { signal: emojiDeadline() })
     },
 
-    sendReadReceipt(roomId: string, eventId: string): Promise<Record<string, never>> {
+    sendReadReceipt(roomId: RoomId, eventId: EventId): Promise<Record<string, never>> {
       return transport.request(Endpoints.MARK_READ({ roomId, eventId }), {
         method: 'POST',
         body: {},

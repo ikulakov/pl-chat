@@ -1,3 +1,4 @@
+import type { UserId } from '@/domain/ids'
 import { readOwnEventIds } from '@/domain/receipts'
 import { isSystem } from '@/domain/timeline'
 import { useChatScroll } from '@/hooks/useChatScroll'
@@ -27,7 +28,7 @@ import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { SystemMessage } from './SystemMessage'
 
 interface Props {
-  userId: string
+  userId: UserId
 }
 
 export function MessageList({ userId }: Props) {

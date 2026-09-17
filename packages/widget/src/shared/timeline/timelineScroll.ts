@@ -1,3 +1,4 @@
+import type { LocalId } from '@/domain/ids'
 /**
  * Доступ к прокрутке ленты снаружи дерева React.
  *
@@ -9,10 +10,10 @@
  *
  * Модульная переменная безопасна, потому что лента в виджете ровно одна.
  */
-let scrollToItem: ((localId: string) => void) | null = null
+let scrollToItem: ((localId: LocalId) => void) | null = null
 
 /** Вызывается лентой при монтировании; возвращает функцию отписки для cleanup эффекта. */
-export function registerTimelineScroll(fn: (localId: string) => void): () => void {
+export function registerTimelineScroll(fn: (localId: LocalId) => void): () => void {
   scrollToItem = fn
 
   return () => {
@@ -22,6 +23,6 @@ export function registerTimelineScroll(fn: (localId: string) => void): () => voi
 }
 
 /** Прокручивает ленту к сообщению. Молча ничего не делает, если ленты сейчас нет на экране. */
-export function scrollTimelineTo(localId: string): void {
+export function scrollTimelineTo(localId: LocalId): void {
   scrollToItem?.(localId)
 }

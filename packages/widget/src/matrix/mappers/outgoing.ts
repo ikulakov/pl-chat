@@ -1,4 +1,5 @@
 import type { CardAction } from '@/domain/adaptiveCards'
+import type { EventId } from '@/domain/ids'
 import { replyEventIdOf } from '@/domain/reply'
 import {
   isMedia,
@@ -57,7 +58,7 @@ export function toMessageContent(
 }
 
 export function toAdaptiveActionContent(
-  cardEventId: string,
+  cardEventId: EventId,
   action: CardAction,
 ): Matrix.OutgoingAdaptiveActionContent {
   return {

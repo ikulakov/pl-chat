@@ -1,15 +1,16 @@
+import type { EventId, UserId } from './ids'
 import { isOptimistic } from './optimistic'
 
 /** Одно событие `m.reaction`: кто и чем отреагировал. */
 export interface ReactionEntry {
   // id события реакции; до ответа сервера — placeholder `optimistic:{uuid}`
-  eventId: string
-  sender: string
+  eventId: EventId
+  sender: UserId
   key: string
 }
 
 /** Реакции по id целевого сообщения. */
-export type ReactionIndex = Record<string, ReactionEntry[]>
+export type ReactionIndex = Record<EventId, ReactionEntry[]>
 
 /**
  * Изменения реакций одной порции событий, в хронологическом порядке.
@@ -21,16 +22,29 @@ export type ReactionIndex = Record<string, ReactionEntry[]>
 export type ReactionDelta = ReactionOp[]
 
 export type ReactionOp =
-  | { op: 'add'; targetEventId: string; entry: ReactionEntry }
+  | { op: 'add'; targetEventId: EventId; entry: ReactionEntry }
   // редакция адресует событие реакции, а не сообщение, и цель из неё не восстановить
-  | { op: 'remove'; eventId: string }
+  | { op: 'remove'; eventId: EventId }
+
+/**
+ * Подтверждение реакции: черновик получил настоящий id.
+ *
+ * Оба поля адресуют одно и то же событие реакции — до ответа сервера и после, — поэтому едут
+ * парой, а не двумя соседними аргументами. Тип у них один (`EventId`), и в позиционном вызове
+ * их было нечем развести: перестановка компилировалась молча, а ломалось тихо — реакция
+ * оставалась с оптимистичным id и не снималась повторным тапом. Имена полей это закрывают.
+ */
+export interface ReactionConfirmation {
+  draft: EventId
+  confirmed: EventId
+}
 
 /** Свёртка реакций сообщения для UI: по одному чипу на эмодзи. */
 export interface ReactionSummary {
   key: string
   count: number
   // id своей реакции с этим ключом — им же её и снимаем; null — своей нет
-  ownEventId: string | null
+  ownEventId: EventId | null
 }
 
 const NO_SUMMARIES: ReactionSummary[] = []
@@ -44,7 +58,7 @@ const NO_SUMMARIES: ReactionSummary[] = []
  */
 export function addReaction(
   index: ReactionIndex,
-  targetEventId: string,
+  targetEventId: EventId,
   entry: ReactionEntry,
 ): ReactionIndex {
   const entries = index[targetEventId] ?? []
@@ -67,17 +81,16 @@ export function addReaction(
 /** Проставляет оптимистичной записи реальный `eventId` из ответа на отправку. */
 export function confirmReaction(
   index: ReactionIndex,
-  targetEventId: string,
-  localEventId: string,
-  eventId: string,
+  targetEventId: EventId,
+  { draft, confirmed }: ReactionConfirmation,
 ): ReactionIndex {
   const entries = index[targetEventId]
-  const localIndex = entries?.findIndex((e) => e.eventId === localEventId) ?? -1
+  const draftIndex = entries?.findIndex((e) => e.eventId === draft) ?? -1
   // эхо из /sync могло опередить ответ на PUT и уже подменить запись — подтверждать нечего
-  if (!entries || localIndex === -1) return index
+  if (!entries || draftIndex === -1) return index
 
   const next = [...entries]
-  next[localIndex] = { ...entries[localIndex]!, eventId }
+  next[draftIndex] = { ...entries[draftIndex]!, eventId: confirmed }
 
   return { ...index, [targetEventId]: next }
 }
@@ -85,8 +98,8 @@ export function confirmReaction(
 /** Убирает реакцию у известной цели. Пустая цель из индекса удаляется целиком. */
 export function removeReaction(
   index: ReactionIndex,
-  targetEventId: string,
-  eventId: string,
+  targetEventId: EventId,
+  eventId: EventId,
 ): ReactionIndex {
   const entries = index[targetEventId]
   if (!entries) return index
@@ -117,7 +130,7 @@ export function applyReactionDelta(index: ReactionIndex, delta: ReactionDelta): 
 
 // Редакция называет только id снимаемой реакции, поэтому цель ищем перебором. Индекс мал:
 // в нём живут лишь сообщения, на которые кто-то отреагировал.
-function removeAnywhere(index: ReactionIndex, eventId: string): ReactionIndex {
+function removeAnywhere(index: ReactionIndex, eventId: EventId): ReactionIndex {
   for (const targetEventId of Object.keys(index)) {
     const next = removeReaction(index, targetEventId, eventId)
     if (next !== index) return next
@@ -128,8 +141,8 @@ function removeAnywhere(index: ReactionIndex, eventId: string): ReactionIndex {
 
 export function findOwnReaction(
   index: ReactionIndex,
-  targetEventId: string,
-  ownUserId: string,
+  targetEventId: EventId,
+  ownUserId: UserId,
   key: string,
 ): ReactionEntry | undefined {
   return index[targetEventId]?.find((e) => e.sender === ownUserId && e.key === key)
@@ -141,7 +154,7 @@ export function findOwnReaction(
  */
 export function aggregateReactions(
   entries: ReactionEntry[] | undefined,
-  ownUserId: string,
+  ownUserId: UserId,
 ): ReactionSummary[] {
   if (!entries || entries.length === 0) return NO_SUMMARIES
 

@@ -1,4 +1,5 @@
 import type { StickerFormat } from './emoji'
+import type { EventId, UserId } from './ids'
 import { isOptimistic } from './optimistic'
 import { isMedia, isSticker, type MessageTimelineItem, type StickerMedia } from './timeline'
 
@@ -25,8 +26,8 @@ export type ReplyQuote =
   | { kind: 'sticker'; preview?: ReplyStickerPreview }
 
 export interface ReplyTarget {
-  eventId: string
-  sender: string
+  eventId: EventId
+  sender: UserId
   quote: ReplyQuote
 }
 
@@ -48,7 +49,7 @@ function replyStickerOf(item: MessageTimelineItem): ReplyStickerPreview | undefi
   return media ? { ...media, body, format } : undefined
 }
 
-export const replyEventIdOf = (item: MessageTimelineItem): string | undefined =>
+export const replyEventIdOf = (item: MessageTimelineItem): EventId | undefined =>
   item.relation?.type === 'reply' ? item.relation.eventId : undefined
 
 /**

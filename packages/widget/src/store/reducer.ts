@@ -1,5 +1,6 @@
 import { applyCardAnswers } from '@/domain/adaptiveCards'
 import { applyMediaVerdicts } from '@/domain/mediaVerdict'
+import type { LocalId } from '@/domain/ids'
 import { mergeTimeline, prependTimeline } from '@/domain/mergeTimeline'
 import {
   addReaction,
@@ -28,7 +29,7 @@ function updateTimeline(
 
 function updateMessage(
   state: ChatRuntimeState,
-  localId: string,
+  localId: LocalId,
   updater: (message: MessageTimelineItem) => TimelineItem,
 ): ChatRuntimeState {
   return updateTimeline(state, (timeline) =>
@@ -205,12 +206,7 @@ export function chatRuntimeReducer(
 
     case 'reaction.confirmed':
       return updateRoom(state, {
-        reactions: confirmReaction(
-          state.room.reactions,
-          action.targetEventId,
-          action.localEventId,
-          action.eventId,
-        ),
+        reactions: confirmReaction(state.room.reactions, action.targetEventId, action.reaction),
       })
 
     case 'reaction.removed':

@@ -1,17 +1,18 @@
+import type { EventId, MediaId, TxnId, UserId } from '@/domain/ids'
 import type { MatrixEventType, MediaScanStatus, MsgType, RelType } from './consts'
 
 interface BaseClientEvent {
-  event_id: string
+  event_id: EventId
   // Наличие поля (даже '') — признак state event
   state_key?: string
-  sender: string
+  sender: UserId
   origin_server_ts: number
-  unsigned?: { transaction_id?: string }
+  unsigned?: { transaction_id?: TxnId }
 }
 
 export interface WithRelation {
   'm.relates_to'?: {
-    'm.in_reply_to'?: { event_id: string }
+    'm.in_reply_to'?: { event_id: EventId }
   }
 }
 
@@ -59,10 +60,10 @@ export interface AdaptiveActionMessageContent {
   body: string
   adaptive_action: {
     action_id: string
-    source_event_id: string
+    source_event_id: EventId
     data?: Record<string, unknown>
   }
-  'm.relates_to'?: { rel_type: 'm.reference'; event_id: string }
+  'm.relates_to'?: { rel_type: 'm.reference'; event_id: EventId }
 }
 
 export interface RoomMessageEvent extends BaseClientEvent {
@@ -85,7 +86,7 @@ export interface ReactionEvent extends BaseClientEvent {
   content: {
     'm.relates_to'?: {
       rel_type?: typeof RelType.Annotation
-      event_id?: string
+      event_id?: EventId
       key?: string
     }
   }
@@ -94,7 +95,7 @@ export interface ReactionEvent extends BaseClientEvent {
 /** Удаление события: снятие реакции — редакция самого события реакции. */
 export interface RedactionEvent extends BaseClientEvent {
   type: typeof MatrixEventType.Redaction
-  content: { redacts?: string }
+  content: { redacts?: EventId }
 }
 
 export interface OperatorCurrentEvent extends BaseClientEvent {
@@ -102,7 +103,7 @@ export interface OperatorCurrentEvent extends BaseClientEvent {
   state_key: ''
   content: {
     status: 'active' | 'left'
-    operator_id?: string
+    operator_id?: UserId
     displayname?: string
     avatar_url?: string
     since_ts?: number
@@ -112,7 +113,7 @@ export interface OperatorCurrentEvent extends BaseClientEvent {
 export interface OperatorJoinedEvent extends BaseClientEvent {
   type: typeof MatrixEventType.OperatorJoined
   content: {
-    operator_id: string
+    operator_id: UserId
     displayname: string
     avatar_url?: string
     role: 'human' | 'bot'
@@ -122,7 +123,7 @@ export interface OperatorJoinedEvent extends BaseClientEvent {
 export interface OperatorLeftEvent extends BaseClientEvent {
   type: typeof MatrixEventType.OperatorLeft
   content: {
-    operator_id: string
+    operator_id: UserId
     reason: 'completed' | 'transferred' | 'timeout'
   }
 }
@@ -134,10 +135,10 @@ export interface OperatorLeftEvent extends BaseClientEvent {
 export interface MediaStatusEvent extends BaseClientEvent {
   type: typeof MatrixEventType.MediaStatus
   content: {
-    media_id: string
+    media_id: MediaId
     // Сообщение, в котором сослались на файл. Может отсутствовать: вердикт способен прийти
     // раньше, чем записано само сообщение, поэтому сопоставляем по media_id, а не по нему.
-    event_id?: string
+    event_id?: EventId
     status: (typeof MediaScanStatus)[keyof typeof MediaScanStatus]
   }
 }
@@ -176,9 +177,9 @@ export type ClientEvent =
 export interface ReceiptEvent {
   type: typeof MatrixEventType.Receipt
   content: Record<
-    string,
+    EventId,
     {
-      'm.read'?: Record<string, { ts?: number }>
+      'm.read'?: Record<UserId, { ts?: number }>
     }
   >
 }

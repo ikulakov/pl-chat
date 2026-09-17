@@ -1,4 +1,5 @@
 import type { CardAnswer } from '@/domain/adaptiveCards'
+import type { EventId, MediaId, UserId } from '@/domain/ids'
 import type { MediaVerdict } from '@/domain/mediaVerdict'
 import type { ReactionIndex } from '@/domain/reactions'
 import type { ReadReceipt } from '@/domain/receipts'
@@ -56,7 +57,7 @@ export function selectOperatorDisplayName(state: ChatStoreState): string | null 
   return state.room.operator.displayName
 }
 
-export function selectUserId(state: ChatStoreState): string | null {
+export function selectUserId(state: ChatStoreState): UserId | null {
   return state.identity?.userId ?? null
 }
 
@@ -76,7 +77,7 @@ export function selectHasMessages(state: ChatStoreState): boolean {
   return !state.room.timeline.every(isSystem)
 }
 
-export function selectReadReceipts(state: ChatStoreState): Record<string, ReadReceipt> {
+export function selectReadReceipts(state: ChatStoreState): Record<UserId, ReadReceipt> {
   return state.room.readReceipts
 }
 
@@ -84,11 +85,11 @@ export function selectReactions(state: ChatStoreState): ReactionIndex {
   return state.room.reactions
 }
 
-export function selectCardAnswers(state: ChatStoreState): Record<string, CardAnswer> {
+export function selectCardAnswers(state: ChatStoreState): Record<EventId, CardAnswer> {
   return state.room.cardAnswers
 }
 
-export function selectMediaVerdicts(state: ChatStoreState): Record<string, MediaVerdict> {
+export function selectMediaVerdicts(state: ChatStoreState): Record<MediaId, MediaVerdict> {
   return state.room.mediaVerdicts
 }
 

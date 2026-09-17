@@ -499,8 +499,7 @@ describe('chatRuntimeReducer — реакции', () => {
     const confirmed = chatRuntimeReducer(added, {
       type: 'reaction.confirmed',
       targetEventId: '$m1',
-      localEventId: 'optimistic:l1',
-      eventId: '$r1',
+      reaction: { draft: 'optimistic:l1', confirmed: '$r1' },
     })
 
     expect(added.room.reactions['$m1']).toHaveLength(1)

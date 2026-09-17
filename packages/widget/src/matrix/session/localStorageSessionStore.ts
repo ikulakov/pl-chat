@@ -1,3 +1,4 @@
+import type { UserId } from '@/domain/ids'
 import type { MatrixSessionStore, SessionInit } from './types'
 
 const LOCAL_KEY = 'plchat.session'
@@ -14,7 +15,7 @@ interface PersistedSession {
   accessToken: string
   refreshToken: string | null
   expiresAt: number
-  userId: string
+  userId: UserId
 }
 
 export class LocalStorageSessionStore implements MatrixSessionStore {

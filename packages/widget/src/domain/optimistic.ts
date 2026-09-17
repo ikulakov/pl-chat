@@ -1,6 +1,7 @@
 import { isPreviewableImage, resolveMimeType } from '@/shared/utils/fileValidation'
 import type { ImageDimensions } from '@/shared/utils/imageDimensions'
 import type { StickerItem } from './emoji'
+import type { EventId, LocalId, TxnId, UserId } from './ids'
 import type {
   MediaTimelineItem,
   MediaUpload,
@@ -11,15 +12,16 @@ import type {
 
 const OPTIMISTIC_PREFIX = 'optimistic:'
 
-export function isOptimistic(eventId: string): boolean {
+export function isOptimistic(eventId: EventId): boolean {
   return eventId.startsWith(OPTIMISTIC_PREFIX)
 }
 
-type Outgoing<M extends MessageTimelineItem> = M & { txnId: string }
+/** Черновик всегда отправляется, поэтому ключ идемпотентности у него есть всегда. */
+type Outgoing<M extends MessageTimelineItem> = M & { txnId: TxnId }
 
 interface CreateOptimisticParams<M extends MessageTimelineItem> {
-  sender: string
-  replyToEventId: string | undefined
+  sender: UserId
+  replyToEventId: EventId | undefined
   fields: Pick<M, 'kind' | 'content'> & Partial<Omit<M, 'relation'>>
 }
 
@@ -28,8 +30,8 @@ function createOptimistic<M extends MessageTimelineItem>({
   replyToEventId,
   fields,
 }: CreateOptimisticParams<M>): Outgoing<M> {
-  const localId = crypto.randomUUID()
-  const txnId = crypto.randomUUID()
+  const localId: LocalId = crypto.randomUUID()
+  const txnId: TxnId = crypto.randomUUID()
 
   return {
     localId,
@@ -44,9 +46,9 @@ function createOptimistic<M extends MessageTimelineItem>({
 }
 
 interface CreateOptimisticTextMessageParams {
-  sender: string
+  sender: UserId
   text: string
-  replyToEventId?: string | undefined
+  replyToEventId?: EventId | undefined
 }
 
 export function createOptimisticTextMessage({
@@ -62,7 +64,7 @@ export function createOptimisticTextMessage({
 }
 
 interface CreateOptimisticStickerMessageParams {
-  sender: string
+  sender: UserId
   sticker: StickerItem
 }
 
@@ -92,11 +94,11 @@ export function createOptimisticStickerMessage({
 }
 
 interface CreateOptimisticMediaMessageParams {
-  sender: string
+  sender: UserId
   file: File
   caption?: string | undefined
   dims?: ImageDimensions | undefined
-  replyToEventId?: string | undefined
+  replyToEventId?: EventId | undefined
 }
 
 export function createOptimisticMediaMessage({

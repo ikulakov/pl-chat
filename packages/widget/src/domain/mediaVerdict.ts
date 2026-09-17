@@ -1,11 +1,12 @@
 import { parseMxcUrl } from '@/shared/utils/mxc'
+import type { MediaId, UserId } from './ids'
 import type { MediaTimelineItem, TimelineItem } from './timeline'
 import { isMedia } from './timeline'
 
 export type MediaVerdict = { status: 'ready' | 'rejected' }
 
 export interface MediaVerdictEntry {
-  mediaId: string
+  mediaId: MediaId
   verdict: MediaVerdict
 }
 
@@ -14,9 +15,9 @@ export interface MediaVerdictEntry {
  * не перезаписываем: повтор со страницей истории или дубль события не должен его менять.
  */
 export function applyMediaVerdicts(
-  existing: Record<string, MediaVerdict>,
+  existing: Record<MediaId, MediaVerdict>,
   incoming: MediaVerdictEntry[],
-): Record<string, MediaVerdict> {
+): Record<MediaId, MediaVerdict> {
   if (incoming.length === 0) return existing
 
   let result = existing
@@ -36,13 +37,13 @@ export function applyMediaVerdicts(
 
 /** Впервые отклонённые файлы: не было в `prev`, в `next` — rejected. */
 export function pickFirstRejected(
-  prev: Record<string, MediaVerdict>,
-  next: Record<string, MediaVerdict>,
+  prev: Record<MediaId, MediaVerdict>,
+  next: Record<MediaId, MediaVerdict>,
   incoming: MediaVerdictEntry[],
-): string[] {
+): MediaId[] {
   if (prev === next) return []
 
-  const rejected = new Set<string>()
+  const rejected = new Set<MediaId>()
 
   for (const { mediaId } of incoming) {
     if (!prev[mediaId] && next[mediaId]?.status === 'rejected') rejected.add(mediaId)
@@ -54,8 +55,8 @@ export function pickFirstRejected(
 /** Первое сообщение клиента в ленте с одним из отклоненных файлов; файлы оператора пропускаем. */
 export function findOwnMedia(
   timeline: TimelineItem[],
-  mediaIds: string[],
-  userId: string,
+  mediaIds: MediaId[],
+  userId: UserId,
 ): MediaTimelineItem | undefined {
   const mediaIdSet = new Set(mediaIds)
 

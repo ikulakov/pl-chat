@@ -1,3 +1,4 @@
+import type { RoomId, UserId } from '@/domain/ids'
 import { sleep } from '@/shared/utils/sleep'
 import type { MatrixApi } from '../api/matrixApi'
 import { isMatrixAuthError, MatrixErrCode, MatrixError } from '../api/matrixError'
@@ -8,13 +9,13 @@ const ROOM_VISIBILITY_RETRY_DELAYS_MS = [200, 500]
 const MAX_SYNC_RETRIES = 3
 
 export interface GuestSession {
-  userId: string
-  roomId: string
+  userId: UserId
+  roomId: RoomId
   cursor: string
   initialRoom: Matrix.JoinedRoom
 }
 
-type SupportRoom = { roomId: string; initialRoom: Matrix.JoinedRoom }
+type SupportRoom = { roomId: RoomId; initialRoom: Matrix.JoinedRoom }
 
 export class MatrixSessionManager {
   private readonly api: MatrixApi

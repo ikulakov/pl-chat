@@ -1,3 +1,4 @@
+import type { LocalId, UserId } from '@/domain/ids'
 import { isSystem, type TimelineItem } from '@/domain/timeline'
 import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -19,7 +20,7 @@ function isAtBottom(list: HTMLElement): boolean {
 
 interface UseChatScrollParams {
   timeline: TimelineItem[]
-  userId: string
+  userId: UserId
   containerRef: React.RefObject<HTMLElement | null>
   bottomRef: React.RefObject<Element | null>
 }
@@ -46,7 +47,7 @@ function getScrollTopForTarget(list: HTMLElement, target: ScrollTarget): number 
 export function useChatScroll({ containerRef, bottomRef, timeline, userId }: UseChatScrollParams): {
   isNearBottom: boolean
   scrollToBottom: () => void
-  scrollToItem: (localId: string) => void
+  scrollToItem: (localId: LocalId) => void
 } {
   // Ref источник истины, state намеренно отстаёт: пока идёт плавный автоскролл он заморожен
   const [isNearBottom, setIsNearBottom] = useState(true)
@@ -196,7 +197,7 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
 
   // Скролл к сообщению по localId с центрированием в видимой области
   const scrollToItem = useCallback(
-    (localId: string): void => {
+    (localId: LocalId): void => {
       const list = containerRef.current
       if (!list) return
 

@@ -1,3 +1,4 @@
+import type { RoomId } from '@/domain/ids'
 import { consoleDev } from '@/shared/utils/consoleDev'
 import { sleep } from '@/shared/utils/sleep'
 import type { RuntimeAction } from '@/store/state'
@@ -18,7 +19,7 @@ const HISTORY_RETRY_BASE_MS = 1_000
 const HISTORY_RETRY_MAX_MS = 10_000
 
 export interface HistoryContext {
-  roomId: string
+  roomId: RoomId
   prevBatch: string
 }
 

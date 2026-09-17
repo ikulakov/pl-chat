@@ -1,3 +1,4 @@
+import type { EventId } from './ids'
 import type { SendStatus } from './timeline'
 
 export interface AdaptiveCardPayload extends Record<string, unknown> {
@@ -14,7 +15,7 @@ export interface CardAction {
 }
 
 export interface CardAnswer {
-  cardEventId: string
+  cardEventId: EventId
   actionId: string
   status: SendStatus
 }
@@ -104,9 +105,9 @@ export function toSubmitActions(card: AdaptiveCardPayload): CardAction[] | null 
 }
 
 export function applyCardAnswers(
-  existing: Record<string, CardAnswer>,
+  existing: Record<EventId, CardAnswer>,
   incoming: CardAnswer[],
-): Record<string, CardAnswer> {
+): Record<EventId, CardAnswer> {
   if (incoming.length === 0) return existing
 
   let result = existing

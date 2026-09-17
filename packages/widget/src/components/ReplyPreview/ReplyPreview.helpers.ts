@@ -1,7 +1,8 @@
+import type { UserId } from '@/domain/ids'
 import type { ReplyQuote, ReplyStickerPreview } from '@/domain/reply'
 import { t } from '@/i18n'
 
-export function replyAuthorLabel(sender: string, userId: string | null): string {
+export function replyAuthorLabel(sender: UserId, userId: UserId | null): string {
   return sender === userId ? t('chat.reply.you') : t('chat.reply.operator')
 }
 

@@ -1,6 +1,8 @@
+import type { MediaId } from '@/domain/ids'
+
 export interface ParsedMxcUrl {
   serverName: string
-  mediaId: string
+  mediaId: MediaId
 }
 
 const MXC_PATTERN = /^mxc:\/\/([^/?#]+)\/([^/?#]+)$/

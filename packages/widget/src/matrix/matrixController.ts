@@ -1,12 +1,6 @@
 import type { CardAction } from '@/domain/adaptiveCards'
-import type {
-  EmojiAnimation,
-  EmojiCatalog,
-  EmojiCategory,
-  EmojiIndex,
-  StickerItem,
-  StickerPack,
-} from '@/domain/emoji'
+import type { StickerItem } from '@/domain/emoji'
+import type { EventId, LocalId, RoomId, TxnId, UserId } from '@/domain/ids'
 import type { ThumbnailSize } from '@/domain/media'
 import { MediaUnavailableError } from '@/domain/mediaFailure'
 import {
@@ -18,7 +12,6 @@ import {
 import { findOwnReaction, type ReactionEntry } from '@/domain/reactions'
 import { canMoveMarker } from '@/domain/receipts'
 import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '@/domain/timeline'
-import { createBatchedLoader } from '@/shared/lottie/animationBatcher'
 import { isAbortError, isDeadlineError } from '@/shared/utils/abort'
 import { consoleDev } from '@/shared/utils/consoleDev'
 import { evictOldest } from '@/shared/utils/evictOldest'
@@ -36,7 +29,6 @@ import {
   type AuthErrorContext,
 } from './api/matrixError'
 import { MatrixHistoryLoader } from './history/historyLoader'
-import { toEmojiCatalog, toEmojiCategory, toEmojiIndex, toStickerPacks } from './mappers/emoji'
 import { classifyMediaError } from './mappers/mediaError'
 import {
   outgoingEventType,
@@ -77,22 +69,16 @@ const MAX_LOCAL_ORIGINALS = 3
 export interface MatrixService {
   connect: () => Promise<void>
   disconnect: () => void
-  sendMessage: (text: string, replyToEventId?: string) => Promise<void>
+  sendMessage: (text: string, replyToEventId?: EventId) => Promise<void>
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
   sendSticker: (sticker: StickerItem) => Promise<void>
-  sendCardAction: (cardEventId: string, action: CardAction) => Promise<void>
+  sendCardAction: (cardEventId: EventId, action: CardAction) => Promise<void>
   loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
   downloadFile: (mxcUrl: string) => Promise<Blob>
-  loadEmojiCatalog: () => Promise<EmojiCatalog>
-  loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
-  loadEmojiIndex: () => Promise<EmojiIndex>
-  loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
-  loadStickerPacks: () => Promise<StickerPack[]>
-  loadStickerAnimation: (mediaId: string) => Promise<EmojiAnimation>
-  cancelUpload: (localId: string) => void
-  resendMessage: (localId: string) => Promise<void>
-  markRead: (eventId: string) => Promise<void>
-  toggleReaction: (targetEventId: string, key: string) => Promise<void>
+  cancelUpload: (localId: LocalId) => void
+  resendMessage: (localId: LocalId) => Promise<void>
+  markRead: (eventId: EventId) => Promise<void>
+  toggleReaction: (targetEventId: EventId, key: string) => Promise<void>
   loadMoreHistory: () => Promise<void>
   stopLoadingHistory: () => void
 }
@@ -132,19 +118,10 @@ export class MatrixController implements MatrixService {
   // пропадала бы из ленты сразу после отправки. Отвечает и на превью, и на оригинал.
   private readonly localOriginals = new Map<string, Blob>()
 
-  // Индекс пака. В отличие от медиа это server-managed справочник — один и тот же ответ для
-  // всех, поэтому смена сессии его не обесценивает и nextLifecycle() его не чистит. Хранится
-  // промис: он же дедуп параллельных запросов, пока первый ещё в полёте.
-  private emojiIndex: Promise<EmojiIndex> | null = null
-
   // txnId незавершённых ответов на карточки, по `${cardEventId}#${actionId}`. Нужен, чтобы
   // повтор после сетевого сбоя ушёл с тем же ключом идемпотентности; чистится при смене
   // сессии — в новой комнате прежние event_id уже ничего не адресуют.
   private readonly cardActionTxnIds = new Map<string, string>()
-
-  // Склейка загрузок эмодзи в пачки. Заводится в конструкторе: батчер держит окно сбора
-  // заявок, и общий он должен быть на весь контроллер, а не на вызов.
-  private readonly emojiAnimations: (codepoint: string, version: string) => Promise<EmojiAnimation>
 
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
@@ -157,11 +134,6 @@ export class MatrixController implements MatrixService {
     this.sessionManager = deps.sessionManager
     this.dispatch = deps.dispatch
     this.getState = deps.getState
-    this.emojiAnimations = createBatchedLoader({
-      loadBatch: (codepoints, version) =>
-        deps.api.getEmojiAnimations(codepoints, version).then((response) => response.emoji ?? {}),
-      loadOne: (codepoint, version) => deps.api.getEmojiAnimation(codepoint, version),
-    })
   }
 
   async connect(): Promise<void> {
@@ -246,7 +218,7 @@ export class MatrixController implements MatrixService {
     await this.dispatchSend(connection.identity.roomId, message, 'sendSticker')
   }
 
-  async sendCardAction(cardEventId: string, action: CardAction): Promise<void> {
+  async sendCardAction(cardEventId: EventId, action: CardAction): Promise<void> {
     const connection = this.requireConnection()
     if (!connection) return
 
@@ -335,49 +307,6 @@ export class MatrixController implements MatrixService {
     )
   }
 
-  // Каталоги эмодзи и стикеров не проходят через стор и не сверяются с lifecycleId: это не
-  // состояние диалога, а справочник — он одинаков для любой сессии и переживает переподключение.
-  async loadEmojiCatalog(): Promise<EmojiCatalog> {
-    return toEmojiCatalog(await this.api.getEmojiCategories())
-  }
-
-  async loadEmojiCategory(categoryId: string): Promise<EmojiCategory> {
-    return toEmojiCategory(await this.api.getEmojiCategory(categoryId))
-  }
-
-  /**
-   * Индекс пака для ленты. В отличие от каталога вкладок, запрашивается один раз за жизнь
-   * вкладки: он нужен на каждое текстовое сообщение, а меняется только с версией пака.
-   */
-  loadEmojiIndex(): Promise<EmojiIndex> {
-    this.emojiIndex ??= this.api
-      .getEmojiPacks()
-      .then(toEmojiIndex)
-      .catch((err: unknown) => {
-        // Упавший запрос в кэше не держим: следующая попытка начнёт заново.
-        this.emojiIndex = null
-        throw err
-      })
-
-    return this.emojiIndex
-  }
-
-  /**
-   * Анимация одного эмодзи — но в сеть уходит пачка: заявки соседних ячеек пикера и соседних
-   * сообщений ленты склеиваются в один запрос к `/bundle`, см. `animationBatcher`.
-   */
-  loadEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
-    return this.emojiAnimations(codepoint, version)
-  }
-
-  async loadStickerPacks(): Promise<StickerPack[]> {
-    return toStickerPacks(await this.api.getStickerPacks())
-  }
-
-  loadStickerAnimation(mediaId: string): Promise<EmojiAnimation> {
-    return this.api.getStickerAnimation(mediaId)
-  }
-
   private async withLocalFallback(
     mxcUrl: string,
     fetch: (parsed: ParsedMxcUrl) => Promise<Blob>,
@@ -449,7 +378,7 @@ export class MatrixController implements MatrixService {
     }
   }
 
-  cancelUpload(localId: string): void {
+  cancelUpload(localId: LocalId): void {
     this.uploads.get(localId)?.abort()
     this.uploads.delete(localId)
     this.dispatch({ type: 'message.discarded', localId })
@@ -471,7 +400,7 @@ export class MatrixController implements MatrixService {
     this.syncLoop.stop()
   }
 
-  async resendMessage(localId: string): Promise<void> {
+  async resendMessage(localId: LocalId): Promise<void> {
     const connection = this.requireConnection()
     if (!connection) return
 
@@ -500,7 +429,7 @@ export class MatrixController implements MatrixService {
     await this.dispatchSend(identity.roomId, sendable, 'resendMessage')
   }
 
-  async markRead(eventId: string): Promise<void> {
+  async markRead(eventId: EventId): Promise<void> {
     const connection = this.requireConnection()
     if (!connection) return
 
@@ -540,7 +469,7 @@ export class MatrixController implements MatrixService {
    * ветку «поставить/снять» выбирает гард по стору, и без немедленного обновления второй тап
    * ушёл бы вторым PUT'ом на постановку.
    */
-  async toggleReaction(targetEventId: string, key: string): Promise<void> {
+  async toggleReaction(targetEventId: EventId, key: string): Promise<void> {
     const connection = this.requireConnection()
     if (!connection) return
 
@@ -561,14 +490,14 @@ export class MatrixController implements MatrixService {
   }
 
   private async addReaction(
-    roomId: string,
-    targetEventId: string,
-    sender: string,
+    roomId: RoomId,
+    targetEventId: EventId,
+    sender: UserId,
     key: string,
   ): Promise<void> {
-    const localEventId = `optimistic:${crypto.randomUUID()}`
-    const txnId = crypto.randomUUID()
-    const entry: ReactionEntry = { eventId: localEventId, sender, key }
+    const draftEventId: EventId = `optimistic:${crypto.randomUUID()}`
+    const txnId: TxnId = crypto.randomUUID()
+    const entry: ReactionEntry = { eventId: draftEventId, sender, key }
 
     this.dispatch({ type: 'reaction.added', targetEventId, entry })
     const lifecycleId = this.lifecycleId
@@ -577,18 +506,22 @@ export class MatrixController implements MatrixService {
       const { event_id } = await this.api.sendReaction({ roomId, txnId, targetEventId, key })
       if (!this.isCurrentLifecycle(lifecycleId)) return
 
-      this.dispatch({ type: 'reaction.confirmed', targetEventId, localEventId, eventId: event_id })
+      this.dispatch({
+        type: 'reaction.confirmed',
+        targetEventId,
+        reaction: { draft: draftEventId, confirmed: event_id },
+      })
     } catch (err) {
       if (!this.isCurrentLifecycle(lifecycleId)) return
 
-      this.dispatch({ type: 'reaction.removed', targetEventId, eventId: localEventId })
+      this.dispatch({ type: 'reaction.removed', targetEventId, eventId: draftEventId })
       this.handleAuthError(err, 'toggleReaction')
     }
   }
 
   private async removeReaction(
-    roomId: string,
-    targetEventId: string,
+    roomId: RoomId,
+    targetEventId: EventId,
     entry: ReactionEntry,
   ): Promise<void> {
     this.dispatch({ type: 'reaction.removed', targetEventId, eventId: entry.eventId })
@@ -629,7 +562,7 @@ export class MatrixController implements MatrixService {
   }
 
   private async dispatchSend(
-    roomId: string,
+    roomId: RoomId,
     message: OutgoingTimelineItem,
     context: AuthErrorContext,
   ): Promise<void> {

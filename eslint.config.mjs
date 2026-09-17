@@ -4,6 +4,71 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const WIDGET_SRC = fileURLToPath(new URL('./packages/widget/src/', import.meta.url))
+
+/**
+ * Слои виджета — папки первого уровня в `src/`. `styles/` в список не входит: это не слой,
+ * а глобальный CSS, который подключает композиционный корень.
+ */
+const LAYERS = new Set([
+  'components',
+  'domain',
+  'hooks',
+  'i18n',
+  'matrix',
+  'middleware',
+  'shared',
+  'store',
+])
+
+/** Слой, в котором лежит файл; null — корень `src/` (композиционный корень) или вне `src/`. */
+function layerOf(absolutePath) {
+  const relative = path.relative(WIDGET_SRC, absolutePath)
+  if (relative === '' || relative.startsWith('..')) return null
+
+  const [first] = relative.split(path.sep)
+  return LAYERS.has(first) ? first : null
+}
+
+/**
+ * Относительный импорт не покидает свой слой. Раньше это проверялось порогом глубины
+ * (`../../../*`), и порог врал в обе стороны: `components/Foo.tsx → ../store/store` проходил,
+ * а появление папки уровнем глубже сделало бы ложными внутрислойные импорты. Здесь слой файла
+ * и слой цели считаются по факту, от `src/`, поэтому глубина ни на что не влияет.
+ *
+ * Молчит там, где относительный путь и есть контракт: внутри одного слоя (файл рядом), в
+ * файлах корня `src/` (корень собирает слои и берёт их как соседей) и на цели вне слоёв —
+ * корневой `../chatController`, глобальный CSS.
+ */
+const layerBoundary = {
+  meta: {
+    type: 'problem',
+    docs: { description: 'межслойный импорт идёт через @/, относительный путь — внутри слоя' },
+    schema: [],
+  },
+  create(context) {
+    function check(node) {
+      const request = node.source?.value
+      if (typeof request !== 'string' || !request.startsWith('.')) return
+
+      const fileLayer = layerOf(context.filename)
+      if (!fileLayer) return
+
+      const targetLayer = layerOf(path.resolve(path.dirname(context.filename), request))
+      if (!targetLayer || targetLayer === fileLayer) return
+
+      context.report({
+        node: node.source,
+        message: `Между слоями импортируй через @/ (здесь @/${targetLayer}/…); относительный путь — только внутри своего слоя.`,
+      })
+    }
+
+    return { ImportDeclaration: check, ExportNamedDeclaration: check, ExportAllDeclaration: check }
+  },
+}
 
 export default tseslint.config(
   {
@@ -58,20 +123,22 @@ export default tseslint.config(
     },
   },
 
-  // Абсолютные импорты между слоями: `@/shared/utils/cn` вместо `../../../shared/utils/cn`.
+  // Абсолютные импорты между слоями: `@/shared/utils/cn` вместо `../../shared/utils/cn`.
   // Внутри своего слоя относительный путь остаётся — он и показывает, что файл рядом.
-  // Порог — три этажа, и это не «на глаз»: самая глубокая папка внутри слоя лежит на двух
-  // уровнях (components/Composer/EmojiPicker), поэтому внутрислойный импорт выше `../../`
-  // не поднимается и под правило не попадает. Ловится, значит, только межслойное — но не
-  // всё: выход в один-два этажа (`../domain/x` из components/) глубиной неотличим от
-  // внутрислойного и остаётся на код-ревью. Если заведётся папка уровнем глубже, правило
-  // начнёт врать на внутрислойных — тогда порог поднимать вместе с ней.
+  // Правило локальное (см. layerBoundary выше): слой файла и слой цели считаются от `src/`,
+  // поэтому оно ловит и выход на один этаж (`../store/store` из components/), который прежний
+  // порог глубины `../../../*` пропускал. Тесты и testUtils не исключены — контракт формы
+  // записи для них тот же.
+  {
+    files: ['packages/widget/src/**/*.{ts,tsx}'],
+    plugins: { local: { rules: { 'layer-boundary': layerBoundary } } },
+    rules: { 'local/layer-boundary': 'error' },
+  },
+
   {
     files: ['packages/widget/src/**/*.{ts,tsx}'],
     // Композиционный корень собирает MatrixService — ему matrix/ знать положено.
-    // testUtils и тесты двуязычны по природе. Цена исключения — эти файлы теряют и правило
-    // глубины выше; для корневого chatController.ts она нулевая (относительных путей такой
-    // длины из корня src/ не бывает).
+    // testUtils и тесты двуязычны по природе.
     ignores: [
       'packages/widget/src/chatController.ts',
       'packages/widget/src/shared/testUtils/**',
@@ -90,11 +157,6 @@ export default tseslint.config(
               group: ['**/matrix/**', '@/matrix/**'],
               message:
                 'matrix/ наружу не импортируется: нужен доменный тип — переводи его в matrix/mappers/*, нужен вызов — заводи метод в MatrixService и прокидывай через ChatActions.',
-            },
-            {
-              group: ['../../../*'],
-              message:
-                'Между слоями импортируй через @/ (например @/shared/utils/cn); относительный путь — только внутри своего слоя.',
             },
           ],
         },
@@ -115,13 +177,6 @@ export default tseslint.config(
               group: ['**/matrix/**', '@/matrix/**'],
               message:
                 'domain и store не знают wire-протокол Matrix: переводи его в matrix/mappers/* и передавай доменный тип (например RoomSyncPatch).',
-            },
-            // Дубль правила глубины из блока выше: flat config отдаёт одноимённое правило
-            // последнему подходящему блоку целиком, поэтому здесь его надо повторить.
-            {
-              group: ['../../../*'],
-              message:
-                'Между слоями импортируй через @/ (например @/shared/utils/cn); относительный путь — только внутри своего слоя.',
             },
           ],
         },
@@ -164,13 +219,6 @@ export default tseslint.config(
               ],
               message:
                 'shared/ — нижний слой: он не знает ни стора, ни контроллера, ни компонентов. Нужен верхний слой — значит модуль не shared: положи его рядом с потребителем.',
-            },
-            // Дубль правила глубины: flat config отдаёт одноимённое правило последнему
-            // подходящему блоку целиком (см. тот же дубль в блоке domain/store ниже).
-            {
-              group: ['../../../*'],
-              message:
-                'Между слоями импортируй через @/ (например @/shared/utils/cn); относительный путь — только внутри своего слоя.',
             },
           ],
         },

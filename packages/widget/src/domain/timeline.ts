@@ -1,23 +1,24 @@
 import type { SystemMessageKey } from '@/i18n'
 import type { AdaptiveCardPayload } from './adaptiveCards'
 import type { StickerFormat } from './emoji'
+import type { EventId, LocalId, MediaId, TxnId, UserId } from './ids'
 import type { UploadFailure } from './mediaFailure'
 
 export type SendStatus = 'sending' | 'sent' | 'failed'
 
 export interface TimelineRelation {
   type: 'reply'
-  eventId: string
+  eventId: EventId
 }
 
 interface BaseTimelineItem {
   // React key, якорь для optimistic-обновлений
-  localId: string
+  localId: LocalId
   // id события в комнате от сервера; до ответа — placeholder `optimistic:{localId}`
-  eventId: string
+  eventId: EventId
   // idempotency-ключ PUT /send — по нему mergeTimeline резолвит черновик в реальное событие.
-  txnId?: string
-  sender: string
+  txnId?: TxnId
+  sender: UserId
   ts: number
   sendStatus: SendStatus
   relation?: TimelineRelation
@@ -93,7 +94,7 @@ export interface StickerTimelineItem extends BaseTimelineItem {
 
 export interface StickerMedia {
   /** Ключ кэша анимации и аргумент загрузчика Lottie — не адрес. */
-  mediaId: string
+  mediaId: MediaId
   /** Адрес байтов: отдаётся без токена, поэтому идёт прямо в `src`. */
   bytesUrl: string
 }
@@ -113,8 +114,8 @@ export type SystemLabel =
 
 export interface SystemTimelineItem {
   kind: 'system' | 'notice'
-  localId: string
-  eventId: string
+  localId: LocalId
+  eventId: EventId
   ts: number
   label: SystemLabel
 }
