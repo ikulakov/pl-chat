@@ -1,5 +1,5 @@
+import { useEmojiSegments } from '@/hooks/useEmojiSegments'
 import { Fragment } from 'react'
-import { useEmojiSegments } from '../../hooks/useEmojiSegments'
 import { InlineEmoji } from './InlineEmoji'
 
 interface Props {

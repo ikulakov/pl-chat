@@ -1,16 +1,16 @@
+import { deferred, makeFile } from '@/shared/testUtils/matrixFixtures'
+import { readImageDimensions, type ImageDimensions } from '@/shared/utils/imageDimensions'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { deferred, makeFile } from '../../shared/testUtils/matrixFixtures'
-import { readImageDimensions, type ImageDimensions } from '../../shared/utils/imageDimensions'
 import { useAttachmentState } from './useAttachmentState'
 
 const sendFile = vi.fn()
-vi.mock('../../hooks/useChatActions', () => ({
+vi.mock('@/hooks/useChatActions', () => ({
   useChatActions: () => ({ sendFile }),
 }))
 
 // jsdom не грузит <img> → readImageDimensions зависла бы. Мокаем интринсик-размеры.
-vi.mock('../../shared/utils/imageDimensions', () => ({
+vi.mock('@/shared/utils/imageDimensions', () => ({
   readImageDimensions: vi.fn().mockResolvedValue({ w: 800, h: 600 }),
 }))
 

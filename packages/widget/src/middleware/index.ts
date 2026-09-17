@@ -1,4 +1,4 @@
-import type { DispatchMiddleware } from '../store/store'
+import type { DispatchMiddleware } from '@/store/store'
 import { mediaRejectedToast } from './mediaRejectedToast'
 
 /**

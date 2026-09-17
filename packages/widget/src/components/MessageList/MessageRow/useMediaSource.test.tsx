@@ -1,12 +1,12 @@
+import { MediaUnavailableError } from '@/domain/mediaFailure'
+import { chatStore } from '@/store/store'
 import { renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MediaUnavailableError } from '../../../domain/mediaFailure'
-import { chatStore } from '../../../store/store'
 import { useMediaSource } from './useMediaSource'
 
 const loadPreview = vi.fn(() => Promise.resolve(new Blob(['bytes'])))
 
-vi.mock('../../../hooks/useChatActions', () => ({
+vi.mock('@/hooks/useChatActions', () => ({
   useChatActions: () => ({ loadPreview }),
 }))
 

@@ -1,7 +1,7 @@
+import type { EmojiIndex } from '@/domain/emoji'
+import { ensureEmojiIndex, resetEmojiIndex } from '@/shared/emoji/emojiIndexStore'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmojiIndex } from '../../../domain/emoji'
-import { ensureEmojiIndex, resetEmojiIndex } from '../../../shared/emoji/emojiIndexStore'
 import type { BubbleMetaData } from './BubbleMeta'
 import { TextContent } from './TextContent'
 
@@ -12,12 +12,12 @@ const index: EmojiIndex = {
   codepointByChar: new Map([['😀', '1f600']]),
 }
 
-vi.mock('../../../hooks/useChatActions', () => {
+vi.mock('@/hooks/useChatActions', () => {
   const actions = { loadEmojiAnimation: () => Promise.resolve({}) }
   return { useChatActions: () => actions }
 })
 
-vi.mock('../../../shared/lottie/emojiBitmap', () => ({
+vi.mock('@/shared/lottie/emojiBitmap', () => ({
   getEmojiBitmap: () => Promise.resolve(BITMAP),
 }))
 

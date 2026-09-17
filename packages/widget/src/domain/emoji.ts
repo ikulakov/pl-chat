@@ -62,6 +62,8 @@ export interface StickerItem {
   mediaId: string
   /** mxc://… — уезжает в content при отправке. */
   url: string
+  /** Адрес байтов для показа: отдаётся без токена, поэтому идёт прямо в src. */
+  bytesUrl: string
   info: StickerInfo
   /** data:-URL силуэта; рисуется, пока сам стикер не готов. */
   silhouette: string | null

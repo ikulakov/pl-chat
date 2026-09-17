@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import type { TextTimelineItem } from '../../domain/timeline'
-import { t } from '../../i18n'
+import type { TextTimelineItem } from '@/domain/timeline'
+import { t } from '@/i18n'
 import {
   fileItem,
   noticeItem,
   stickerItem,
   systemItem,
   textItem,
-} from '../../shared/testUtils/matrixFixtures'
+} from '@/shared/testUtils/matrixFixtures'
+import { describe, expect, it } from 'vitest'
 import { getPosition, getReplyPreview, indexMessagesByEventId } from './MessageList.helpers'
 
 function message(sender: string): TextTimelineItem {
@@ -130,7 +130,12 @@ describe('getReplyPreview', () => {
       author: t('chat.reply.operator'),
       text: t('chat.reply.sticker'),
       targetId: 'p1',
-      sticker: { mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx', body: '🐥', format: 'image' },
+      sticker: {
+        mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
+        body: '🐥',
+        format: 'image',
+        bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
+      },
     })
   })
 

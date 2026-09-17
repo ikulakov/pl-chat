@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { isSystem, type TimelineItem } from '../../domain/timeline'
+import { isSystem, type TimelineItem } from '@/domain/timeline'
 import {
   OPERATOR_ID,
   operatorJoinedEvent,
   operatorLeftEvent,
   roomMessageEvent,
-} from '../../shared/testUtils/matrixFixtures'
+} from '@/shared/testUtils/matrixFixtures'
 import { MatrixEventType, MsgType } from '../wire/consts'
-import type { ClientEvent } from '../wire/types'
+import type * as Matrix from '../wire'
 import { timelineEventsToItems } from './timeline'
 
 describe('timelineEventsToItems — варианты контента', () => {
@@ -216,7 +216,7 @@ describe('timelineEventsToItems — варианты контента', () => {
           info: { mimetype: 'video/webm', size: 43488, w: 512, h: 512 },
         },
         ...(unsigned ? { unsigned } : {}),
-      }) as unknown as ClientEvent
+      }) as unknown as Matrix.ClientEvent
 
     it('разбирается в элемент ленты со своим kind', () => {
       const [item] = timelineEventsToItems([stickerEvent()])
@@ -231,6 +231,7 @@ describe('timelineEventsToItems — варианты контента', () => {
         content: {
           body: '🩷',
           url: 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+          bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
           info: { mimetype: 'video/webm', size: 43488, w: 512, h: 512 },
         },
       })
@@ -249,7 +250,7 @@ describe('timelineEventsToItems — варианты контента', () => {
         sender: OPERATOR_ID,
         origin_server_ts: 8,
         content: { body: '🩷', url: 'mxc://bank.ru/x' },
-      } as unknown as ClientEvent
+      } as unknown as Matrix.ClientEvent
 
       expect(timelineEventsToItems([bare])[0]).toMatchObject({
         content: { info: { mimetype: 'application/octet-stream', size: 0 } },
@@ -266,14 +267,14 @@ describe('timelineEventsToItems — варианты контента', () => {
       sender: OPERATOR_ID,
       origin_server_ts: 1,
       content: { msgtype: 'm.audio', body: 'запись', url: 'mxc://bank.ru/x' },
-    } as unknown as ClientEvent
+    } as unknown as Matrix.ClientEvent
     const reaction = {
       type: 'm.reaction',
       event_id: '$react',
       sender: OPERATOR_ID,
       origin_server_ts: 3,
       content: {},
-    } as unknown as ClientEvent
+    } as unknown as Matrix.ClientEvent
 
     const items = timelineEventsToItems([
       mediaMessage,

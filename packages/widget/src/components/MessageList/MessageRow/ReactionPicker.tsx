@@ -1,7 +1,7 @@
+import type { ReactionSummary } from '@/domain/reactions'
+import { t } from '@/i18n'
+import { cn } from '@/shared/utils/cn'
 import { useRef } from 'react'
-import type { ReactionSummary } from '../../../domain/reactions'
-import { t } from '../../../i18n'
-import { cn } from '../../../shared/utils/cn'
 import { QUICK_REACTIONS } from './quickReactions'
 import styles from './ReactionPicker.module.css'
 

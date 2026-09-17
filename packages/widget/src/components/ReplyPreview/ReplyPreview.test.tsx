@@ -1,6 +1,6 @@
+import { t } from '@/i18n'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { t } from '../../i18n'
 import { ReplyPreview } from './ReplyPreview'
 
 // lottie-web поднимает плеер, которого в jsdom нет; здесь проверяется разметка цитаты.
@@ -42,7 +42,12 @@ describe('ReplyPreview', () => {
       <ReplyPreview
         author="Вы"
         text={t('chat.reply.sticker')}
-        sticker={{ mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx', body: '🐥', format: 'image' }}
+        sticker={{
+          mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
+          bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
+          body: '🐥',
+          format: 'image',
+        }}
       />,
     )
 

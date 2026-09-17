@@ -1,21 +1,21 @@
-import { useChatActions } from '../hooks/useChatActions'
-import { useChatStore } from '../hooks/useChatStore'
-import { t } from '../i18n'
-import { ERROR_ILLUSTRATION } from '../shared/assets/inlineAssets'
-import welcomeIllustration from '../shared/assets/welcome-illustration.webp'
-import { externalLinks } from '../shared/constants/externalLinks'
-import { Spinner } from '../shared/ui/Spinner'
-import { StatusScreen, StatusScreenAction, StatusScreenImage } from '../shared/ui/StatusScreen'
+import { useChatActions } from '@/hooks/useChatActions'
+import { useChatStore } from '@/hooks/useChatStore'
+import { t } from '@/i18n'
+import { ERROR_ILLUSTRATION } from '@/shared/assets/inlineAssets'
+import welcomeIllustration from '@/shared/assets/welcome-illustration.webp'
+import { externalLinks } from '@/shared/constants/externalLinks'
+import { Spinner } from '@/shared/ui/Spinner'
+import { StatusScreen, StatusScreenAction, StatusScreenImage } from '@/shared/ui/StatusScreen'
 import {
   selectHasMessages,
   selectPanelView,
   selectPhase,
   selectUserId,
   selectViewport,
-} from '../store/selectors'
+} from '@/store/selectors'
 import { AttachmentProvider } from './Attachment/AttachmentProvider'
 import chatStyles from './ChatPanel.module.css'
-import { Composer } from './Composer/Composer'
+import { Composer } from './Composer'
 import { DevOperatorTools } from './dev/DevOperatorTools'
 import { ErrorBoundary } from './ErrorBoundary'
 import { Header } from './Header'

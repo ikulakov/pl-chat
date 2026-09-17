@@ -1,8 +1,10 @@
-import { isAdaptiveCardPayload } from '../../domain/adaptiveCards'
-import type { SystemLabel, TimelineItem, TimelineRelation } from '../../domain/timeline'
+import { isAdaptiveCardPayload } from '@/domain/adaptiveCards'
+import type { SystemLabel, TimelineItem, TimelineRelation } from '@/domain/timeline'
+import type * as Matrix from '../wire'
+import { parseMxcUrl } from '@/shared/utils/mxc'
+import { Endpoints } from '../api/endpoints'
 import { MsgType } from '../wire/consts'
 import { isOperatorJoined, isOperatorLeft, isRoomMessage, isStickerEvent } from '../wire/guards'
-import type * as Matrix from '../wire/types'
 
 function operatorJoinedLabel(content: Matrix.OperatorJoinedEvent['content']): SystemLabel {
   return content.role === 'bot'
@@ -146,6 +148,7 @@ function roomMessageToItem(event: Matrix.RoomMessageEvent): TimelineItem | undef
  */
 function createStickerItem(event: Matrix.StickerEvent): TimelineItem {
   const { body, url, info } = event.content
+  const mediaId = parseMxcUrl(url)?.mediaId
 
   return {
     kind: 'sticker',
@@ -153,6 +156,7 @@ function createStickerItem(event: Matrix.StickerEvent): TimelineItem {
     content: {
       body,
       url,
+      bytesUrl: mediaId ? Endpoints.STICKER_BYTES({ mediaId }) : null,
       info: {
         mimetype: info?.mimetype ?? 'application/octet-stream',
         size: info?.size ?? 0,

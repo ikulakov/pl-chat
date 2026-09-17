@@ -1,4 +1,4 @@
-import { splitLinks, type TextSegment } from '../../../shared/utils/linkify'
+import { splitLinks, type TextSegment } from '@/shared/utils/linkify'
 import { EmojiText } from '../../Emoji/EmojiText'
 import { BubbleMeta, type BubbleMetaData } from './BubbleMeta'
 import styles from './TextContent.module.css'

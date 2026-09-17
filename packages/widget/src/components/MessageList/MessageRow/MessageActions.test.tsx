@@ -1,9 +1,9 @@
+import { t } from '@/i18n'
+import { FEATURES } from '@/shared/features'
+import { fileItem, textItem } from '@/shared/testUtils/matrixFixtures'
+import { chatStore } from '@/store/store'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { FEATURES } from '../../../features'
-import { t } from '../../../i18n'
-import { fileItem, textItem } from '../../../shared/testUtils/matrixFixtures'
-import { chatStore } from '../../../store/store'
 import { MessageActions } from './MessageActions'
 
 const resendMessage = vi.fn()
@@ -11,11 +11,11 @@ const replyTo = vi.fn()
 const toggleReaction = vi.fn()
 const showToast = vi.hoisted(() => vi.fn())
 
-vi.mock('../../../hooks/useChatActions', () => ({
+vi.mock('@/hooks/useChatActions', () => ({
   useChatActions: () => ({ resendMessage, replyTo, toggleReaction }),
 }))
 
-vi.mock('../../../shared/ui/Toast', () => ({ showToast }))
+vi.mock('@/shared/ui/Toast', () => ({ showToast }))
 
 describe('MessageActions', () => {
   beforeEach(() => {

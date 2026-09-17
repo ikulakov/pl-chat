@@ -1,5 +1,5 @@
-import type { RoomSyncPatch } from '../../domain/roomSync'
-import type * as Matrix from '../wire/types'
+import type { RoomSyncPatch } from '@/domain/roomSync'
+import type * as Matrix from '../wire'
 import { collectCardAnswers } from './adaptiveCard'
 import { collectMediaVerdicts } from './mediaStatus'
 import { toOperatorState } from './operator'

@@ -1,7 +1,7 @@
+import type { MessageKey } from '@/i18n'
+import { t } from '@/i18n'
+import { cn } from '@/shared/utils/cn'
 import { useRef } from 'react'
-import type { MessageKey } from '../../../i18n'
-import { t } from '../../../i18n'
-import { cn } from '../../../shared/utils/cn'
 import styles from './EmojiPicker.module.css'
 
 export type PickerTab = 'emoji' | 'stickers'

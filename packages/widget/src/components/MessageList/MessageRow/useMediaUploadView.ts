@@ -1,5 +1,5 @@
-import type { MediaTimelineItem } from '../../../domain/timeline'
-import type { UploadFailure } from '../../../domain/mediaFailure'
+import type { UploadFailure } from '@/domain/mediaFailure'
+import type { MediaTimelineItem } from '@/domain/timeline'
 
 /**
  * Состояние своей отдачи байт, общее для картинки и файла: рисуют они его по-разному

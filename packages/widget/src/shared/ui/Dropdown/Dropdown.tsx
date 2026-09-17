@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { t } from '../../../i18n'
+import { t } from '@/i18n'
 import { resolvePortalContainer } from '../floating/portal'
 import { useDismiss } from '../floating/useDismiss'
 import { DropdownContext } from './context'

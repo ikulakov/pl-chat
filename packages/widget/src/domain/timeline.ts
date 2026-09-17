@@ -1,4 +1,4 @@
-import type { SystemMessageKey } from '../i18n'
+import type { SystemMessageKey } from '@/i18n'
 import type { AdaptiveCardPayload } from './adaptiveCards'
 import type { UploadFailure } from './mediaFailure'
 
@@ -78,6 +78,8 @@ export interface StickerTimelineItem extends BaseTimelineItem {
     /** Эмодзи-подпись: показываем как alt и как текст цитаты. */
     body: string
     url: string
+    /** Адрес байтов для показа; null — mxc не разобрался, показывать нечего. */
+    bytesUrl: string | null
     info: MediaInfo
   }
 }

@@ -1,7 +1,7 @@
+import { isSystem, type TimelineItem } from '@/domain/timeline'
+import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { isSystem, type TimelineItem } from '../domain/timeline'
 import { useIntersectionObserver } from './useIntersectionObserver'
-import { ITEM_ID_ATTR } from '../shared/timeline/domAttributes'
 
 const NEAR_BOTTOM_PX = 80
 const SMOOTH_TAIL_PX = 200

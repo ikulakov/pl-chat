@@ -1,4 +1,4 @@
-import type { EmojiAnimation } from '../../domain/emoji'
+import type { EmojiAnimation } from '@/domain/emoji'
 import { readFrame, writeFrame } from '../emoji/emojiDb'
 import { evictOldest } from '../utils/evictOldest'
 import { createTaskQueue } from '../utils/taskQueue'

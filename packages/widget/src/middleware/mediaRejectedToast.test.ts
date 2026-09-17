@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { MediaVerdict, MediaVerdictEntry } from '../domain/mediaVerdict'
-import type { TimelineItem } from '../domain/timeline'
+import type { MediaVerdict, MediaVerdictEntry } from '@/domain/mediaVerdict'
+import type { TimelineItem } from '@/domain/timeline'
 import { mediaRejectedToast } from './mediaRejectedToast'
-import type { ChatRuntimeState, RuntimeAction } from '../store/state'
-import type { Dispatch } from '../store/store'
+import type { ChatRuntimeState, RuntimeAction } from '@/store/state'
+import type { Dispatch } from '@/store/store'
 
 const scrollTimelineTo = vi.hoisted(() => vi.fn())
 const showToast = vi.hoisted(() => vi.fn())
 
-vi.mock('../shared/timeline/timelineScroll', () => ({ scrollTimelineTo }))
-vi.mock('../shared/ui/Toast', () => ({ showToast }))
+vi.mock('@/shared/timeline/timelineScroll', () => ({ scrollTimelineTo }))
+vi.mock('@/shared/ui/Toast', () => ({ showToast }))
 
 const OWN = '@me:bank.ru'
 

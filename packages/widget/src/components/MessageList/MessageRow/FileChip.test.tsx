@@ -1,8 +1,8 @@
+import { t } from '@/i18n'
+import { fileItem } from '@/shared/testUtils/matrixFixtures'
+import { chatStore } from '@/store/store'
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { t } from '../../../i18n'
-import { fileItem } from '../../../shared/testUtils/matrixFixtures'
-import { chatStore } from '../../../store/store'
 import type { BubbleMetaData } from './BubbleMeta'
 import { FileChip } from './FileChip'
 
@@ -10,7 +10,7 @@ const cancelUpload = vi.fn()
 const resendMessage = vi.fn()
 const downloadFile = vi.fn(() => Promise.resolve(new Blob(['bytes'])))
 
-vi.mock('../../../hooks/useChatActions', () => ({
+vi.mock('@/hooks/useChatActions', () => ({
   useChatActions: () => ({ cancelUpload, resendMessage, downloadFile }),
 }))
 

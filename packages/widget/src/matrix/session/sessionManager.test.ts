@@ -1,15 +1,15 @@
-import { describe, expect, it, vi } from 'vitest'
 import {
   createFakeTokenStore,
   makeMatrixApi,
   ROOM_ID,
   syncResponse,
-} from '../../shared/testUtils/matrixFixtures'
+} from '@/shared/testUtils/matrixFixtures'
+import { describe, expect, it, vi } from 'vitest'
 import type { MatrixApi } from '../api/matrixApi'
 import { MatrixError } from '../api/matrixError'
 import { MatrixSessionManager } from './sessionManager'
 
-vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock('@/shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 function makeApi(overrides: Partial<MatrixApi> = {}): MatrixApi {
   return makeMatrixApi({

@@ -1,7 +1,7 @@
-import type { OperatorState } from '../../domain/operator'
+import type { OperatorState } from '@/domain/operator'
 import { OperatorStatus } from '../wire/consts'
 import { isOperatorCurrent } from '../wire/guards'
-import type * as Matrix from '../wire/types'
+import type * as Matrix from '../wire'
 
 export function toOperatorState(events: Matrix.ClientEvent[]): OperatorState | undefined {
   const operatorEvent = events.findLast(isOperatorCurrent)

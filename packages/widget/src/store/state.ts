@@ -1,12 +1,12 @@
-import type { CardAnswer } from '../domain/adaptiveCards'
-import type { MediaVerdict, MediaVerdictEntry } from '../domain/mediaVerdict'
-import type { OperatorState } from '../domain/operator'
-import type { ReactionDelta, ReactionEntry, ReactionIndex } from '../domain/reactions'
-import type { ReadReceipt } from '../domain/receipts'
-import type { ReplyTarget } from '../domain/reply'
-import type { RoomSyncPatch } from '../domain/roomSync'
-import type { TimelineItem } from '../domain/timeline'
-import type { UploadFailure } from '../domain/mediaFailure'
+import type { CardAnswer } from '@/domain/adaptiveCards'
+import type { UploadFailure } from '@/domain/mediaFailure'
+import type { MediaVerdict, MediaVerdictEntry } from '@/domain/mediaVerdict'
+import type { OperatorState } from '@/domain/operator'
+import type { ReactionDelta, ReactionEntry, ReactionIndex } from '@/domain/reactions'
+import type { ReadReceipt } from '@/domain/receipts'
+import type { ReplyTarget } from '@/domain/reply'
+import type { RoomSyncPatch } from '@/domain/roomSync'
+import type { TimelineItem } from '@/domain/timeline'
 
 export type RuntimeAction =
   | { type: 'session.starting' }

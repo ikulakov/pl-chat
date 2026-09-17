@@ -1,16 +1,16 @@
+import type { TextTimelineItem } from '@/domain/timeline'
+import { systemItem, textItem } from '@/shared/testUtils/matrixFixtures'
+import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '@/store/initialState'
+import { chatStore } from '@/store/store'
 import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TextTimelineItem } from '../../domain/timeline'
-import { systemItem, textItem } from '../../shared/testUtils/matrixFixtures'
-import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '../../store/initialState'
-import { chatStore } from '../../store/store'
 import { MessageList } from './MessageList'
 
 const ME = '@me:bank'
 
 // Экшены дёргают ChatController → MatrixService, которые в этом тесте не поднимаются
 const loadMoreHistory = vi.fn()
-vi.mock('../../hooks/useChatActions', () => ({
+vi.mock('@/hooks/useChatActions', () => ({
   useChatActions: () => ({
     resendMessage: vi.fn(),
     markRead: vi.fn(),

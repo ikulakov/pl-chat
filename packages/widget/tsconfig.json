@@ -8,7 +8,8 @@
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
     "plugins": [{ "name": "typescript-plugin-css-modules" }],
     "paths": {
-      "@bankchat/protocol": ["../protocol/src/index.ts"]
+      "@bankchat/protocol": ["../protocol/src/index.ts"],
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src"]

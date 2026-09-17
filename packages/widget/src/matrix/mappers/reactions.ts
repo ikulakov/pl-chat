@@ -1,7 +1,7 @@
-import type { ReactionDelta } from '../../domain/reactions'
+import type { ReactionDelta } from '@/domain/reactions'
 import { RelType } from '../wire/consts'
 import { isReaction, isRedaction } from '../wire/guards'
-import type * as Matrix from '../wire/types'
+import type * as Matrix from '../wire'
 
 /**
  * Собирает изменения реакций из сырых событий комнаты (timeline из sync либо страница истории).

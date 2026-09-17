@@ -1,4 +1,4 @@
-import type { EmojiIndex } from '../../domain/emoji'
+import type { EmojiIndex } from '@/domain/emoji'
 import { consoleDev } from '../utils/consoleDev'
 import { readCachedEmojiIndex, writeCachedEmojiIndex } from './emojiCatalogCache'
 import { syncPackVersion } from './emojiDb'

@@ -1,7 +1,7 @@
+import { ensureEmojiIndex } from '@/shared/emoji/emojiIndexStore'
+import { FEATURES } from '@/shared/features'
+import { selectUserId } from '@/store/selectors'
 import { useEffect } from 'react'
-import { FEATURES } from '../features'
-import { ensureEmojiIndex } from '../shared/emoji/emojiIndexStore'
-import { selectUserId } from '../store/selectors'
 import { useChatActions } from './useChatActions'
 import { useChatStore } from './useChatStore'
 

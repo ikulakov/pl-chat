@@ -1,5 +1,5 @@
+import { emojiLayout, splitEmoji, type EmojiLayout, type EmojiSegment } from '@/domain/emoji'
 import { useMemo } from 'react'
-import { emojiLayout, splitEmoji, type EmojiLayout, type EmojiSegment } from '../domain/emoji'
 import { useEmojiIndex } from './useEmojiIndex'
 
 /**

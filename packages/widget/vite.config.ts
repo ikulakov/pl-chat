@@ -1,4 +1,5 @@
 import react from '@vitejs/plugin-react'
+import { fileURLToPath } from 'node:url'
 import sbom from 'rollup-plugin-sbom'
 import { defineConfig } from 'vite'
 
@@ -29,6 +30,13 @@ export default defineConfig({
       apply: 'build',
     },
   ],
+  // Абсолютные импорты внутри виджета: @/ — это src/. Алиас обязан совпадать с paths
+  // в tsconfig.json и tsconfig.build.json; vitest.config.ts наследует его через mergeConfig.
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   base: '/widget',
   server: {
     port: 5174,

@@ -1,9 +1,9 @@
+import { isSystem } from '@/domain/timeline'
+import { useChatStore } from '@/hooks/useChatStore'
+import { t } from '@/i18n'
+import { selectUserId } from '@/store/selectors'
+import { chatStore } from '@/store/store'
 import { useEffect, useState } from 'react'
-import { isSystem } from '../../domain/timeline'
-import { useChatStore } from '../../hooks/useChatStore'
-import { t } from '../../i18n'
-import { selectUserId } from '../../store/selectors'
-import { chatStore } from '../../store/store'
 import styles from './DevOperatorTools.module.css'
 
 // Фолбэк, пока в комнате ещё нет ни одного операторского сообщения

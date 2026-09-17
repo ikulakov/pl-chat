@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mediaStatusEvent, roomMessageEvent } from '../../shared/testUtils/matrixFixtures'
+import { mediaStatusEvent, roomMessageEvent } from '@/shared/testUtils/matrixFixtures'
 import { collectMediaVerdicts } from './mediaStatus'
 
 describe('collectMediaVerdicts', () => {

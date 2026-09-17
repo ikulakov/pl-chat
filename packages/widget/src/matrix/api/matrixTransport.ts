@@ -1,6 +1,6 @@
-import { withDeadline } from '../../shared/utils/abort'
+import { withDeadline } from '@/shared/utils/abort'
 import type { TokenSource } from '../session/types'
-import type { RefreshResponse } from '../wire/dto'
+import type * as Matrix from '../wire'
 import { Endpoints } from './endpoints'
 import { makeMatrixError, MatrixErrCode, MatrixError } from './matrixError'
 
@@ -215,7 +215,7 @@ export class MatrixTransport {
           if (res.status === 401) return false
           throw makeMatrixError(res.status, await res.text())
         }
-        const data = (await res.json()) as RefreshResponse
+        const data = (await res.json()) as Matrix.RefreshResponse
         // Другая вкладка уже переписала сессию, пока летел наш /refresh — не затираем её.
         if (this.tokens.getRefreshToken() !== refreshToken) {
           // null — сессию снесли (logout), иначе она просто свежее нашей

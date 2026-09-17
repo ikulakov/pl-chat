@@ -1,6 +1,6 @@
-import type { EmojiCategory } from '../../../domain/emoji'
-import { t } from '../../../i18n'
-import { cn } from '../../../shared/utils/cn'
+import type { EmojiCategory } from '@/domain/emoji'
+import { t } from '@/i18n'
+import { cn } from '@/shared/utils/cn'
 import styles from './EmojiPicker.module.css'
 
 /**

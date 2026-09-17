@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { setLocale } from '../../i18n'
+import { setLocale } from '@/i18n'
 import { formatSize } from './formatSize'
 
 describe('formatSize', () => {

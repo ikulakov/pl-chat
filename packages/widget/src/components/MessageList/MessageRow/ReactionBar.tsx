@@ -1,6 +1,6 @@
-import type { ReactionSummary } from '../../../domain/reactions'
-import { t } from '../../../i18n'
-import { cn } from '../../../shared/utils/cn'
+import type { ReactionSummary } from '@/domain/reactions'
+import { t } from '@/i18n'
+import { cn } from '@/shared/utils/cn'
 import styles from './ReactionBar.module.css'
 
 interface Props {

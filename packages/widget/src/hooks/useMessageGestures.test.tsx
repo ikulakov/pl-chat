@@ -1,7 +1,7 @@
+import { TestPointerEvent, touch } from '@/shared/testUtils/pointer'
 import { act, fireEvent, render } from '@testing-library/react'
 import { useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { TestPointerEvent, touch } from '../shared/testUtils/pointer'
 import { LONG_PRESS_MS, SWIPE_TRIGGER_PX, useMessageGestures } from './useMessageGestures'
 
 interface HarnessProps {

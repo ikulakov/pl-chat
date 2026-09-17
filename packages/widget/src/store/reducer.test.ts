@@ -1,10 +1,10 @@
+import type { RoomSyncPatch } from '@/domain/roomSync'
+import type { TextTimelineItem } from '@/domain/timeline'
+import { fileItem, OPERATOR_ID, textItem } from '@/shared/testUtils/matrixFixtures'
 import { describe, expect, it } from 'vitest'
-import { fileItem, OPERATOR_ID, textItem } from '../shared/testUtils/matrixFixtures'
-import type { RoomSyncPatch } from '../domain/roomSync'
-import type { TextTimelineItem } from '../domain/timeline'
+import { INITIAL_RUNTIME_STATE } from './initialState'
 import { chatRuntimeReducer } from './reducer'
 import type { ChatRuntimeState, Identity } from './state'
-import { INITIAL_RUNTIME_STATE } from './initialState'
 
 const IDENTITY: Identity = { userId: '@user:bank', roomId: '!room:bank' }
 const OPERATOR = '@operator:bank'

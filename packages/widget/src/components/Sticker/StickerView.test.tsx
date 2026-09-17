@@ -1,16 +1,16 @@
+import { resetAnimationCache } from '@/shared/lottie/animationCache'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { resetAnimationCache } from '../../shared/lottie/animationCache'
 import { StickerView, type StickerViewData } from './StickerView'
 
 const loadStickerAnimation = vi.fn()
 
-vi.mock('../../hooks/useChatActions', () => ({
+vi.mock('@/hooks/useChatActions', () => ({
   useChatActions: () => ({ loadStickerAnimation }),
 }))
 
 // lottie-web тянет canvas, которого в jsdom нет; здесь проверяется выбор ветки, а не плеер.
-vi.mock('../../shared/lottie/lottiePlayer', () => ({
+vi.mock('@/shared/lottie/lottiePlayer', () => ({
   loadLottiePlayer: () => Promise.resolve({}),
   createEmojiPlayer: () => ({
     totalFrames: 30,
@@ -25,6 +25,7 @@ const SILHOUETTE = 'data:image/png;base64,iVBORw0KG'
 function sticker(overrides: Partial<StickerViewData> = {}): StickerViewData {
   return {
     mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
+    bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
     body: '🩷',
     format: 'image',
     silhouette: SILHOUETTE,

@@ -1,5 +1,4 @@
-import { vi } from 'vitest'
-import type { AdaptiveCardPayload } from '../../domain/adaptiveCards'
+import type { AdaptiveCardPayload } from '@/domain/adaptiveCards'
 import type {
   AdaptiveCardTimelineItem,
   FileTimelineItem,
@@ -8,21 +7,12 @@ import type {
   StickerTimelineItem,
   SystemTimelineItem,
   TextTimelineItem,
-} from '../../domain/timeline'
-import type { MatrixApi } from '../../matrix/api/matrixApi'
-import type { SessionInit } from '../../matrix/session/types'
-import { MatrixEventType, MediaScanStatus, MsgType, OperatorStatus } from '../../matrix/wire/consts'
-import type { MessagesResponse, SyncResponse } from '../../matrix/wire/dto'
-import type {
-  ClientEvent,
-  EphemeralEvent,
-  JoinedRoom,
-  MediaStatusEvent,
-  OperatorCurrentEvent,
-  OperatorJoinedEvent,
-  OperatorLeftEvent,
-  RoomMessageEvent,
-} from '../../matrix/wire/types'
+} from '@/domain/timeline'
+import type { MatrixApi } from '@/matrix/api/matrixApi'
+import type { SessionInit } from '@/matrix/session/types'
+import type * as Matrix from '@/matrix/wire'
+import { MatrixEventType, MediaScanStatus, MsgType, OperatorStatus } from '@/matrix/wire/consts'
+import { vi } from 'vitest'
 
 export const ROOM_ID = '!room:bank'
 export const OPERATOR_ID = '@operator:bank'
@@ -63,6 +53,7 @@ export function stickerItem(
     content: {
       body: body ?? '🩷',
       url: url ?? 'mxc://bank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+      bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
       info: { mimetype: mimetype ?? 'image/webp', size: 4096, w: 512, h: 512 },
     },
   }
@@ -182,15 +173,15 @@ export function makeFile(name: string, size = 1, type = ''): File {
 
 export function receiptEvent(
   content: Record<string, { 'm.read'?: Record<string, { ts?: number }> }>,
-): EphemeralEvent {
+): Matrix.EphemeralEvent {
   return { type: 'm.receipt', content }
 }
 
-export function readReceipt(eventId: string, reader: string, ts = 1): EphemeralEvent {
+export function readReceipt(eventId: string, reader: string, ts = 1): Matrix.EphemeralEvent {
   return receiptEvent({ [eventId]: { 'm.read': { [reader]: { ts } } } })
 }
 
-export function emptyJoinedRoom(overrides: Partial<JoinedRoom> = {}): JoinedRoom {
+export function emptyJoinedRoom(overrides: Partial<Matrix.JoinedRoom> = {}): Matrix.JoinedRoom {
   return {
     state: { events: [] },
     timeline: { events: [] },
@@ -199,8 +190,8 @@ export function emptyJoinedRoom(overrides: Partial<JoinedRoom> = {}): JoinedRoom
 }
 
 export function operatorCurrentEvent(
-  overrides: Partial<OperatorCurrentEvent['content']> = {},
-): OperatorCurrentEvent {
+  overrides: Partial<Matrix.OperatorCurrentEvent['content']> = {},
+): Matrix.OperatorCurrentEvent {
   return {
     type: MatrixEventType.OperatorCurrent,
     state_key: '',
@@ -217,10 +208,10 @@ export function operatorCurrentEvent(
 }
 
 export function roomMessageEvent(
-  overrides: Partial<Omit<RoomMessageEvent, 'content'>> & {
-    content?: Partial<RoomMessageEvent['content']>
+  overrides: Partial<Omit<Matrix.RoomMessageEvent, 'content'>> & {
+    content?: Partial<Matrix.RoomMessageEvent['content']>
   } = {},
-): RoomMessageEvent {
+): Matrix.RoomMessageEvent {
   const { content, ...rest } = overrides
   return {
     type: MatrixEventType.RoomMessage,
@@ -229,14 +220,18 @@ export function roomMessageEvent(
     origin_server_ts: 2,
     // content — дискриминированный union; фикстура собирает конкретный вариант вручную,
     // спред Partial<union> размывает msgtype до объединения литералов
-    content: { msgtype: MsgType.Text, body: 'hello', ...content } as RoomMessageEvent['content'],
+    content: {
+      msgtype: MsgType.Text,
+      body: 'hello',
+      ...content,
+    } as Matrix.RoomMessageEvent['content'],
     ...rest,
   }
 }
 
 export function operatorJoinedEvent(
-  overrides: Partial<OperatorJoinedEvent['content']> = {},
-): OperatorJoinedEvent {
+  overrides: Partial<Matrix.OperatorJoinedEvent['content']> = {},
+): Matrix.OperatorJoinedEvent {
   return {
     type: MatrixEventType.OperatorJoined,
     event_id: '$op-joined',
@@ -252,8 +247,8 @@ export function operatorJoinedEvent(
 }
 
 export function operatorLeftEvent(
-  overrides: Partial<OperatorLeftEvent['content']> = {},
-): OperatorLeftEvent {
+  overrides: Partial<Matrix.OperatorLeftEvent['content']> = {},
+): Matrix.OperatorLeftEvent {
   return {
     type: MatrixEventType.OperatorLeft,
     event_id: '$op-left',
@@ -270,8 +265,8 @@ export function operatorLeftEvent(
 // Сопоставляем по media_id, а не по content.event_id: вердикт может прийти раньше сообщения,
 // и тогда ссылаться ему не на что.
 export function mediaStatusEvent(
-  overrides: Partial<MediaStatusEvent['content']> = {},
-): MediaStatusEvent {
+  overrides: Partial<Matrix.MediaStatusEvent['content']> = {},
+): Matrix.MediaStatusEvent {
   return {
     type: MatrixEventType.MediaStatus,
     event_id: '$media-status',
@@ -285,15 +280,18 @@ export function mediaStatusEvent(
   }
 }
 
-export function syncResponse(next: string, room: JoinedRoom = emptyJoinedRoom()): SyncResponse {
+export function syncResponse(
+  next: string,
+  room: Matrix.JoinedRoom = emptyJoinedRoom(),
+): Matrix.SyncResponse {
   return { next_batch: next, rooms: { join: { [ROOM_ID]: room } } }
 }
 
 export function messagesResponse(
-  chunk: ClientEvent[] = [],
+  chunk: Matrix.ClientEvent[] = [],
   end?: string,
   start = 's100',
-): MessagesResponse {
+): Matrix.MessagesResponse {
   return { chunk, start, ...(end !== undefined && { end }) }
 }
 

@@ -1,17 +1,19 @@
+import type { StickerFormat } from '@/domain/emoji'
+import { useChatActions } from '@/hooks/useChatActions'
+import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
+import { getAnimationCache } from '@/shared/lottie/animationCache'
+import { createEmojiPlayer, loadLottiePlayer } from '@/shared/lottie/lottiePlayer'
+import { lottiePool } from '@/shared/lottie/lottiePool'
+import { cn } from '@/shared/utils/cn'
 import { useEffect, useRef, useState } from 'react'
-import type { StickerFormat } from '../../domain/emoji'
-import { useChatActions } from '../../hooks/useChatActions'
-import { useIntersectionObserver } from '../../hooks/useIntersectionObserver'
-import { Endpoints } from '../../matrix/api/endpoints'
-import { getAnimationCache } from '../../shared/lottie/animationCache'
-import { createEmojiPlayer, loadLottiePlayer } from '../../shared/lottie/lottiePlayer'
-import { lottiePool } from '../../shared/lottie/lottiePool'
-import { cn } from '../../shared/utils/cn'
 import { Silhouette } from '../Silhouette/Silhouette'
 import styles from './Sticker.module.css'
 
 export interface StickerViewData {
+  /** Ключ кэша анимации и аргумент загрузчика — не адрес. */
   mediaId: string
+  /** Адрес байтов, готовый: собирают мапперы, компонент маршрутов не знает. */
+  bytesUrl: string
   /** Эмодзи-подпись: она же доступное имя. */
   body: string
   format: StickerFormat
@@ -35,8 +37,6 @@ interface Props {
  * если держать их в двух местах.
  */
 export function StickerView({ sticker, size, root }: Props) {
-  const src = Endpoints.STICKER_BYTES({ mediaId: sticker.mediaId })
-
   return (
     <span
       className={styles.sticker}
@@ -51,14 +51,14 @@ export function StickerView({ sticker, size, root }: Props) {
         />
       ) : sticker.format === 'video' ? (
         <VideoSticker
-          src={src}
+          src={sticker.bytesUrl}
           silhouette={sticker.silhouette ?? null}
           {...(root ? { root } : {})}
         />
       ) : (
         <img
           className={styles.layer}
-          src={src}
+          src={sticker.bytesUrl}
           alt=""
           loading="lazy"
           draggable={false}

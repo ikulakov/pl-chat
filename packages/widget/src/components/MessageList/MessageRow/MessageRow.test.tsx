@@ -1,12 +1,12 @@
+import type { EmojiIndex } from '@/domain/emoji'
+import type { MessageTimelineItem } from '@/domain/timeline'
+import { LONG_PRESS_MS } from '@/hooks/useMessageGestures'
+import { t } from '@/i18n'
+import { ensureEmojiIndex, resetEmojiIndex } from '@/shared/emoji/emojiIndexStore'
+import { textItem } from '@/shared/testUtils/matrixFixtures'
+import { TestPointerEvent, touch } from '@/shared/testUtils/pointer'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmojiIndex } from '../../../domain/emoji'
-import type { MessageTimelineItem } from '../../../domain/timeline'
-import { LONG_PRESS_MS } from '../../../hooks/useMessageGestures'
-import { t } from '../../../i18n'
-import { ensureEmojiIndex, resetEmojiIndex } from '../../../shared/emoji/emojiIndexStore'
-import { textItem } from '../../../shared/testUtils/matrixFixtures'
-import { TestPointerEvent, touch } from '../../../shared/testUtils/pointer'
 import { MessageRow } from './MessageRow'
 
 const BUBBLE = '[data-role="message-bubble"]'
@@ -20,7 +20,7 @@ const index: EmojiIndex = {
   ]),
 }
 
-vi.mock('../../../hooks/useChatActions', () => {
+vi.mock('@/hooks/useChatActions', () => {
   const actions = {
     resendMessage: vi.fn(),
     replyTo: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock('../../../hooks/useChatActions', () => {
   return { useChatActions: () => actions }
 })
 
-vi.mock('../../../shared/lottie/emojiBitmap', () => ({
+vi.mock('@/shared/lottie/emojiBitmap', () => ({
   getEmojiBitmap: () => Promise.resolve('data:image/png;base64,AAA'),
 }))
 

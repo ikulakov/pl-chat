@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { readOwnEventIds } from '../../domain/receipts'
-import { isSystem } from '../../domain/timeline'
-import { useChatScroll } from '../../hooks/useChatScroll'
-import { useChatStore } from '../../hooks/useChatStore'
-import { useLoadMoreHistory } from '../../hooks/useLoadMoreHistory'
-import { useSendReadReceipts } from '../../hooks/useSendReadReceipts'
-import { registerTimelineScroll } from '../../shared/timeline/timelineScroll'
-import { Spinner } from '../../shared/ui/Spinner'
-import { ToastOutlet } from '../../shared/ui/Toast'
-import { cn } from '../../shared/utils/cn'
+import { readOwnEventIds } from '@/domain/receipts'
+import { isSystem } from '@/domain/timeline'
+import { useChatScroll } from '@/hooks/useChatScroll'
+import { useChatStore } from '@/hooks/useChatStore'
+import { useLoadMoreHistory } from '@/hooks/useLoadMoreHistory'
+import { useSendReadReceipts } from '@/hooks/useSendReadReceipts'
+import { registerTimelineScroll } from '@/shared/timeline/timelineScroll'
+import { Spinner } from '@/shared/ui/Spinner'
+import { ToastOutlet } from '@/shared/ui/Toast'
+import { cn } from '@/shared/utils/cn'
 import {
   selectIsOpen,
   selectReactions,
   selectReadReceipts,
   selectTimeline,
-} from '../../store/selectors'
+} from '@/store/selectors'
+import { useEffect, useMemo, useRef } from 'react'
 import {
   getPosition,
   getReplyPreview,
@@ -22,7 +22,7 @@ import {
   indexMessagesByEventId,
 } from './MessageList.helpers'
 import styles from './MessageList.module.css'
-import { MessageRow } from './MessageRow/MessageRow'
+import { MessageRow } from './MessageRow'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { SystemMessage } from './SystemMessage'
 

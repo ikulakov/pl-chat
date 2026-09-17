@@ -1,4 +1,4 @@
-import type { CardAction } from '../domain/adaptiveCards'
+import type { CardAction } from '@/domain/adaptiveCards'
 import type {
   EmojiAnimation,
   EmojiCatalog,
@@ -6,26 +6,27 @@ import type {
   EmojiIndex,
   StickerItem,
   StickerPack,
-} from '../domain/emoji'
-import { MediaUnavailableError } from '../domain/mediaFailure'
+} from '@/domain/emoji'
+import type { ThumbnailSize } from '@/domain/media'
+import { MediaUnavailableError } from '@/domain/mediaFailure'
 import {
   createOptimisticMediaMessage,
   createOptimisticStickerMessage,
   createOptimisticTextMessage,
   isOptimistic,
-} from '../domain/optimistic'
-import { findOwnReaction, type ReactionEntry } from '../domain/reactions'
-import { canMoveMarker } from '../domain/receipts'
-import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '../domain/timeline'
-import { createBatchedLoader } from '../shared/lottie/animationBatcher'
-import { isAbortError, isDeadlineError } from '../shared/utils/abort'
-import { consoleDev } from '../shared/utils/consoleDev'
-import { evictOldest } from '../shared/utils/evictOldest'
-import type { ImageDimensions } from '../shared/utils/imageDimensions'
-import { parseMxcUrl, type ParsedMxcUrl } from '../shared/utils/mxc'
-import { sleep } from '../shared/utils/sleep'
-import type { ChatRuntimeState, RuntimeAction } from '../store/state'
-import { type MatrixApi, type ThumbnailSize } from './api/matrixApi'
+} from '@/domain/optimistic'
+import { findOwnReaction, type ReactionEntry } from '@/domain/reactions'
+import { canMoveMarker } from '@/domain/receipts'
+import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '@/domain/timeline'
+import { createBatchedLoader } from '@/shared/lottie/animationBatcher'
+import { isAbortError, isDeadlineError } from '@/shared/utils/abort'
+import { consoleDev } from '@/shared/utils/consoleDev'
+import { evictOldest } from '@/shared/utils/evictOldest'
+import type { ImageDimensions } from '@/shared/utils/imageDimensions'
+import { parseMxcUrl, type ParsedMxcUrl } from '@/shared/utils/mxc'
+import { sleep } from '@/shared/utils/sleep'
+import type { ChatRuntimeState, RuntimeAction } from '@/store/state'
+import { type MatrixApi } from './api/matrixApi'
 import {
   isForbiddenError,
   isMatrixAuthError,

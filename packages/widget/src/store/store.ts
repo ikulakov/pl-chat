@@ -1,7 +1,7 @@
 import type { ViewportMode } from '@bankchat/protocol'
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import { dispatchMiddleware } from '../middleware'
+import { dispatchMiddleware } from '@/middleware'
 import { INITIAL_RUNTIME_STATE } from './initialState'
 import { chatRuntimeReducer } from './reducer'
 import type { ChatRuntimeState, RuntimeAction } from './state'

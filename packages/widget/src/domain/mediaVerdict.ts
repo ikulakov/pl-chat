@@ -1,4 +1,4 @@
-import { parseMxcUrl } from '../shared/utils/mxc'
+import { parseMxcUrl } from '@/shared/utils/mxc'
 import type { MediaTimelineItem, TimelineItem } from './timeline'
 import { isMedia } from './timeline'
 

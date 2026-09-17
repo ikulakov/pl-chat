@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmojiAnimation } from '../../domain/emoji'
+import type { EmojiAnimation } from '@/domain/emoji'
 import { clearEmojiBitmaps, getEmojiBitmap } from './emojiBitmap'
 
 const destroy = vi.fn()

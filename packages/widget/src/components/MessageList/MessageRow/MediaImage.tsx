@@ -1,14 +1,14 @@
+import { isRetryableFailure, type UploadFailure } from '@/domain/mediaFailure'
+import type { ImageTimelineItem } from '@/domain/timeline'
+import { t } from '@/i18n'
+import { ProgressRing } from '@/shared/ui/ProgressRing'
+import { Spinner } from '@/shared/ui/Spinner'
+import { CloseIcon, DownloadIcon, ImageIcon, RetryIcon } from '@/shared/ui/icons'
+import { cn } from '@/shared/utils/cn'
 import { useEffect, useState } from 'react'
-import type { ImageTimelineItem } from '../../../domain/timeline'
-import { isRetryableFailure, type UploadFailure } from '../../../domain/mediaFailure'
-import { useMediaSource } from './useMediaSource'
-import { t } from '../../../i18n'
-import { pickThumbnailSize } from './thumbnailSize'
-import { ProgressRing } from '../../../shared/ui/ProgressRing'
-import { Spinner } from '../../../shared/ui/Spinner'
-import { CloseIcon, DownloadIcon, ImageIcon, RetryIcon } from '../../../shared/ui/icons'
-import { cn } from '../../../shared/utils/cn'
 import styles from './MediaImage.module.css'
+import { pickThumbnailSize } from './thumbnailSize'
+import { useMediaSource } from './useMediaSource'
 
 interface Props {
   item: ImageTimelineItem

@@ -1,5 +1,5 @@
+import { roomMessageEvent } from '@/shared/testUtils/matrixFixtures'
 import { describe, expect, it } from 'vitest'
-import { roomMessageEvent } from '../../shared/testUtils/matrixFixtures'
 import { MsgType } from '../wire/consts'
 import { collectCardAnswers, toCardAnswer } from './adaptiveCard'
 

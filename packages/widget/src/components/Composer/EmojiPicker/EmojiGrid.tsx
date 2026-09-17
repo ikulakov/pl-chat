@@ -1,7 +1,7 @@
+import type { EmojiCategory } from '@/domain/emoji'
+import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
+import type { LottieCache } from '@/shared/lottie/lottieCache'
 import { useRef } from 'react'
-import type { EmojiCategory } from '../../../domain/emoji'
-import { useIntersectionObserver } from '../../../hooks/useIntersectionObserver'
-import type { LottieCache } from '../../../shared/lottie/lottieCache'
 import { EmojiCell } from './EmojiCell'
 import styles from './EmojiPicker.module.css'
 

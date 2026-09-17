@@ -1,7 +1,7 @@
+import { getAnimationCache } from '@/shared/lottie/animationCache'
+import { getEmojiBitmap } from '@/shared/lottie/emojiBitmap'
+import type { EmojiBitmapSize } from '@/shared/lottie/types'
 import { useEffect, useState } from 'react'
-import { getAnimationCache } from '../shared/lottie/animationCache'
-import { getEmojiBitmap } from '../shared/lottie/emojiBitmap'
-import type { EmojiBitmapSize } from '../shared/lottie/types'
 import { useChatActions } from './useChatActions'
 
 /**

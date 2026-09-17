@@ -1,9 +1,9 @@
+import type { CardAction } from '@/domain/adaptiveCards'
+import { adaptiveCardItem } from '@/shared/testUtils/matrixFixtures'
+import { chatStore } from '@/store/store'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CardAction } from '../../../domain/adaptiveCards'
-import { adaptiveCardItem } from '../../../shared/testUtils/matrixFixtures'
-import { chatStore } from '../../../store/store'
 import { AdaptiveCardActions } from './AdaptiveCardActions'
 
 // Диспетчит в НАСТОЯЩИЙ стор — как реальный MatrixController.sendCardAction, а не мок с
@@ -13,7 +13,7 @@ const sendCardAction = vi.fn((cardEventId: string, action: CardAction) => {
   return Promise.resolve()
 })
 
-vi.mock('../../../hooks/useChatActions', () => ({
+vi.mock('@/hooks/useChatActions', () => ({
   useChatActions: () => ({ sendCardAction }),
 }))
 

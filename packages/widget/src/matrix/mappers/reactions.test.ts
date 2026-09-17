@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { OPERATOR_ID, roomMessageEvent } from '../../shared/testUtils/matrixFixtures'
-import type * as Matrix from '../wire/types'
+import { OPERATOR_ID, roomMessageEvent } from '@/shared/testUtils/matrixFixtures'
+import type * as Matrix from '../wire'
 import { toReactionDelta } from './reactions'
 
 function reactionEvent(

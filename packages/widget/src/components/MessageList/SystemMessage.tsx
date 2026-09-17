@@ -1,6 +1,6 @@
-import type { SystemLabel } from '../../domain/timeline'
-import { t } from '../../i18n'
-import { ITEM_ID_ATTR } from '../../shared/timeline/domAttributes'
+import type { SystemLabel } from '@/domain/timeline'
+import { t } from '@/i18n'
+import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
 import styles from './SystemMessage.module.css'
 
 interface Props {

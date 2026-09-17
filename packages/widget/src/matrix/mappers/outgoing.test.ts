@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { MediaTimelineItem, MessageTimelineItem } from '../../domain/timeline'
-import { fileItem, imageItem, stickerItem, textItem } from '../../shared/testUtils/matrixFixtures'
+import type { MediaTimelineItem, MessageTimelineItem } from '@/domain/timeline'
+import { fileItem, imageItem, stickerItem, textItem } from '@/shared/testUtils/matrixFixtures'
 import { outgoingEventType, toMessageContent } from './outgoing'
 
 // Сборка тела события — единственное место перевода домена в wire на исходящем направлении.

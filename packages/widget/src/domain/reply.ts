@@ -1,4 +1,4 @@
-import { parseMxcUrl } from '../shared/utils/mxc'
+import { parseMxcUrl } from '@/shared/utils/mxc'
 import { toStickerFormat, type StickerFormat } from './emoji'
 import { isOptimistic } from './optimistic'
 import { isMedia, isSticker, type MessageTimelineItem } from './timeline'
@@ -14,6 +14,7 @@ export interface ReplyStickerPreview {
   mediaId: string
   body: string
   format: StickerFormat
+  bytesUrl: string
 }
 
 /**
@@ -46,13 +47,15 @@ export function replyQuoteOf(item: MessageTimelineItem): ReplyQuote | undefined 
 function replyStickerOf(item: MessageTimelineItem): ReplyStickerPreview | undefined {
   if (!isSticker(item)) return
 
+  const { bytesUrl } = item.content
   const mediaId = parseMxcUrl(item.content.url)?.mediaId
-  if (!mediaId) return
+  if (!mediaId || !bytesUrl) return
 
   return {
     mediaId,
     body: item.content.body,
     format: toStickerFormat(item.content.info.mimetype),
+    bytesUrl,
   }
 }
 

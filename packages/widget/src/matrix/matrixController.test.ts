@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { isSystem, type TextTimelineItem } from '../domain/timeline'
+import { isSystem, type TextTimelineItem } from '@/domain/timeline'
 import {
   createFakeTokenStore,
   deferred,
@@ -9,16 +9,16 @@ import {
   roomMessageEvent,
   syncResponse,
   textItem,
-} from '../shared/testUtils/matrixFixtures'
-import { INITIAL_RUNTIME_STATE } from '../store/initialState'
-import { chatRuntimeReducer } from '../store/reducer'
-import type { ChatRuntimeState, Identity, RoomState, RuntimeAction } from '../store/state'
+} from '@/shared/testUtils/matrixFixtures'
+import { INITIAL_RUNTIME_STATE } from '@/store/initialState'
+import { chatRuntimeReducer } from '@/store/reducer'
+import type { ChatRuntimeState, Identity, RoomState, RuntimeAction } from '@/store/state'
 import type { MatrixApi } from './api/matrixApi'
 import { MatrixError } from './api/matrixError'
 import { MatrixController } from './matrixController'
 import { MatrixSessionManager } from './session/sessionManager'
 
-vi.mock('../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock('@/shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 const IDENTITY: Identity = { userId: '@u:bank', roomId: '!r:bank' }
 
@@ -526,6 +526,7 @@ describe('MatrixController (orchestrator)', () => {
       body: '🩷',
       mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
       url: 'mxc://otpbank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+      bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
       info: { mimetype: 'video/webm', w: 512, h: 512, size: 43488 },
       silhouette: null,
       format: 'video',

@@ -1,7 +1,7 @@
-import type { CardAction, CardAnswer } from '../../../domain/adaptiveCards'
-import { t } from '../../../i18n'
-import { Tooltip } from '../../../shared/ui/Tooltip'
-import { cn } from '../../../shared/utils/cn'
+import type { CardAction, CardAnswer } from '@/domain/adaptiveCards'
+import { t } from '@/i18n'
+import { Tooltip } from '@/shared/ui/Tooltip'
+import { cn } from '@/shared/utils/cn'
 import styles from './CardActions.module.css'
 
 interface Props {

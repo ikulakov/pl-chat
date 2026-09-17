@@ -1,5 +1,5 @@
 import type { AnimationItem, LottiePlayer } from 'lottie-web'
-import type { EmojiAnimation } from '../../domain/emoji'
+import type { EmojiAnimation } from '@/domain/emoji'
 
 let playerPromise: Promise<LottiePlayer> | null = null
 

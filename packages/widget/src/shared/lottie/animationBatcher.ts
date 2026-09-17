@@ -1,4 +1,4 @@
-import type { EmojiAnimation } from '../../domain/emoji'
+import type { EmojiAnimation } from '@/domain/emoji'
 import { consoleDev } from '../utils/consoleDev'
 
 /**

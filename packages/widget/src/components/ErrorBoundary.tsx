@@ -1,7 +1,7 @@
+import { t } from '@/i18n'
+import { ERROR_ILLUSTRATION } from '@/shared/assets/inlineAssets'
+import { StatusScreen, StatusScreenAction, StatusScreenImage } from '@/shared/ui/StatusScreen'
 import { Component, type ReactNode } from 'react'
-import { t } from '../i18n'
-import { ERROR_ILLUSTRATION } from '../shared/assets/inlineAssets'
-import { StatusScreen, StatusScreenAction, StatusScreenImage } from '../shared/ui/StatusScreen'
 import styles from './ErrorBoundary.module.css'
 
 interface Props {

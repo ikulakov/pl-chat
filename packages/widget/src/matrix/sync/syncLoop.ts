@@ -1,12 +1,12 @@
-import { sleep } from '../../shared/utils/sleep'
+import { sleep } from '@/shared/utils/sleep'
 import type { MatrixApi } from '../api/matrixApi'
-import type { SyncResponse } from '../wire/dto'
+import type * as Matrix from '../wire'
 import { currentPresence } from './presence'
 
 export interface SyncTick {
   since: string
   next: string
-  response: SyncResponse
+  response: Matrix.SyncResponse
 }
 
 interface SyncLoopOptions {

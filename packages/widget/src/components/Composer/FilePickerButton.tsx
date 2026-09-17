@@ -1,8 +1,8 @@
+import { t } from '@/i18n'
+import { IconButton } from '@/shared/ui/IconButton'
+import { AttachIcon } from '@/shared/ui/icons'
+import { FILE_ACCEPT } from '@/shared/utils/fileValidation'
 import { useRef } from 'react'
-import { t } from '../../i18n'
-import { FILE_ACCEPT } from '../../shared/utils/fileValidation'
-import { IconButton } from '../../shared/ui/IconButton'
-import { AttachIcon } from '../../shared/ui/icons'
 
 interface Props {
   disabled: boolean

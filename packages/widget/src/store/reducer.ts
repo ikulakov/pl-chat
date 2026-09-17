@@ -1,19 +1,19 @@
-import { applyCardAnswers } from '../domain/adaptiveCards'
-import { applyMediaVerdicts } from '../domain/mediaVerdict'
-import { mergeTimeline, prependTimeline } from '../domain/mergeTimeline'
+import { applyCardAnswers } from '@/domain/adaptiveCards'
+import { applyMediaVerdicts } from '@/domain/mediaVerdict'
+import { mergeTimeline, prependTimeline } from '@/domain/mergeTimeline'
 import {
   addReaction,
   applyReactionDelta,
   confirmReaction,
   removeReaction,
-} from '../domain/reactions'
-import { applyReadMarkers } from '../domain/receipts'
-import type { RoomSyncPatch } from '../domain/roomSync'
-import type { MessageTimelineItem, TimelineItem } from '../domain/timeline'
-import { isMedia, isSystem } from '../domain/timeline'
-import { assertNever } from '../shared/utils/assertNever'
-import type { ChatRuntimeState, RoomState, RuntimeAction } from './state'
+} from '@/domain/reactions'
+import { applyReadMarkers } from '@/domain/receipts'
+import type { RoomSyncPatch } from '@/domain/roomSync'
+import type { MessageTimelineItem, TimelineItem } from '@/domain/timeline'
+import { isMedia, isSystem } from '@/domain/timeline'
+import { assertNever } from '@/shared/utils/assertNever'
 import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from './initialState'
+import type { ChatRuntimeState, RoomState, RuntimeAction } from './state'
 
 function updateRoom(state: ChatRuntimeState, patch: Partial<RoomState>): ChatRuntimeState {
   return { ...state, room: { ...state.room, ...patch } }

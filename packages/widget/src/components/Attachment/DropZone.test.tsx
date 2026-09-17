@@ -1,6 +1,6 @@
+import { makeFile } from '@/shared/testUtils/matrixFixtures'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { makeFile } from '../../shared/testUtils/matrixFixtures'
 import { DropZone } from './DropZone'
 
 const pickFile = vi.fn()

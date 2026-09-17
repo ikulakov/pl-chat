@@ -1,6 +1,6 @@
+import type { EmojiIndex } from '@/domain/emoji'
+import { getEmojiIndex, subscribeEmojiIndex } from '@/shared/emoji/emojiIndexStore'
 import { useSyncExternalStore } from 'react'
-import type { EmojiIndex } from '../domain/emoji'
-import { getEmojiIndex, subscribeEmojiIndex } from '../shared/emoji/emojiIndexStore'
 
 /**
  * Индекс пака для рендера, `null` — пока не загружен.

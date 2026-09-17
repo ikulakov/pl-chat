@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { StickerWire } from '../wire/emoji'
+import type * as Matrix from '../wire'
 import { toEmojiCatalog, toEmojiCategory, toStickerPacks } from './emoji'
 
 describe('toEmojiCatalog', () => {
@@ -59,13 +59,13 @@ describe('toEmojiCategory', () => {
   })
 })
 
-function stickerPacks(...stickers: StickerWire[]) {
+function stickerPacks(...stickers: Matrix.StickerWire[]) {
   return toStickerPacks({
     packs: [{ id: 'rubi_otp', display_name: 'Rubi OTP', stickers }],
   })
 }
 
-function stickerWire(overrides: Partial<StickerWire> = {}): StickerWire {
+function stickerWire(overrides: Partial<Matrix.StickerWire> = {}): Matrix.StickerWire {
   return {
     id: '01_1fa77',
     body: '🩷',
@@ -89,6 +89,7 @@ describe('toStickerPacks', () => {
           body: '🩷',
           mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
           url: 'mxc://otpbank.ru/AbCdEfGhIjKlMnOpQrStUvWx',
+          bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
           info: { mimetype: 'image/webp', w: 512, h: 512, size: 4096 },
           silhouette: 'data:image/png;base64,iVBORw0KG',
           format: 'image',

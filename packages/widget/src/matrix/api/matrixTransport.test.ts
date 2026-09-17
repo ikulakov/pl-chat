@@ -1,6 +1,6 @@
+import { createFakeTokenStore } from '@/shared/testUtils/matrixFixtures'
+import { isDeadlineError } from '@/shared/utils/abort'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { isDeadlineError } from '../../shared/utils/abort'
-import { createFakeTokenStore } from '../../shared/testUtils/matrixFixtures'
 import { LocalStorageSessionStore } from '../session/localStorageSessionStore'
 import { MatrixTransport } from './matrixTransport'
 

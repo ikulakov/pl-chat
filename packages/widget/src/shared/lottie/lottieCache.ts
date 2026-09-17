@@ -1,4 +1,4 @@
-import type { EmojiAnimation } from '../../domain/emoji'
+import type { EmojiAnimation } from '@/domain/emoji'
 import { evictOldest } from '../utils/evictOldest'
 
 // Разжатая анимация — это разобранный JSON на десятки килобайт. Потолок в записях, а не в

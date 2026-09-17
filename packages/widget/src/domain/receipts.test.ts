@@ -1,6 +1,5 @@
+import { systemItem, textItem } from '@/shared/testUtils/matrixFixtures'
 import { describe, expect, it } from 'vitest'
-import { systemItem, textItem } from '../shared/testUtils/matrixFixtures'
-import type { TimelineItem } from './timeline'
 import {
   applyReadMarkers,
   canMoveMarker,
@@ -9,6 +8,7 @@ import {
   type ReadMarker,
   type ReadReceipt,
 } from './receipts'
+import type { TimelineItem } from './timeline'
 
 const OWN = '@guest:bank'
 const OPERATOR = '@operator:bank'

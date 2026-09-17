@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MatrixError } from '../../matrix/api/matrixError'
+import { MatrixError } from '@/matrix/api/matrixError'
 import { consoleDev } from './consoleDev'
 
 describe('consoleDev', () => {

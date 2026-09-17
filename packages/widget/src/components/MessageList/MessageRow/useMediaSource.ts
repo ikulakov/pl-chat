@@ -1,10 +1,10 @@
+import type { ThumbnailSize } from '@/domain/media'
+import { toMediaFailure } from '@/domain/mediaFailure'
+import { useChatActions } from '@/hooks/useChatActions'
+import { useChatStore } from '@/hooks/useChatStore'
+import { parseMxcUrl } from '@/shared/utils/mxc'
+import { selectMediaVerdicts } from '@/store/selectors'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { toMediaFailure } from '../../../domain/mediaFailure'
-import type { ThumbnailSize } from '../../../matrix/api/matrixApi'
-import { useChatActions } from '../../../hooks/useChatActions'
-import { useChatStore } from '../../../hooks/useChatStore'
-import { parseMxcUrl } from '../../../shared/utils/mxc'
-import { selectMediaVerdicts } from '../../../store/selectors'
 
 /**
  * `checking` и `rejected` — состояния конвейера проверки файла на сервере. Два источника:

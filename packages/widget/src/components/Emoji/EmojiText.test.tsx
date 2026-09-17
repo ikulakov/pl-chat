@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmojiIndex } from '../../domain/emoji'
-import { ensureEmojiIndex, resetEmojiIndex } from '../../shared/emoji/emojiIndexStore'
+import type { EmojiIndex } from '@/domain/emoji'
+import { ensureEmojiIndex, resetEmojiIndex } from '@/shared/emoji/emojiIndexStore'
 import { EmojiText } from './EmojiText'
 
 const BITMAP = 'data:image/png;base64,AAA'
@@ -12,12 +12,12 @@ const index: EmojiIndex = {
 }
 
 // Байты анимации берутся через ChatActions — их подменяем; сам кадр рисовать нечем (jsdom).
-vi.mock('../../hooks/useChatActions', () => {
+vi.mock('@/hooks/useChatActions', () => {
   const actions = { loadEmojiAnimation: () => Promise.resolve({}) }
   return { useChatActions: () => actions }
 })
 
-vi.mock('../../shared/lottie/emojiBitmap', () => ({
+vi.mock('@/shared/lottie/emojiBitmap', () => ({
   getEmojiBitmap: () => Promise.resolve(BITMAP),
 }))
 

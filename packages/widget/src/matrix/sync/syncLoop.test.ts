@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { deferred, ROOM_ID, syncResponse } from '../../shared/testUtils/matrixFixtures'
+import { deferred, ROOM_ID, syncResponse } from '@/shared/testUtils/matrixFixtures'
 import type { MatrixApi } from '../api/matrixApi'
-import type { SyncResponse } from '../wire/dto'
+import type * as Matrix from '../wire'
 import { SetPresence } from './presence'
 import { MatrixSyncLoop, type SyncTick } from './syncLoop'
 
-vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock('@/shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 type LongPoll = MatrixApi['longPollSync']
 
@@ -128,7 +128,7 @@ describe('MatrixSyncLoop', () => {
   })
 
   it('start() is idempotent: a second call while running does not spawn another poll', async () => {
-    const longPollSync = vi.fn<LongPoll>(() => new Promise<SyncResponse>(() => {}))
+    const longPollSync = vi.fn<LongPoll>(() => new Promise<Matrix.SyncResponse>(() => {}))
     const loop = new MatrixSyncLoop({ longPollSync })
 
     loop.start({ cursor: 'c0', onTick: () => {} })
@@ -145,7 +145,7 @@ describe('MatrixSyncLoop', () => {
     let signal: AbortSignal | undefined
     const longPollSync = vi.fn<LongPoll>((_since, options) => {
       signal = options?.signal ?? undefined
-      return new Promise<SyncResponse>(() => {})
+      return new Promise<Matrix.SyncResponse>(() => {})
     })
     const loop = new MatrixSyncLoop({ longPollSync })
 
@@ -157,13 +157,13 @@ describe('MatrixSyncLoop', () => {
   })
 
   it('a stale run() that outlives a fast stop()+start() does not kill the new run()', async () => {
-    const oldPoll = deferred<SyncResponse>()
-    const newPoll = deferred<SyncResponse>()
+    const oldPoll = deferred<Matrix.SyncResponse>()
+    const newPoll = deferred<Matrix.SyncResponse>()
     const ticks: SyncTick[] = []
     const longPollSync = vi.fn<LongPoll>(async (since) => {
       if (since === 'c0') return oldPoll.promise
       if (since === 'c1') return newPoll.promise
-      return new Promise<SyncResponse>(() => {})
+      return new Promise<Matrix.SyncResponse>(() => {})
     })
     const loop = new MatrixSyncLoop({ longPollSync })
 

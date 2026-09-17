@@ -5,7 +5,7 @@ import {
   operatorCurrentEvent,
   readReceipt,
   roomMessageEvent,
-} from '../../shared/testUtils/matrixFixtures'
+} from '@/shared/testUtils/matrixFixtures'
 import { toRoomSyncPatch } from './roomSync'
 
 const OPERATOR = '@operator:bank'

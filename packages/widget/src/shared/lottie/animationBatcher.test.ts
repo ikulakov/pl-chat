@@ -1,5 +1,5 @@
+import type { EmojiAnimation } from '@/domain/emoji'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmojiAnimation } from '../../domain/emoji'
 import { createBatchedLoader } from './animationBatcher'
 
 /** Окно сбора закрываем вручную: иначе каждая проверка ждала бы реальные 16 мс. */

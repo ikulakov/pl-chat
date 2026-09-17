@@ -1,24 +1,9 @@
-import type { EmojiAnimation } from '../../domain/emoji'
-import type { ParsedMxcUrl } from '../../shared/utils/mxc'
+import type { EmojiAnimation } from '@/domain/emoji'
+import type { ThumbnailSize } from '@/domain/media'
+import type { ParsedMxcUrl } from '@/shared/utils/mxc'
 import type { SetPresence } from '../sync/presence'
+import type * as Matrix from '../wire'
 import { RelType } from '../wire/consts'
-import type {
-  MessagesResponse,
-  OutgoingContent,
-  OutgoingReactionContent,
-  OutgoingRedactionContent,
-  RegisterResponse,
-  SendEventResponse,
-  SyncResponse,
-  UploadResponse,
-} from '../wire/dto'
-import type {
-  EmojiBundleResponse,
-  EmojiCategoriesResponse,
-  EmojiCategoryWire,
-  EmojiPacksResponse,
-  StickerPacksResponse,
-} from '../wire/emoji'
 import { Endpoints } from './endpoints'
 import type { MatrixTransport, UploadOptions } from './matrixTransport'
 
@@ -45,17 +30,12 @@ const SYNC_DEADLINE_SLACK_MS = 30_000
 const EMOJI_TIMEOUT_MS = 30_000
 const emojiDeadline = () => AbortSignal.timeout(EMOJI_TIMEOUT_MS)
 
-export interface ThumbnailSize {
-  width: number
-  height: number
-}
-
 interface SendMessageParams {
   roomId: string
   txnId: string
   /** `m.room.message` для текста и медиа, `m.sticker` для стикера. */
   eventType: string
-  content: OutgoingContent
+  content: Matrix.OutgoingContent
 }
 
 interface SendReactionParams {
@@ -73,7 +53,7 @@ interface RedactEventParams {
 
 export function createMatrixApi(transport: MatrixTransport) {
   return {
-    registerGuest(): Promise<RegisterResponse> {
+    registerGuest(): Promise<Matrix.RegisterResponse> {
       return transport.request(Endpoints.REGISTER, {
         method: 'POST',
         body: {},
@@ -81,7 +61,7 @@ export function createMatrixApi(transport: MatrixTransport) {
       })
     },
 
-    initialSync(): Promise<SyncResponse> {
+    initialSync(): Promise<Matrix.SyncResponse> {
       return transport.request(Endpoints.SYNC, {
         searchParams: { timeout: 0 },
       })
@@ -95,7 +75,7 @@ export function createMatrixApi(transport: MatrixTransport) {
         /** Присутствие клиента на момент запроса; без него сервер активность не бампит. */
         setPresence?: SetPresence
       },
-    ): Promise<SyncResponse> {
+    ): Promise<Matrix.SyncResponse> {
       const timeout = options?.timeoutMs ?? SYNC_TIMEOUT_MS
 
       return transport.request(Endpoints.SYNC, {
@@ -111,7 +91,11 @@ export function createMatrixApi(transport: MatrixTransport) {
       })
     },
 
-    getRoomHistory(roomId: string, from: string, signal?: AbortSignal): Promise<MessagesResponse> {
+    getRoomHistory(
+      roomId: string,
+      from: string,
+      signal?: AbortSignal,
+    ): Promise<Matrix.MessagesResponse> {
       return transport.request(Endpoints.LOAD_HISTORY({ roomId }), {
         searchParams: {
           dir: 'b',
@@ -127,7 +111,7 @@ export function createMatrixApi(transport: MatrixTransport) {
       txnId,
       eventType,
       content,
-    }: SendMessageParams): Promise<SendEventResponse> {
+    }: SendMessageParams): Promise<Matrix.SendEventResponse> {
       return transport.request(Endpoints.SEND_EVENT({ roomId, eventType, txnId }), {
         method: 'PUT',
         body: content,
@@ -139,8 +123,8 @@ export function createMatrixApi(transport: MatrixTransport) {
       txnId,
       targetEventId,
       key,
-    }: SendReactionParams): Promise<SendEventResponse> {
-      const content: OutgoingReactionContent = {
+    }: SendReactionParams): Promise<Matrix.SendEventResponse> {
+      const content: Matrix.OutgoingReactionContent = {
         'm.relates_to': { rel_type: RelType.Annotation, event_id: targetEventId, key },
       }
 
@@ -151,8 +135,8 @@ export function createMatrixApi(transport: MatrixTransport) {
     },
 
     // Снятие реакции — редакция самого события реакции; сообщения клиент не редактирует.
-    redactEvent({ roomId, txnId, eventId }: RedactEventParams): Promise<SendEventResponse> {
-      const content: OutgoingRedactionContent = { redacts: eventId }
+    redactEvent({ roomId, txnId, eventId }: RedactEventParams): Promise<Matrix.SendEventResponse> {
+      const content: Matrix.OutgoingRedactionContent = { redacts: eventId }
 
       return transport.request(Endpoints.SEND_REDACTION({ roomId, txnId }), {
         method: 'PUT',
@@ -160,7 +144,7 @@ export function createMatrixApi(transport: MatrixTransport) {
       })
     },
 
-    uploadMedia(file: File, options?: UploadOptions): Promise<UploadResponse> {
+    uploadMedia(file: File, options?: UploadOptions): Promise<Matrix.UploadResponse> {
       return transport.upload(Endpoints.UPLOAD_MEDIA, file, {
         ...options,
         searchParams: { filename: file.name },
@@ -180,18 +164,18 @@ export function createMatrixApi(transport: MatrixTransport) {
       })
     },
 
-    getEmojiCategories(): Promise<EmojiCategoriesResponse> {
+    getEmojiCategories(): Promise<Matrix.EmojiCategoriesResponse> {
       return transport.request(Endpoints.EMOJI_CATEGORIES, { signal: emojiDeadline() })
     },
 
-    getEmojiCategory(categoryId: string): Promise<EmojiCategoryWire> {
+    getEmojiCategory(categoryId: string): Promise<Matrix.EmojiCategoryWire> {
       return transport.request(Endpoints.EMOJI_CATEGORY({ categoryId }), {
         signal: emojiDeadline(),
       })
     },
 
     /** Весь пак разом: по нему лента строит индекс «символ → codepoint». */
-    getEmojiPacks(): Promise<EmojiPacksResponse> {
+    getEmojiPacks(): Promise<Matrix.EmojiPacksResponse> {
       return transport.request(Endpoints.EMOJI_PACKS, { signal: emojiDeadline() })
     },
 
@@ -215,14 +199,14 @@ export function createMatrixApi(transport: MatrixTransport) {
      * Сервер склеивает ответ из готовых gzip-членов, поэтому распаковывать по-прежнему нечего:
      * браузер разжимает поток целиком и отдаёт цельный JSON.
      */
-    getEmojiAnimations(codepoints: string[], version: string): Promise<EmojiBundleResponse> {
+    getEmojiAnimations(codepoints: string[], version: string): Promise<Matrix.EmojiBundleResponse> {
       return transport.request(Endpoints.EMOJI_BUNDLE, {
         searchParams: { cp: codepoints.join(','), v: version },
         signal: emojiDeadline(),
       })
     },
 
-    getStickerPacks(): Promise<StickerPacksResponse> {
+    getStickerPacks(): Promise<Matrix.StickerPacksResponse> {
       return transport.request(Endpoints.STICKER_PACKS, { signal: emojiDeadline() })
     },
 

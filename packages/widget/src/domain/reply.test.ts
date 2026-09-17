@@ -1,5 +1,5 @@
+import { fileItem, stickerItem, textItem } from '@/shared/testUtils/matrixFixtures'
 import { describe, expect, it } from 'vitest'
-import { fileItem, stickerItem, textItem } from '../shared/testUtils/matrixFixtures'
 import { replyQuoteOf, replyTargetOf } from './reply'
 
 describe('replyQuoteOf', () => {
@@ -14,7 +14,12 @@ describe('replyQuoteOf', () => {
   it('стикер — описание, а не готовая подпись: перевод делается при рендере', () => {
     expect(replyQuoteOf(stickerItem({ body: '🐥' }))).toEqual({
       kind: 'sticker',
-      preview: { mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx', body: '🐥', format: 'image' },
+      preview: {
+        mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
+        body: '🐥',
+        format: 'image',
+        bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
+      },
     })
   })
 

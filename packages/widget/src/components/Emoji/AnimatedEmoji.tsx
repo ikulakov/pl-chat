@@ -1,11 +1,11 @@
+import { useChatActions } from '@/hooks/useChatActions'
+import { useEmojiBitmap } from '@/hooks/useEmojiBitmap'
+import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
+import { getAnimationCache } from '@/shared/lottie/animationCache'
+import { createEmojiPlayer, loadLottiePlayer } from '@/shared/lottie/lottiePlayer'
+import { lottiePool, type PoolPlayer } from '@/shared/lottie/lottiePool'
+import { cn } from '@/shared/utils/cn'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useChatActions } from '../../hooks/useChatActions'
-import { useEmojiBitmap } from '../../hooks/useEmojiBitmap'
-import { useIntersectionObserver } from '../../hooks/useIntersectionObserver'
-import { getAnimationCache } from '../../shared/lottie/animationCache'
-import { createEmojiPlayer, loadLottiePlayer } from '../../shared/lottie/lottiePlayer'
-import { lottiePool, type PoolPlayer } from '../../shared/lottie/lottiePool'
-import { cn } from '../../shared/utils/cn'
 import styles from './Emoji.module.css'
 
 interface Props {

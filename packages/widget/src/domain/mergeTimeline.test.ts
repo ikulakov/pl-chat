@@ -1,5 +1,5 @@
+import { textItem } from '@/shared/testUtils/matrixFixtures'
 import { describe, expect, it } from 'vitest'
-import { textItem } from '../shared/testUtils/matrixFixtures'
 import { mergeTimeline, prependTimeline } from './mergeTimeline'
 
 const base = textItem({ localId: '$a', eventId: '$a', sender: '@op:bank.ru', body: 'hi', ts: 100 })

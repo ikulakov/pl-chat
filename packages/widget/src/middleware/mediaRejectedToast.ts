@@ -1,8 +1,8 @@
-import { scrollTimelineTo } from '../shared/timeline/timelineScroll'
-import { findOwnMedia, pickFirstRejected } from '../domain/mediaVerdict'
-import { t } from '../i18n'
-import { showToast } from '../shared/ui/Toast'
-import type { DispatchMiddleware } from '../store/store'
+import { findOwnMedia, pickFirstRejected } from '@/domain/mediaVerdict'
+import { t } from '@/i18n'
+import { scrollTimelineTo } from '@/shared/timeline/timelineScroll'
+import { showToast } from '@/shared/ui/Toast'
+import type { DispatchMiddleware } from '@/store/store'
 
 /**
  * Тост «файл не прошёл проверку безопасности» с переходом к сообщению.

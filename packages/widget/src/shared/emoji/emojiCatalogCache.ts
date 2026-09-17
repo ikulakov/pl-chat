@@ -1,4 +1,4 @@
-import type { EmojiCatalog, EmojiCategory, EmojiIndex, EmojiItem } from '../../domain/emoji'
+import type { EmojiCatalog, EmojiCategory, EmojiIndex, EmojiItem } from '@/domain/emoji'
 import { readMeta, writeMeta } from './emojiDb'
 
 /**

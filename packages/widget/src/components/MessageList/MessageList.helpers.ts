@@ -1,9 +1,9 @@
-import { replyEventIdOf, replyQuoteOf, type ReplyStickerPreview } from '../../domain/reply'
-import { isSystem, type MessageTimelineItem, type TimelineItem } from '../../domain/timeline'
-import { t } from '../../i18n'
-import { formatDateLabel, startOfDay } from '../../shared/utils/formatDate'
+import { replyEventIdOf, replyQuoteOf, type ReplyStickerPreview } from '@/domain/reply'
+import { isSystem, type MessageTimelineItem, type TimelineItem } from '@/domain/timeline'
+import { t } from '@/i18n'
+import { formatDateLabel, startOfDay } from '@/shared/utils/formatDate'
 import { replyAuthorLabel, replyQuoteView } from '../ReplyPreview/ReplyPreview.helpers'
-import type { BubblePosition } from './MessageRow/MessageBubble'
+import type { BubblePosition } from './MessageRow'
 
 interface DayGroup {
   key: string

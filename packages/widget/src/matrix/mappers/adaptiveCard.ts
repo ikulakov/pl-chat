@@ -1,7 +1,7 @@
-import type { CardAnswer } from '../../domain/adaptiveCards'
+import type { CardAnswer } from '@/domain/adaptiveCards'
+import type * as Matrix from '../wire'
 import { MsgType } from '../wire/consts'
 import { isRoomMessage } from '../wire/guards'
-import type * as Matrix from '../wire/types'
 
 export function toCardAnswer(event: Matrix.ClientEvent): CardAnswer | undefined {
   if (!isRoomMessage(event) || event.content.msgtype !== MsgType.AdaptiveAction) return

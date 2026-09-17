@@ -1,5 +1,5 @@
-import { isPreviewableImage, resolveMimeType } from '../shared/utils/fileValidation'
-import type { ImageDimensions } from '../shared/utils/imageDimensions'
+import { isPreviewableImage, resolveMimeType } from '@/shared/utils/fileValidation'
+import type { ImageDimensions } from '@/shared/utils/imageDimensions'
 import type { StickerItem } from './emoji'
 import type {
   MediaTimelineItem,
@@ -83,6 +83,7 @@ export function createOptimisticStickerMessage({
       content: {
         body: sticker.body,
         url: sticker.url,
+        bytesUrl: sticker.bytesUrl,
         info: { ...sticker.info, size: sticker.info.size ?? 0 },
       },
     },

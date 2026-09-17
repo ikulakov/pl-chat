@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { EmojiCatalog } from '../../../domain/emoji'
-import { useChatActions } from '../../../hooks/useChatActions'
+import type { EmojiCatalog } from '@/domain/emoji'
+import { useChatActions } from '@/hooks/useChatActions'
 import {
   readCachedCatalog,
   writeCachedCatalog,
   writeCachedCategory,
-} from '../../../shared/emoji/emojiCatalogCache'
-import { syncPackVersion } from '../../../shared/emoji/emojiDb'
-import { consoleDev } from '../../../shared/utils/consoleDev'
+} from '@/shared/emoji/emojiCatalogCache'
+import { syncPackVersion } from '@/shared/emoji/emojiDb'
+import { consoleDev } from '@/shared/utils/consoleDev'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type CatalogState =
   | { status: 'loading' }

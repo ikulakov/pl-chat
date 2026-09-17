@@ -1,4 +1,4 @@
-import type { ThumbnailSize } from '../../../matrix/api/matrixApi'
+import type { ThumbnailSize } from '@/domain/media'
 
 const STANDARD: ThumbnailSize = { width: 320, height: 240 }
 const RETINA: ThumbnailSize = { width: 640, height: 480 }

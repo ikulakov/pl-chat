@@ -1,8 +1,8 @@
+import type { StickerItem, StickerPack } from '@/domain/emoji'
+import { useChatActions } from '@/hooks/useChatActions'
+import { t } from '@/i18n'
+import { consoleDev } from '@/shared/utils/consoleDev'
 import { useEffect, useState } from 'react'
-import type { StickerItem, StickerPack } from '../../../domain/emoji'
-import { useChatActions } from '../../../hooks/useChatActions'
-import { t } from '../../../i18n'
-import { consoleDev } from '../../../shared/utils/consoleDev'
 import { StickerView } from '../../Sticker/StickerView'
 import styles from './EmojiPicker.module.css'
 

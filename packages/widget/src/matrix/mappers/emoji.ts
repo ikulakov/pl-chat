@@ -1,4 +1,3 @@
-import { normalizeEmojiKey, toStickerFormat } from '../../domain/emoji'
 import type {
   EmojiCatalog,
   EmojiCategory,
@@ -6,21 +5,16 @@ import type {
   EmojiItem,
   StickerItem,
   StickerPack,
-} from '../../domain/emoji'
-import type {
-  EmojiCategoriesResponse,
-  EmojiCategoryWire,
-  EmojiPacksResponse,
-  EmojiWire,
-  StickerPacksResponse,
-  StickerWire,
-} from '../wire/emoji'
+} from '@/domain/emoji'
+import { normalizeEmojiKey, toStickerFormat } from '@/domain/emoji'
+import { Endpoints } from '../api/endpoints'
+import type * as Matrix from '../wire'
 
 /**
  * Каталог вкладок: состава ещё нет, есть только счётчики — по ним сетка резервирует место
  * и решает, какую категорию догружать.
  */
-export function toEmojiCatalog(wire: EmojiCategoriesResponse): EmojiCatalog {
+export function toEmojiCatalog(wire: Matrix.EmojiCategoriesResponse): EmojiCatalog {
   return {
     version: wire.version,
     categories: (wire.categories ?? []).map(toEmptyCategory),
@@ -28,7 +22,7 @@ export function toEmojiCatalog(wire: EmojiCategoriesResponse): EmojiCatalog {
 }
 
 /** Состав одной вкладки — здесь же приезжают силуэты. */
-export function toEmojiCategory(wire: EmojiCategoryWire): EmojiCategory {
+export function toEmojiCategory(wire: Matrix.EmojiCategoryWire): EmojiCategory {
   const items = (wire.emoji ?? []).map(toEmojiItem)
 
   return {
@@ -46,7 +40,7 @@ export function toEmojiCategory(wire: EmojiCategoryWire): EmojiCategory {
  * Ключ нормализуется так же, как при разборе текста, — без вариационного селектора. Иначе ❤️
  * (`2764 fe0f`) из сообщения не найдётся, хотя `2764` в паке есть.
  */
-export function toEmojiIndex(wire: EmojiPacksResponse): EmojiIndex {
+export function toEmojiIndex(wire: Matrix.EmojiPacksResponse): EmojiIndex {
   const packs = wire.packs ?? []
   const codepointByChar = new Map<string, string>()
 
@@ -67,7 +61,7 @@ export function toEmojiIndex(wire: EmojiPacksResponse): EmojiIndex {
  * рендиции (расширения в `url` нет), а пара `{body, info, url}` уезжает в `content` события
  * `m.sticker` дословно, собирать её самому не нужно.
  */
-export function toStickerPacks(wire: StickerPacksResponse): StickerPack[] {
+export function toStickerPacks(wire: Matrix.StickerPacksResponse): StickerPack[] {
   return (wire.packs ?? []).map((pack) => ({
     id: pack.id,
     title: pack.display_name,
@@ -75,7 +69,7 @@ export function toStickerPacks(wire: StickerPacksResponse): StickerPack[] {
   }))
 }
 
-function toStickerItem(wire: StickerWire): StickerItem {
+function toStickerItem(wire: Matrix.StickerWire): StickerItem {
   const mimetype = wire.info?.mimetype ?? ''
 
   return {
@@ -83,13 +77,14 @@ function toStickerItem(wire: StickerWire): StickerItem {
     body: wire.body,
     mediaId: wire.media_id,
     url: wire.url,
+    bytesUrl: Endpoints.STICKER_BYTES({ mediaId: wire.media_id }),
     info: { ...wire.info, mimetype },
     silhouette: wire.p ? `data:image/png;base64,${wire.p}` : null,
     format: toStickerFormat(mimetype),
   }
 }
 
-function toEmptyCategory(wire: EmojiCategoryWire): EmojiCategory {
+function toEmptyCategory(wire: Matrix.EmojiCategoryWire): EmojiCategory {
   return {
     id: wire.id,
     title: wire.display_name,
@@ -98,7 +93,7 @@ function toEmptyCategory(wire: EmojiCategoryWire): EmojiCategory {
   }
 }
 
-function toEmojiItem(wire: EmojiWire): EmojiItem {
+function toEmojiItem(wire: Matrix.EmojiWire): EmojiItem {
   return {
     codepoint: wire.codepoint,
     char: wire.e,

@@ -1,9 +1,9 @@
+import { toSubmitActions, type CardAction } from '@/domain/adaptiveCards'
+import type { AdaptiveCardTimelineItem } from '@/domain/timeline'
+import { useChatActions } from '@/hooks/useChatActions'
+import { useChatStore } from '@/hooks/useChatStore'
+import { selectCardAnswers } from '@/store/selectors'
 import { useMemo } from 'react'
-import { toSubmitActions, type CardAction } from '../../../domain/adaptiveCards'
-import type { AdaptiveCardTimelineItem } from '../../../domain/timeline'
-import { useChatActions } from '../../../hooks/useChatActions'
-import { useChatStore } from '../../../hooks/useChatStore'
-import { selectCardAnswers } from '../../../store/selectors'
 import { CardActions } from './CardActions'
 
 interface Props {

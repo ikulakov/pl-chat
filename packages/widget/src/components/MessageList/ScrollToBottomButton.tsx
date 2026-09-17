@@ -1,8 +1,8 @@
-import { useChatStore } from '../../hooks/useChatStore'
-import { t } from '../../i18n'
-import { IconButton } from '../../shared/ui/IconButton'
-import { ChevronDownIcon } from '../../shared/ui/icons'
-import { selectUnreadCount } from '../../store/selectors'
+import { useChatStore } from '@/hooks/useChatStore'
+import { t } from '@/i18n'
+import { IconButton } from '@/shared/ui/IconButton'
+import { ChevronDownIcon } from '@/shared/ui/icons'
+import { selectUnreadCount } from '@/store/selectors'
 import styles from './ScrollToBottomButton.module.css'
 
 const MAX_BADGE_COUNT = 99

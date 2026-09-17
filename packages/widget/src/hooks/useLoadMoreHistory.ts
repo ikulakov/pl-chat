@@ -1,7 +1,7 @@
+import type { TimelineItem } from '@/domain/timeline'
+import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
+import { selectIsLoadingHistory } from '@/store/selectors'
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
-import type { TimelineItem } from '../domain/timeline'
-import { ITEM_ID_ATTR } from '../shared/timeline/domAttributes'
-import { selectIsLoadingHistory } from '../store/selectors'
 import { useChatActions } from './useChatActions'
 import { useChatStore } from './useChatStore'
 

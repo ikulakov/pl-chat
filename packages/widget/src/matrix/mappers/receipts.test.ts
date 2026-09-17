@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { readReceipt, receiptEvent } from '../../shared/testUtils/matrixFixtures'
-import type { EphemeralEvent } from '../wire/types'
+import { readReceipt, receiptEvent } from '@/shared/testUtils/matrixFixtures'
+import type * as Matrix from '../wire'
 import { toReadMarkers } from './receipts'
 
 const OPERATOR = '@operator:bank'
@@ -13,7 +13,7 @@ describe('toReadMarkers', () => {
   })
 
   it('игнорирует не-receipt ephemeral-события (m.typing и пр.)', () => {
-    const typing: EphemeralEvent = {
+    const typing: Matrix.EphemeralEvent = {
       type: 'm.typing',
       content: { user_ids: [OPERATOR] },
     }

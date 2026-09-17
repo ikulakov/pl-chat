@@ -5,16 +5,16 @@ import {
   messagesResponse,
   OPERATOR_ID,
   roomMessageEvent,
-} from '../../shared/testUtils/matrixFixtures'
-import { chatRuntimeReducer } from '../../store/reducer'
-import type { ChatRuntimeState, RuntimeAction } from '../../store/state'
-import { INITIAL_RUNTIME_STATE } from '../../store/initialState'
+} from '@/shared/testUtils/matrixFixtures'
+import { chatRuntimeReducer } from '@/store/reducer'
+import type { ChatRuntimeState, RuntimeAction } from '@/store/state'
+import { INITIAL_RUNTIME_STATE } from '@/store/initialState'
 import type { MatrixApi } from '../api/matrixApi'
 import { MatrixError } from '../api/matrixError'
-import type { ClientEvent } from '../wire/types'
+import type * as Matrix from '../wire'
 import { MatrixHistoryLoader } from './historyLoader'
 
-vi.mock('../../shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock('@/shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
 
 const ROOM_ID = '!r:bank'
 
@@ -22,7 +22,7 @@ type HistoryPage = Awaited<ReturnType<MatrixApi['getRoomHistory']>>
 
 // событие, которое виджет не рендерит: сервер считает limit по сырым событиям,
 // поэтому целая страница может не дать ни одного видимого сообщения
-const invisibleEvent: ClientEvent = {
+const invisibleEvent: Matrix.ClientEvent = {
   type: 'm.reaction',
   event_id: '$react1',
   sender: OPERATOR_ID,

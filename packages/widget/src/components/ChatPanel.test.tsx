@@ -1,9 +1,9 @@
+import { t } from '@/i18n'
+import { systemItem, textItem } from '@/shared/testUtils/matrixFixtures'
+import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '@/store/initialState'
+import { chatStore } from '@/store/store'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { t } from '../i18n'
-import { systemItem, textItem } from '../shared/testUtils/matrixFixtures'
-import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '../store/initialState'
-import { chatStore } from '../store/store'
 import { ChatPanel } from './ChatPanel'
 import type * as MessageListModule from './MessageList/MessageList'
 
@@ -24,7 +24,7 @@ vi.mock('./MessageList/MessageList', async (importOriginal) => {
   }
 })
 
-vi.mock('../hooks/useChatActions', () => ({
+vi.mock('@/hooks/useChatActions', () => ({
   useChatActions: () => ({
     reconnect,
     loadEmojiIndex: vi.fn(),

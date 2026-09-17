@@ -1,4 +1,4 @@
-import { createEndpoints } from '../../shared/utils/createEndpoints'
+import { createEndpoints } from '@/shared/utils/createEndpoints'
 
 const MATRIX_CLIENT = '/_matrix/client'
 const MATRIX_MEDIA = '/_matrix/media'

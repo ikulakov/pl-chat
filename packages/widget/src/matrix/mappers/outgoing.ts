@@ -1,5 +1,5 @@
-import type { CardAction } from '../../domain/adaptiveCards'
-import { replyEventIdOf } from '../../domain/reply'
+import type { CardAction } from '@/domain/adaptiveCards'
+import { replyEventIdOf } from '@/domain/reply'
 import {
   isMedia,
   isSticker,
@@ -7,14 +7,9 @@ import {
   type MediaTimelineItem,
   type StickerTimelineItem,
   type TextTimelineItem,
-} from '../../domain/timeline'
+} from '@/domain/timeline'
 import { MatrixEventType, MsgType } from '../wire/consts'
-import type {
-  OutgoingAdaptiveActionContent,
-  OutgoingMediaContent,
-  OutgoingStickerContent,
-  OutgoingTextContent,
-} from '../wire/dto'
+import type * as Matrix from '../wire'
 
 export type OutgoingTimelineItem = TextTimelineItem | MediaTimelineItem | StickerTimelineItem
 
@@ -23,7 +18,7 @@ export function outgoingEventType(message: OutgoingTimelineItem): string {
   return isSticker(message) ? MatrixEventType.Sticker : MatrixEventType.RoomMessage
 }
 
-function toMediaContent(content: MediaContent): Omit<OutgoingMediaContent, 'msgtype'> {
+function toMediaContent(content: MediaContent): Omit<Matrix.OutgoingMediaContent, 'msgtype'> {
   const { body, url, filename, info } = content
 
   return {
@@ -41,7 +36,7 @@ function toMediaContent(content: MediaContent): Omit<OutgoingMediaContent, 'msgt
 
 export function toMessageContent(
   message: OutgoingTimelineItem,
-): OutgoingTextContent | OutgoingMediaContent | OutgoingStickerContent {
+): Matrix.OutgoingTextContent | Matrix.OutgoingMediaContent | Matrix.OutgoingStickerContent {
   // Стикер — до вычисления связи: `m.sticker` её не переносит, бэкенд поле молча отбросит.
   if (isSticker(message)) {
     const { body, url, info } = message.content
@@ -64,7 +59,7 @@ export function toMessageContent(
 export function toAdaptiveActionContent(
   cardEventId: string,
   action: CardAction,
-): OutgoingAdaptiveActionContent {
+): Matrix.OutgoingAdaptiveActionContent {
   return {
     msgtype: MsgType.AdaptiveAction,
     body: `[action: ${action.id}]`,

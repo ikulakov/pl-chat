@@ -1,4 +1,4 @@
-import type { UploadFailure } from '../../domain/mediaFailure'
+import type { UploadFailure } from '@/domain/mediaFailure'
 import {
   isForbiddenError,
   isHttpStatus,

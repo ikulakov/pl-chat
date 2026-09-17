@@ -9,10 +9,10 @@ import type {
   StickerItem,
   StickerPack,
 } from './domain/emoji'
+import type { ThumbnailSize } from './domain/media'
+import type { ReplyTarget } from './domain/reply'
 import { createMatrixService } from './matrix/createMatrixService'
 import type { MatrixService, SendFileOptions } from './matrix/matrixController'
-import type { ThumbnailSize } from './matrix/api/matrixApi'
-import type { ReplyTarget } from './domain/reply'
 import { chatStore } from './store/store'
 
 export interface ChatActions {

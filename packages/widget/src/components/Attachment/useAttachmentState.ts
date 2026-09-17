@@ -1,11 +1,7 @@
+import { useChatActions } from '@/hooks/useChatActions'
+import { isPreviewableImage, validateFile, type FileRejection } from '@/shared/utils/fileValidation'
+import { readImageDimensions, type ImageDimensions } from '@/shared/utils/imageDimensions'
 import { useCallback, useEffect, useState } from 'react'
-import { useChatActions } from '../../hooks/useChatActions'
-import {
-  isPreviewableImage,
-  validateFile,
-  type FileRejection,
-} from '../../shared/utils/fileValidation'
-import { readImageDimensions, type ImageDimensions } from '../../shared/utils/imageDimensions'
 
 export interface PendingAttachment {
   file: File

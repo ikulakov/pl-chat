@@ -1,11 +1,11 @@
 /* eslint-disable i18next/no-literal-string -- якорь заглушки пикера, не UI-текст */
+import { t } from '@/i18n'
+import { FEATURES } from '@/shared/features'
+import { makeFile } from '@/shared/testUtils/matrixFixtures'
+import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '@/store/initialState'
+import { chatStore } from '@/store/store'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { FEATURES } from '../../features'
-import { t } from '../../i18n'
-import { makeFile } from '../../shared/testUtils/matrixFixtures'
-import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '../../store/initialState'
-import { chatStore } from '../../store/store'
 import { AttachmentProvider } from '../Attachment/AttachmentProvider'
 import { Composer } from './Composer'
 import { MAX_MESSAGE_LENGTH } from './MessageTextarea'
@@ -13,7 +13,7 @@ import { MAX_MESSAGE_LENGTH } from './MessageTextarea'
 const sendMessage = vi.fn()
 const sendFile = vi.fn()
 const cancelReply = vi.fn()
-vi.mock('../../hooks/useChatActions', () => ({
+vi.mock('@/hooks/useChatActions', () => ({
   useChatActions: () => ({ sendMessage, sendFile, cancelReply }),
 }))
 

@@ -1,8 +1,7 @@
-import { sleep } from '../../shared/utils/sleep'
+import { sleep } from '@/shared/utils/sleep'
 import type { MatrixApi } from '../api/matrixApi'
 import { isMatrixAuthError, MatrixErrCode, MatrixError } from '../api/matrixError'
-import type { SyncResponse } from '../wire/dto'
-import type { JoinedRoom } from '../wire/types'
+import type * as Matrix from '../wire'
 import type { MatrixSessionStore } from './types'
 
 const ROOM_VISIBILITY_RETRY_DELAYS_MS = [200, 500]
@@ -12,10 +11,10 @@ export interface GuestSession {
   userId: string
   roomId: string
   cursor: string
-  initialRoom: JoinedRoom
+  initialRoom: Matrix.JoinedRoom
 }
 
-type SupportRoom = { roomId: string; initialRoom: JoinedRoom }
+type SupportRoom = { roomId: string; initialRoom: Matrix.JoinedRoom }
 
 export class MatrixSessionManager {
   private readonly api: MatrixApi
@@ -80,7 +79,7 @@ export class MatrixSessionManager {
     return { userId, ...room }
   }
 
-  private findSupportRoom(sync: SyncResponse): SupportRoom | null {
+  private findSupportRoom(sync: Matrix.SyncResponse): SupportRoom | null {
     const join = sync.rooms?.join
     if (!join) return null
 
