@@ -30,6 +30,7 @@
   "chat.scroll-down-unread": "Go to bottom, unread: {count}",
   "chat.action.menu": "Menu",
   "chat.action.copy": "Copy",
+  "chat.action.copied": "Message copied",
   "chat.action.retry": "Retry",
   "chat.action.reply": "Reply",
   "chat.reaction.pick": "Reactions",

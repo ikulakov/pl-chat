@@ -30,6 +30,9 @@ export const mediaRejectedToast: DispatchMiddleware =
 
     const media = findOwnMedia(nextState.room.timeline, freshIds, userId)
     if (media) {
-      showToast(t('chat.media.rejected'), () => scrollTimelineTo(media.localId))
+      showToast(t('chat.media.rejected'), {
+        tone: 'error',
+        onClick: () => scrollTimelineTo(media.localId),
+      })
     }
   }

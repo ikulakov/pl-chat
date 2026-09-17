@@ -93,11 +93,21 @@ export function Composer() {
       )}
 
       <div className={cn(styles.field, isTooLong && styles.error)}>
-        <div className={styles.main}>
+        <div className={styles.slot}>
           <FilePickerButton
             disabled={hasValidAttachment}
             onFileSelect={attachment.pickFile}
           />
+        </div>
+        <div
+          className={styles.inputArea}
+          onPointerDown={(event) => {
+            if (event.target !== event.currentTarget) return
+
+            event.preventDefault()
+            textareaRef.current?.focus()
+          }}
+        >
           <MessageTextarea
             ref={textareaRef}
             value={text}
@@ -107,23 +117,21 @@ export function Composer() {
             onEscape={replyTarget ? cancelReply : undefined}
           />
         </div>
-        <div className={styles.rightBtns}>
-          {FEATURES.emoji && (
-            <div className={styles.slot}>
-              <EmojiPickerButton onSelectEmoji={insertEmoji} />
-            </div>
-          )}
+        {FEATURES.emoji && (
           <div className={styles.slot}>
-            <IconButton
-              variant="contrast"
-              className={styles.sendBtn}
-              aria-label={t('input.send')}
-              onClick={submit}
-              disabled={!canSend}
-            >
-              <SendIcon />
-            </IconButton>
+            <EmojiPickerButton onSelectEmoji={insertEmoji} />
           </div>
+        )}
+        <div className={styles.slot}>
+          <IconButton
+            variant="contrast"
+            className={styles.sendBtn}
+            aria-label={t('input.send')}
+            onClick={submit}
+            disabled={!canSend}
+          >
+            <SendIcon />
+          </IconButton>
         </div>
       </div>
 

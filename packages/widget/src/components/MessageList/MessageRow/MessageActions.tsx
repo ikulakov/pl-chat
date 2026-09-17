@@ -5,11 +5,14 @@ import { replyTargetOf } from '../../../domain/reply'
 import { isMedia, type MessageTimelineItem } from '../../../domain/timeline'
 import { FEATURES } from '../../../features'
 import { useChatActions } from '../../../hooks/useChatActions'
+import { useChatStore } from '../../../hooks/useChatStore'
 import { t } from '../../../i18n'
 import { Dropdown, type DropdownHandle, DropdownItem } from '../../../shared/ui/Dropdown'
 import { IconButton } from '../../../shared/ui/IconButton'
+import { showToast } from '../../../shared/ui/Toast'
 import { CopyIcon, MoreIcon, ReplyIcon, RetryIcon } from '../../../shared/ui/icons'
 import { copyText } from '../../../shared/utils/clipboard'
+import { selectViewport } from '../../../store/selectors'
 import { ReactionPicker } from './ReactionPicker'
 
 interface Props {
@@ -21,6 +24,7 @@ interface Props {
 
 export function MessageActions({ ref, message, isOwn, reactions }: Props) {
   const { resendMessage, replyTo, toggleReaction } = useChatActions()
+  const viewport = useChatStore(selectViewport)
 
   const replyTarget = replyTargetOf(message)
   const uploadFailed = isMedia(message) && message.upload?.error
@@ -32,6 +36,14 @@ export function MessageActions({ ref, message, isOwn, reactions }: Props) {
 
   const hasMenuItems = canRetry || canReply || canCopy
   const disabled = !(hasMenuItems || canReact)
+
+  const handleCopy = (): void => {
+    void copyText(message.content.body).then((copied) => {
+      if (copied && viewport === 'fullscreen') {
+        showToast(t('chat.action.copied'))
+      }
+    })
+  }
 
   const menuItems = hasMenuItems ? (
     <>
@@ -56,7 +68,7 @@ export function MessageActions({ ref, message, isOwn, reactions }: Props) {
       {canCopy && (
         <DropdownItem
           icon={<CopyIcon />}
-          onSelect={() => copyText(message.content.body)}
+          onSelect={handleCopy}
         >
           {t('chat.action.copy')}
         </DropdownItem>

@@ -89,7 +89,7 @@ describe('mediaRejectedToast', () => {
     dispatch(rejectedSync('mine'))
 
     expect(showToast).toHaveBeenCalledTimes(1)
-    showToast.mock.calls[0]?.[1]()
+    showToast.mock.calls[0]?.[1].onClick()
     expect(scrollTimelineTo).toHaveBeenCalledWith('local-mine')
   })
 

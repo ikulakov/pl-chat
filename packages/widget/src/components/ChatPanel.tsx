@@ -6,7 +6,6 @@ import welcomeIllustration from '../shared/assets/welcome-illustration.webp'
 import { externalLinks } from '../shared/constants/externalLinks'
 import { Spinner } from '../shared/ui/Spinner'
 import { StatusScreen, StatusScreenAction, StatusScreenImage } from '../shared/ui/StatusScreen'
-import { ToastOutlet } from '../shared/ui/Toast'
 import {
   selectHasMessages,
   selectPanelView,
@@ -93,8 +92,6 @@ export function ChatPanel() {
               />
             )}
             <Composer />
-
-            <ToastOutlet />
           </AttachmentProvider>
         )}
       </ErrorBoundary>

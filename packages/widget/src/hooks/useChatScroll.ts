@@ -27,12 +27,12 @@ interface UseChatScrollParams {
 function getScrollTopForTarget(list: HTMLElement, target: ScrollTarget): number {
   if (target === 'bottom') return list.scrollHeight - list.clientHeight
 
-  return (
-    list.scrollTop +
-    target.element.getBoundingClientRect().top -
-    list.getBoundingClientRect().top -
-    (list.clientHeight - target.element.offsetHeight) / 2
-  )
+  const elementTop =
+    list.scrollTop + target.element.getBoundingClientRect().top - list.getBoundingClientRect().top
+
+  if (target.element.offsetHeight > list.clientHeight) return elementTop
+
+  return elementTop - (list.clientHeight - target.element.offsetHeight) / 2
 }
 
 /**

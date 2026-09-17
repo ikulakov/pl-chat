@@ -93,4 +93,6 @@ import { t } from '../i18n'
 pnpm build       # собирает protocol, loader, widget
 pnpm typecheck   # проверка типов
 pnpm lint        # линтер
+pnpm test        # юнит-тесты (vitest)
+pnpm sbom        # собирает виджет и кладёт sbom.json в корень репозитория
 ```

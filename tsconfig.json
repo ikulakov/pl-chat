@@ -4,6 +4,7 @@
     { "path": "./packages/protocol" },
     { "path": "./packages/loader" },
     { "path": "./packages/widget" },
-    { "path": "./tools/host-demo" }
+    { "path": "./tools/host-demo" },
+    { "path": "./e2e" }
   ]
 }

@@ -3,15 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FEATURES } from '../../../features'
 import { t } from '../../../i18n'
 import { fileItem, textItem } from '../../../shared/testUtils/matrixFixtures'
+import { chatStore } from '../../../store/store'
 import { MessageActions } from './MessageActions'
 
 const resendMessage = vi.fn()
 const replyTo = vi.fn()
 const toggleReaction = vi.fn()
+const showToast = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../hooks/useChatActions', () => ({
   useChatActions: () => ({ resendMessage, replyTo, toggleReaction }),
 }))
+
+vi.mock('../../../shared/ui/Toast', () => ({ showToast }))
 
 describe('MessageActions', () => {
   beforeEach(() => {
@@ -19,9 +23,11 @@ describe('MessageActions', () => {
     // лежит в features.ts на момент сборки. Выключенное состояние проверяет свой тест ниже.
     vi.spyOn(FEATURES, 'reactions', 'get').mockReturnValue(true)
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
+    chatStore.getState().setViewport('docked')
     resendMessage.mockClear()
     replyTo.mockClear()
     toggleReaction.mockClear()
+    showToast.mockClear()
   })
 
   afterEach(() => {
@@ -44,6 +50,23 @@ describe('MessageActions', () => {
     fireEvent.click(screen.getByText(t('chat.action.copy')))
 
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('hello world'))
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
+  it('shows a success toast after copying in the mobile fullscreen viewport', async () => {
+    chatStore.getState().setViewport('fullscreen')
+    render(
+      <MessageActions
+        message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello world' })}
+        isOwn={false}
+        reactions={[]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+    fireEvent.click(screen.getByText(t('chat.action.copy')))
+
+    await waitFor(() => expect(showToast).toHaveBeenCalledExactlyOnceWith(t('chat.action.copied')))
   })
 
   it('a real tap on "Копировать" (pointerdown → click) is not swallowed by the outside-close handler', async () => {

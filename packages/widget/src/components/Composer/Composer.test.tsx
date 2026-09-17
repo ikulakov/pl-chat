@@ -73,6 +73,18 @@ describe('Composer — семантика отправки', () => {
     expect(sendMessage).not.toHaveBeenCalled()
   })
 
+  it('ставит фокус в поле по нажатию на свободную область ввода', () => {
+    render(<Composer />, { wrapper: AttachmentProvider })
+
+    const textarea = screen.getByRole('textbox')
+    const inputArea = textarea.parentElement
+    expect(inputArea).not.toBeNull()
+
+    fireEvent.pointerDown(inputArea!)
+
+    expect(textarea).toHaveFocus()
+  })
+
   it('не отправляет пустой/whitespace-ввод', () => {
     render(<Composer />, { wrapper: AttachmentProvider })
 

@@ -30,6 +30,7 @@
   "chat.scroll-down-unread": "Вниз, непрочитанных: {count}",
   "chat.action.menu": "Меню",
   "chat.action.copy": "Копировать",
+  "chat.action.copied": "Сообщение скопировано",
   "chat.action.retry": "Повторить отправку",
   "chat.action.reply": "Ответить",
   "chat.reaction.pick": "Реакции",

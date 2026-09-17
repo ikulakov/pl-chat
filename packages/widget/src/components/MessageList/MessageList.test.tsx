@@ -46,6 +46,20 @@ describe('MessageList', () => {
     vi.useRealTimers()
   })
 
+  it('anchors the toast region inside the message-list viewport wrapper', () => {
+    chatStore.setState({
+      room: {
+        ...INITIAL_ROOM_STATE,
+        timeline: [message({ localId: 'a', eventId: '$a', body: 'hi' })],
+      },
+    })
+
+    render(<MessageList userId={ME} />)
+
+    const messageList = screen.getByTestId('message-list')
+    expect(messageList.parentElement).toContainElement(screen.getByRole('alert'))
+  })
+
   it('inserts exactly one date separator per distinct calendar day, not per message', () => {
     const day1 = new Date('2026-07-01T10:00:00').getTime()
     const day2 = new Date('2026-07-02T10:00:00').getTime()

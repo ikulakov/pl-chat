@@ -30,8 +30,8 @@ spec:
           {{- end }}
           resources:
             requests:
-              cpu: "250m"
-              memory: "768Mi"
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+              memory: {{ .Values.resources.requests.memory | quote }}
             limits:
-              cpu: "1000m"
-              memory: "1Gi"
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+              memory: {{ .Values.resources.limits.memory | quote }}

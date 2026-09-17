@@ -17,7 +17,7 @@ export function SendStatusIcon({ sendStatus: status, isRead }: Props) {
     )
   }
   if (status === 'failed') {
-    return <FailedIcon className={styles.failed} />
+    return <FailedIcon />
   }
   return isRead ? <CheckmarkDoubleIcon data-read="true" /> : <CheckmarkIcon data-read="false" />
 }

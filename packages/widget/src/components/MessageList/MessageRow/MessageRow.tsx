@@ -143,6 +143,7 @@ export const MessageRow = memo(
             </div>
           )
         case 'text':
+        case 'adaptiveCard':
           return emojiOnlyLayout ? (
             <EmojiMessage
               segments={segments}
@@ -158,20 +159,10 @@ export const MessageRow = memo(
                   meta={meta}
                 />
               </MessageBubble>
+              {message.kind === 'adaptiveCard' && <AdaptiveCardActions item={message} />}
             </div>
           )
-        case 'adaptiveCard':
-          return (
-            <div className={styles.content}>
-              <MessageBubble {...bubbleProps}>
-                <TextContent
-                  text={message.content.body}
-                  meta={meta}
-                />
-              </MessageBubble>
-              <AdaptiveCardActions item={message} />
-            </div>
-          )
+
         default:
           return assertNever(message)
       }

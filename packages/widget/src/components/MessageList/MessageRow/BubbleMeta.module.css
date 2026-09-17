@@ -7,23 +7,19 @@
   margin-left: 8px;
   align-self: end;
   height: 18px;
+  color: var(--c-text-message-meta);
 }
 
 .metaOwn {
-  color: var(--meta-own-color, var(--c-text-invert-dim));
+  color: var(--c-text-message-own-meta);
 }
 
 .time {
   font-size: 11px;
   font-weight: 400;
   line-height: normal;
-  color: var(--c-text-disabled);
   text-align: right;
   min-width: 28px;
   white-space: nowrap;
   flex-shrink: 0;
-
-  .metaOwn & {
-    color: inherit;
-  }
 }

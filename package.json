@@ -10,13 +10,16 @@
     "dev": "turbo run dev",
     "build": "turbo run build --filter=\"./packages/*\"",
     "test": "turbo run test",
-    "typecheck": "turbo run typecheck",
+    "test:e2e": "playwright test",
+    "typecheck": "turbo run typecheck && tsc --noEmit -p e2e",
     "lint": "turbo run lint",
+    "sbom": "turbo run build --filter=@bankchat/widget && node -e \"require('fs').copyFileSync('packages/widget/dist/sbom.json', 'sbom.json')\"",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-i18next": "^6.1.4",

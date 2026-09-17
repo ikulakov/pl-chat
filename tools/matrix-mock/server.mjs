@@ -31,6 +31,7 @@
 //   /card broken  — Adaptive Card с невалидным payload (деградация в текст)
 //   /card openurl — Adaptive Card только с Action.OpenUrl (кнопки нет — не Action.Submit)
 //   /card many    — Adaptive Card с 12 кнопками (проверка клиентского лимита MAX_BUTTONS=10)
+//   /cards        — четыре быстрых сообщения-карточки с кнопками (как пачка ответов бота)
 //   /notice     — системная плашка (m.notice)
 //   /left       — оператор завершает чат
 //   /join       — оператор возвращается (откат /left)
@@ -59,19 +60,19 @@
 //
 // Авто-ответ приходит и на вложения (m.image/m.file), не только на текст.
 // =============================================================================
-import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import { deflateSync } from "node:zlib";
+import { readFileSync } from 'node:fs'
+import { createServer } from 'node:http'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { deflateSync } from 'node:zlib'
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const scenario = JSON.parse(readFileSync(join(__dirname, "scenario.json"), "utf8"));
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const scenario = JSON.parse(readFileSync(join(__dirname, 'scenario.json'), 'utf8'))
 
-const PORT = process.env.MOCK_PORT ? Number(process.env.MOCK_PORT) : 3001;
-const ROOM = scenario.roomId;
-const OP = scenario.operatorId;
-const GUEST = scenario.guest.user_id;
+const PORT = process.env.MOCK_PORT ? Number(process.env.MOCK_PORT) : 3001
+const ROOM = scenario.roomId
+const OP = scenario.operatorId
+const GUEST = scenario.guest.user_id
 
 // ── Каталог стикеров (mock) ──────────────────────────────────────────────────
 // Настоящий каталог — 5 паков и 150 стикеров в трёх рендициях. Здесь по три позиции на пак,
@@ -83,39 +84,69 @@ const GUEST = scenario.guest.user_id;
 // настоящий webm из пака Rubi OTP — VP9 с альфой не синтезируешь, а без него ветка видео
 // локально непроверяема вовсе.
 const STICKER_PACKS = [
-  { id: "rubi_otp", display_name: "Rubi OTP", description: "Фирменный пак ОТП Банка",
-    mimetype: "video/webm", animated: true, bodies: ["🩷", "😎", "🎉"] },
-  { id: "utya", display_name: "Утя", description: "Анимированный утёнок",
-    mimetype: "application/json", animated: true, bodies: ["🐥", "😴", "🥳"] },
-  { id: "hands_for_friends", display_name: "Руки", description: "Анимированные жесты",
-    mimetype: "application/json", animated: true, bodies: ["👍", "👏", "🤝"] },
-  { id: "gentle_rabbit", display_name: "Кролик", description: "Мягкий кролик",
-    mimetype: "image/webp", animated: false, bodies: ["🐰", "❤️", "😢"] },
-  { id: "panda_chan", display_name: "Панда", description: "Панда-тян",
-    mimetype: "image/webp", animated: false, bodies: ["🐼", "🍜", "😆"] },
-];
+  {
+    id: 'rubi_otp',
+    display_name: 'Rubi OTP',
+    description: 'Фирменный пак ОТП Банка',
+    mimetype: 'video/webm',
+    animated: true,
+    bodies: ['🩷', '😎', '🎉'],
+  },
+  {
+    id: 'utya',
+    display_name: 'Утя',
+    description: 'Анимированный утёнок',
+    mimetype: 'application/json',
+    animated: true,
+    bodies: ['🐥', '😴', '🥳'],
+  },
+  {
+    id: 'hands_for_friends',
+    display_name: 'Руки',
+    description: 'Анимированные жесты',
+    mimetype: 'application/json',
+    animated: true,
+    bodies: ['👍', '👏', '🤝'],
+  },
+  {
+    id: 'gentle_rabbit',
+    display_name: 'Кролик',
+    description: 'Мягкий кролик',
+    mimetype: 'image/webp',
+    animated: false,
+    bodies: ['🐰', '❤️', '😢'],
+  },
+  {
+    id: 'panda_chan',
+    display_name: 'Панда',
+    description: 'Панда-тян',
+    mimetype: 'image/webp',
+    animated: false,
+    bodies: ['🐼', '🍜', '😆'],
+  },
+]
 
 // media_id боевого сервера — ровно 24 символа [A-Za-z0-9]; клиент на это закладывается.
 const mockMediaId = (packId, index) =>
-  (packId.replace(/[^a-z]/g, "") + "Sticker" + index).padEnd(24, "0").slice(0, 24);
+  (packId.replace(/[^a-z]/g, '') + 'Sticker' + index).padEnd(24, '0').slice(0, 24)
 
 // Индекс байтов заполняется сразу — он нужен маршруту отдачи и не требует генерации PNG.
 const STICKERS_BY_MEDIA_ID = new Map(
   STICKER_PACKS.flatMap((pack) =>
     pack.bodies.map((_, i) => [mockMediaId(pack.id, i), { mimetype: pack.mimetype, index: i }]),
   ),
-);
+)
 
 // Сам каталог — лениво: силуэты строит grayPng(), а тот опирается на таблицу CRC, объявленную
 // ниже по файлу. Собирать его на этапе инициализации модуля значило бы обратиться к ней из TDZ.
-let stickerCatalog = null;
+let stickerCatalog = null
 function getStickerCatalog() {
   stickerCatalog ??= STICKER_PACKS.map((pack) => ({
     id: pack.id,
     display_name: pack.display_name,
     description: pack.description,
     stickers: pack.bodies.map((body, i) => ({
-      id: `${String(i + 1).padStart(2, "0")}_${pack.id}`,
+      id: `${String(i + 1).padStart(2, '0')}_${pack.id}`,
       body,
       info: {
         mimetype: pack.mimetype,
@@ -127,123 +158,123 @@ function getStickerCatalog() {
       },
       url: `mxc://bank.ru/${mockMediaId(pack.id, i)}`,
       media_id: mockMediaId(pack.id, i),
-      p: grayPng(i).toString("base64"),
+      p: grayPng(i).toString('base64'),
     })),
-  }));
+  }))
 
-  return stickerCatalog;
+  return stickerCatalog
 }
 
 // ── Каталог эмодзи (mock) ────────────────────────────────────────────────────
 // Настоящий пак — 580 анимаций на 17 МБ в matrixkc (профиль emoji-pack). Здесь встроенный
 // набор: codepoint'ы взяты из реального emoji.csv, поэтому переключение мока на живой
 // бэкенд ничего не ломает. Силуэты и анимации генерируются на лету (см. grayPng/mockLottie).
-const EMOJI_PACK_VERSION = "mock-1";
+const EMOJI_PACK_VERSION = 'mock-1'
 const EMOJI_CATEGORIES = [
   {
-    id: "smileys",
-    display_name: "Смайлы и эмоции",
+    id: 'smileys',
+    display_name: 'Смайлы и эмоции',
     emoji: [
-      ["1f600", "😀"],
-      ["1f602", "😂"],
-      ["1f60d", "😍"],
-      ["1f618", "😘"],
-      ["1f621", "😡"],
-      ["1f62d", "😭"],
-      ["1f643", "🙃"],
-      ["1f929", "🤩"],
-      ["1f92f", "🤯"],
-      ["1f973", "🥳"],
-      ["1f4a9", "💩"],
-      ["2764", "❤"],
-      ["1f47b", "👻"],
-      ["1f480", "💀"],
+      ['1f600', '😀'],
+      ['1f602', '😂'],
+      ['1f60d', '😍'],
+      ['1f618', '😘'],
+      ['1f621', '😡'],
+      ['1f62d', '😭'],
+      ['1f643', '🙃'],
+      ['1f929', '🤩'],
+      ['1f92f', '🤯'],
+      ['1f973', '🥳'],
+      ['1f4a9', '💩'],
+      ['2764', '❤'],
+      ['1f47b', '👻'],
+      ['1f480', '💀'],
     ],
   },
   {
-    id: "animals",
-    display_name: "Животные и природа",
+    id: 'animals',
+    display_name: 'Животные и природа',
     emoji: [
-      ["1f331", "🌱"],
-      ["1f333", "🌳"],
-      ["1f337", "🌷"],
-      ["1f339", "🌹"],
+      ['1f331', '🌱'],
+      ['1f333', '🌳'],
+      ['1f337', '🌷'],
+      ['1f339', '🌹'],
     ],
   },
   {
-    id: "food",
-    display_name: "Еда и напитки",
+    id: 'food',
+    display_name: 'Еда и напитки',
     emoji: [
-      ["1f32d", "🌭"],
-      ["1f346", "🍆"],
-      ["1f353", "🍓"],
-      ["1f355", "🍕"],
+      ['1f32d', '🌭'],
+      ['1f346', '🍆'],
+      ['1f353', '🍓'],
+      ['1f355', '🍕'],
     ],
   },
-];
+]
 const EMOJI_BY_CODEPOINT = new Set(
   EMOJI_CATEGORIES.flatMap((c) => c.emoji.map(([codepoint]) => codepoint)),
-);
+)
 
 // ── In-memory состояние комнаты ──────────────────────────────────────────────
-let seq = 0;
-const nextId = () => "$ev" + ++seq;
-const events = [];
-let typing = [];
-let typingVersion = 0;
-let lastReadEventId = null;
-let receiptVersion = 0;
-let waiters = [];
+let seq = 0
+const nextId = () => '$ev' + ++seq
+const events = []
+let typing = []
+let typingVersion = 0
+let lastReadEventId = null
+let receiptVersion = 0
+let waiters = []
 
 // Одноразовые сбои по команде из чата: снимаются первым же сработавшим запросом,
 // чтобы повтор («Отправить снова») сразу проходил — как при обычном сетевом сбое.
-let failNextSend = false;
-let failNextAction = false;
-let failNextUpload = false;
+let failNextSend = false
+let failNextAction = false
+let failNextUpload = false
 // Отказ fileguard'а — детерминированный вердикт: повтор того же файла даст тот же ответ,
 // поэтому клиент вместо «Повторить» предлагает убрать черновик.
-let rejectNextUpload = false;
+let rejectNextUpload = false
 // Режимы отдачи медиа: имитируют статусную машину карантина CDR на стороне сервера.
-let mediaMode = "clean"; // clean | pending | rejected
-let failThumbnail = false;
+let mediaMode = 'clean' // clean | pending | rejected
+let failThumbnail = false
 
 function push(type, sender, content, stateKey, txnId) {
-  const ev = { event_id: nextId(), type, sender, origin_server_ts: Date.now(), content };
-  if (stateKey !== undefined) ev.state_key = stateKey;
+  const ev = { event_id: nextId(), type, sender, origin_server_ts: Date.now(), content }
+  if (stateKey !== undefined) ev.state_key = stateKey
   // unsigned.transaction_id — как на реальном MatrixKC: виден только паре, которая отправила
   // событие. Мок однопользовательский (один гость), поэтому scoping по (user, device) не нужен —
   // достаточно прокинуть txnId, если он был передан отправителем.
-  if (txnId !== undefined) ev.unsigned = { transaction_id: txnId };
-  events.push(ev);
-  wake();
-  return ev;
+  if (txnId !== undefined) ev.unsigned = { transaction_id: txnId }
+  events.push(ev)
+  wake()
+  return ev
 }
 
 function setTyping(users) {
-  typing = users;
-  typingVersion++;
-  wake();
+  typing = users
+  typingVersion++
+  wake()
 }
 
 function operatorRead(eventId) {
-  lastReadEventId = eventId;
-  receiptVersion++;
-  wake();
+  lastReadEventId = eventId
+  receiptVersion++
+  wake()
 }
 
 function wake() {
-  const w = waiters;
-  waiters = [];
-  w.forEach((r) => r());
+  const w = waiters
+  waiters = []
+  w.forEach((r) => r())
 }
 
 // Сид комнаты из scenario.json.
 // MOCK_EMPTY_ROOM=1 оставляет только state-события (membership, kc.operator.current):
 // комната есть, сообщений нет — так проверяется экран приветствия в пустой ленте.
-const emptyRoom = process.env.MOCK_EMPTY_ROOM === "1";
+const emptyRoom = process.env.MOCK_EMPTY_ROOM === '1'
 for (const e of scenario.seed) {
-  if (emptyRoom && !("state_key" in e)) continue;
-  push(e.type, e.sender, e.content, "state_key" in e ? e.state_key : undefined);
+  if (emptyRoom && !('state_key' in e)) continue
+  push(e.type, e.sender, e.content, 'state_key' in e ? e.state_key : undefined)
 }
 
 // Как реальный MatrixKC (SyncServiceImpl.INITIAL_TIMELINE_LIMIT): initial sync отдаёт
@@ -251,41 +282,41 @@ for (const e of scenario.seed) {
 // в dev фиксированы, scenario.json), events копится на каждый reload/переоткрытие
 // виджета — без капа initial sync рано или поздно возвращает ВСЮ сессионную переписку
 // одним ответом, чего реальный сервер никогда не делает.
-const INITIAL_TIMELINE_LIMIT = 50;
+const INITIAL_TIMELINE_LIMIT = 50
 
 // ── Построение /sync-ответа от курсора "n.tv.rv" ────────────────────────────
 function buildSync(n, tv, rv) {
-  const newEvents = events.slice(n);
-  const stateEvents = newEvents.filter((e) => e.state_key !== undefined);
-  const timelineEvents = newEvents.filter((e) => e.state_key === undefined);
-  const ephemeral = [];
+  const newEvents = events.slice(n)
+  const stateEvents = newEvents.filter((e) => e.state_key !== undefined)
+  const timelineEvents = newEvents.filter((e) => e.state_key === undefined)
+  const ephemeral = []
   if (typingVersion > tv) {
-    ephemeral.push({ type: "m.typing", content: { user_ids: typing } });
+    ephemeral.push({ type: 'm.typing', content: { user_ids: typing } })
   }
   if (receiptVersion > rv && lastReadEventId) {
     ephemeral.push({
-      type: "m.receipt",
-      content: { [lastReadEventId]: { "m.read": { [OP]: { ts: Date.now() } } } },
-    });
+      type: 'm.receipt',
+      content: { [lastReadEventId]: { 'm.read': { [OP]: { ts: Date.now() } } } },
+    })
   }
-  const hasDelta = newEvents.length > 0 || typingVersion > tv || receiptVersion > rv;
-  const timeline = { events: timelineEvents };
+  const hasDelta = newEvents.length > 0 || typingVersion > tv || receiptVersion > rv
+  const timeline = { events: timelineEvents }
   if (n === 0) {
     // Кап живых событий — ВСЕГДА, независимо от тумблера «История»: реальный сервер режет
     // initial sync до INITIAL_TIMELINE_LIMIT безусловно (это защита от раздутого ответа, а не
     // фича истории). Иначе выключенный тумблер продолжал бы отдавать всю накопленную за
     // dev-сессию переписку одним sync — ровно баг, который тумблер должен был исключить.
-    const overflow = Math.max(0, timelineEvents.length - INITIAL_TIMELINE_LIMIT);
+    const overflow = Math.max(0, timelineEvents.length - INITIAL_TIMELINE_LIMIT)
     if (overflow > 0) {
-      timeline.events = timelineEvents.slice(-INITIAL_TIMELINE_LIMIT);
+      timeline.events = timelineEvents.slice(-INITIAL_TIMELINE_LIMIT)
     }
     // limited/prev_batch — курсор докачки. Тумблер «История» регулирует ТОЛЬКО присутствие
     // синтетического корпуса HISTORY (см. combinedTimeline) — живой overflow (сообщения этой
     // dev-сессии сверх лимита) должен докачиваться независимо от тумблера, иначе выключение
     // истории делало бы недостижимыми реально отправленные сообщения.
     if (overflow > 0 || historyEnabled) {
-      timeline.limited = true;
-      timeline.prev_batch = `i${historyBaseLength() + overflow}`;
+      timeline.limited = true
+      timeline.prev_batch = `i${historyBaseLength() + overflow}`
     }
   }
   return {
@@ -298,7 +329,7 @@ function buildSync(n, tv, rv) {
         },
       },
     },
-  };
+  }
 }
 
 // ── История комнаты (для GET /messages) ─────────────────────────────────────
@@ -310,75 +341,75 @@ function buildSync(n, tv, rv) {
 //     именно пустой chunk, а не отсутствие `end` (клиент делает один холостой запрос);
 //   • limit считается по СЫРЫМ событиям, поэтому страница может не дать ни одного
 //     отображаемого сообщения — см. блок невидимых событий ниже.
-const HISTORY_DAYS = 10; // на сколько дней назад растянута переписка (date-разделители)
-const HISTORY_MESSAGES = Number(process.env.MOCK_HISTORY_MESSAGES ?? 480);
-const HISTORY_DELAY_MS = 600; // чтобы спиннер подгрузки был виден
+const HISTORY_DAYS = 10 // на сколько дней назад растянута переписка (date-разделители)
+const HISTORY_MESSAGES = Number(process.env.MOCK_HISTORY_MESSAGES ?? 480)
+const HISTORY_DELAY_MS = 600 // чтобы спиннер подгрузки был виден
 
 // Задержка ответа на media-upload; 0 — мгновенно, как было. Ставить при отладке UI загрузки.
-const UPLOAD_DELAY_MS = Number(process.env.MOCK_UPLOAD_DELAY_MS ?? 0);
+const UPLOAD_DELAY_MS = Number(process.env.MOCK_UPLOAD_DELAY_MS ?? 0)
 
 // Размер клиентской страницы (widget: HISTORY_PAGE_SIZE). Нужен, чтобы блок невидимых
 // событий лёг ровно в границы одной страницы — иначе сценарий «страница без сообщений»
 // не воспроизведётся.
-const CLIENT_PAGE_SIZE = 50;
-const INVISIBLE_PAGE_INDEX = 2; // третья страница с конца — целиком нерендерящаяся
+const CLIENT_PAGE_SIZE = 50
+const INVISIBLE_PAGE_INDEX = 2 // третья страница с конца — целиком нерендерящаяся
 
-const DAY_MS = 86_400_000;
+const DAY_MS = 86_400_000
 
 // Реплики тем идут по кругу: получается длинная переписка «клиент возвращался много раз».
 function buildHistoryMessages(total) {
-  const lines = scenario.historyTopics.flat();
-  const perDay = Math.ceil(total / HISTORY_DAYS);
-  const midnight = new Date().setHours(0, 0, 0, 0);
-  const out = [];
+  const lines = scenario.historyTopics.flat()
+  const perDay = Math.ceil(total / HISTORY_DAYS)
+  const midnight = new Date().setHours(0, 0, 0, 0)
+  const out = []
 
   for (let i = 0; i < total; i++) {
-    const daysAgo = HISTORY_DAYS - Math.floor(i / perDay); // от HISTORY_DAYS до 1 (вчера)
-    const dayStart = midnight - daysAgo * DAY_MS + 10 * 3_600_000; // диалоги с 10:00
-    const [who, text] = lines[i % lines.length];
+    const daysAgo = HISTORY_DAYS - Math.floor(i / perDay) // от HISTORY_DAYS до 1 (вчера)
+    const dayStart = midnight - daysAgo * DAY_MS + 10 * 3_600_000 // диалоги с 10:00
+    const [who, text] = lines[i % lines.length]
 
     out.push({
       event_id: `$hist${i}`,
-      type: "m.room.message",
-      sender: who === "op" ? OP : GUEST,
+      type: 'm.room.message',
+      sender: who === 'op' ? OP : GUEST,
       origin_server_ts: dayStart + (i % perDay) * 5 * 60_000, // реплика раз в 5 минут
-      content: { msgtype: "m.text", body: text },
-    });
+      content: { msgtype: 'm.text', body: text },
+    })
   }
-  return out; // ASC: от самого старого к новому
+  return out // ASC: от самого старого к новому
 }
 
 function buildInvisibleBlock(size, afterTs) {
   return Array.from({ length: size }, (_, i) => ({
     event_id: `$react${i}`,
-    type: "m.reaction",
+    type: 'm.reaction',
     sender: OP,
     origin_server_ts: afterTs + (i + 1) * 1000,
-    content: { "m.relates_to": { rel_type: "m.annotation", event_id: "$ev6", key: "👍" } },
-  }));
+    content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$ev6', key: '👍' } },
+  }))
 }
 
 // HISTORY — синтетическая «допроцессная» лента комнаты в хронологическом порядке (ASC).
-const HISTORY = buildHistoryMessages(HISTORY_MESSAGES);
+const HISTORY = buildHistoryMessages(HISTORY_MESSAGES)
 
 // Блок событий, которые виджет не рендерит, — ровно на границе страницы INVISIBLE_PAGE_INDEX.
 // Клиент обязан сам дотянуть следующую страницу, иначе IntersectionObserver «залипнет»:
 // лента не изменилась → состояние пересечения тоже → повторного выстрела не будет.
-const invisibleAt = HISTORY.length - INVISIBLE_PAGE_INDEX * CLIENT_PAGE_SIZE;
+const invisibleAt = HISTORY.length - INVISIBLE_PAGE_INDEX * CLIENT_PAGE_SIZE
 if (invisibleAt > 0) {
-  const afterTs = HISTORY[invisibleAt - 1].origin_server_ts;
-  HISTORY.splice(invisibleAt, 0, ...buildInvisibleBlock(CLIENT_PAGE_SIZE, afterTs));
+  const afterTs = HISTORY[invisibleAt - 1].origin_server_ts
+  HISTORY.splice(invisibleAt, 0, ...buildInvisibleBlock(CLIENT_PAGE_SIZE, afterTs))
 }
 
 // Флаг для dev-панели: временно скрыть историю без перезапуска мока и без урезания
 // самого массива HISTORY (он используется в findLast ниже для read receipt).
-let historyEnabled = true;
+let historyEnabled = true
 
 // Оператор уже дочитал переписку до последнего сообщения гостя. Реальный сервер отдаёт на initial
 // sync СНИМОК receipts комнаты (SyncServiceImpl: isInitial → receiptMapper.findCurrentByRoom),
 // поэтому ✓✓ на старых своих сообщениях видны сразу. Без этой строки мок присылал receipt только
 // реактивно — после первой отправки, — и подгруженная история выглядела непрочитанной.
-lastReadEventId = HISTORY.findLast((e) => e.sender === GUEST)?.event_id ?? null;
+lastReadEventId = HISTORY.findLast((e) => e.sender === GUEST)?.event_id ?? null
 
 // Единая адресуемая лента для GET /messages: синтетическая HISTORY (индексы [0, HISTORY.length))
 // + всё, что реально прошло через комнату за жизнь процесса (индексы после неё). Живые события
@@ -389,344 +420,402 @@ lastReadEventId = HISTORY.findLast((e) => e.sender === GUEST)?.event_id ?? null;
 // живой overflow остаётся докачиваемым в любом случае (это реально отправленные сообщения,
 // а не декорация мока).
 function liveTimelineEvents() {
-  return events.filter((e) => e.state_key === undefined);
+  return events.filter((e) => e.state_key === undefined)
 }
 
 function historyBaseLength() {
-  return historyEnabled ? HISTORY.length : 0;
+  return historyEnabled ? HISTORY.length : 0
 }
 
 function combinedTimeline() {
-  return historyEnabled ? [...HISTORY, ...liveTimelineEvents()] : liveTimelineEvents();
+  return historyEnabled ? [...HISTORY, ...liveTimelineEvents()] : liveTimelineEvents()
 }
 
 function currentHead() {
-  return `i${combinedTimeline().length}`;
+  return `i${combinedTimeline().length}`
 }
 
 function historyPage(from, limit) {
-  const all = combinedTimeline();
-  const upTo = from && from.startsWith("i") ? Number(from.slice(1)) : all.length;
-  if (upTo <= 0) return { chunk: [], start: from ?? currentHead() }; // начало комнаты (или её видимой части)
+  const all = combinedTimeline()
+  const upTo = from && from.startsWith('i') ? Number(from.slice(1)) : all.length
+  if (upTo <= 0) return { chunk: [], start: from ?? currentHead() } // начало комнаты (или её видимой части)
 
-  const start = Math.max(0, upTo - limit);
-  const chunk = all.slice(start, upTo).reverse(); // dir=b → newest-first
+  const start = Math.max(0, upTo - limit)
+  const chunk = all.slice(start, upTo).reverse() // dir=b → newest-first
 
-  return { chunk, start: from ?? currentHead(), end: `i${start}` };
+  return { chunk, start: from ?? currentHead(), end: `i${start}` }
 }
 
 // ── Авто-поведение оператора ─────────────────────────────────────────────────
 // На что оператор отвечает автоматически. Стикеры и kc.adaptive.action намеренно
 // не здесь: на них ответ сбивал бы проверку соответствующих сценариев.
-const REPLYABLE_MSGTYPES = new Set(["m.text", "m.image", "m.file"]);
-const MEDIA_MSGTYPES = new Set(["m.image", "m.file"]);
+const REPLYABLE_MSGTYPES = new Set(['m.text', 'm.image', 'm.file'])
+const MEDIA_MSGTYPES = new Set(['m.image', 'm.file'])
 
 /** Свежий mediaId на каждую отправку — иначе клиентский кэш превью съест повторный запрос. */
-const freshMxc = () => `mxc://bank.ru/op${Date.now().toString(36)}`;
+const freshMxc = () => `mxc://bank.ru/op${Date.now().toString(36)}`
 
 const OPERATOR_IMAGE = {
-  msgtype: "m.image",
-  body: "квитанция.png",
-  url: "mxc://bank.ru/opimg1",
-  filename: "квитанция.png",
-  info: { mimetype: "image/png", size: 24000, w: 400, h: 300 },
-};
+  msgtype: 'm.image',
+  body: 'квитанция.png',
+  url: 'mxc://bank.ru/opimg1',
+  filename: 'квитанция.png',
+  info: { mimetype: 'image/png', size: 24000, w: 400, h: 300 },
+}
 
 const OPERATOR_FILE = {
-  msgtype: "m.file",
-  body: "Договор.pdf",
-  url: "mxc://bank.ru/opfile1",
-  filename: "Договор.pdf",
-  info: { mimetype: "application/pdf", size: 1_200_000 },
-};
+  msgtype: 'm.file',
+  body: 'Договор.pdf',
+  url: 'mxc://bank.ru/opfile1',
+  filename: 'Договор.pdf',
+  info: { mimetype: 'application/pdf', size: 1_200_000 },
+}
 
 /** Последнее сообщение клиента — цель цитаты оператора. `exclude` — сама команда `/reply`. */
 function lastGuestMessageId(exclude) {
   for (let i = events.length - 1; i >= 0; i--) {
-    const e = events[i];
-    if (e.type === "m.room.message" && e.sender === GUEST && e.event_id !== exclude) {
-      return e.event_id;
+    const e = events[i]
+    if (e.type === 'm.room.message' && e.sender === GUEST && e.event_id !== exclude) {
+      return e.event_id
     }
   }
-  return null;
+  return null
 }
 
 // Активная реакция оператора — поставленная и не снятая редакцией. Реакцию снимает
 // редакция её собственного события, а не сообщения, поэтому ищем по event_id самой реакции.
 function activeOperatorReaction(target, key) {
   const redacted = new Set(
-    events.filter((e) => e.type === "m.room.redaction").map((e) => e.content.redacts)
-  );
+    events.filter((e) => e.type === 'm.room.redaction').map((e) => e.content.redacts),
+  )
   const hit = events.findLast(
     (e) =>
-      e.type === "m.reaction" &&
+      e.type === 'm.reaction' &&
       e.sender === OP &&
-      e.content["m.relates_to"]?.event_id === target &&
-      e.content["m.relates_to"]?.key === key &&
-      !redacted.has(e.event_id)
-  );
-  return hit?.event_id ?? null;
+      e.content['m.relates_to']?.event_id === target &&
+      e.content['m.relates_to']?.key === key &&
+      !redacted.has(e.event_id),
+  )
+  return hit?.event_id ?? null
 }
 
 // Синтетические варианты карточки, которые нет смысла держать в scenario.json — это тест-фикстуры
 // для проверки границ маппера/проекции (domain/adaptiveCards.ts toSubmitActions), не сид-данные.
 const CARD_BUTTONS = {
-  type: "AdaptiveCard",
-  version: "1.5",
-  body: [{ type: "TextBlock", text: "Подтвердите операцию", wrap: true }],
+  type: 'AdaptiveCard',
+  version: '1.5',
+  body: [{ type: 'TextBlock', text: 'Подтвердите операцию', wrap: true }],
   actions: [
-    { type: "Action.Submit", id: "confirm", title: "Подтвердить", data: { action: "confirm" } },
-    { type: "Action.Submit", id: "cancel", title: "Отменить", data: { action: "cancel" } },
+    { type: 'Action.Submit', id: 'confirm', title: 'Подтвердить', data: { action: 'confirm' } },
+    { type: 'Action.Submit', id: 'cancel', title: 'Отменить', data: { action: 'cancel' } },
   ],
-};
+}
 const CARD_THREE = {
-  type: "AdaptiveCard",
-  version: "1.5",
-  body: [{ type: "TextBlock", text: "Нечётное число кнопок", wrap: true }],
+  type: 'AdaptiveCard',
+  version: '1.5',
+  body: [{ type: 'TextBlock', text: 'Нечётное число кнопок', wrap: true }],
   actions: [
-    { type: "Action.Submit", id: "one", title: "Вариант 1", data: { option: 1 } },
-    { type: "Action.Submit", id: "two", title: "Вариант 2", data: { option: 2 } },
-    { type: "Action.Submit", id: "three", title: "Связаться с оператором через чат или запросить звонок ", data: { option: 3 } },
+    { type: 'Action.Submit', id: 'one', title: 'Вариант 1', data: { option: 1 } },
+    { type: 'Action.Submit', id: 'two', title: 'Вариант 2', data: { option: 2 } },
+    {
+      type: 'Action.Submit',
+      id: 'three',
+      title: 'Связаться с оператором через чат или запросить звонок ',
+      data: { option: 3 },
+    },
   ],
-};
+}
 const CARD_OPENURL = {
-  type: "AdaptiveCard",
-  version: "1.5",
-  body: [{ type: "TextBlock", text: "Открыть сайт банка?", wrap: true }],
-  actions: [{ type: "Action.OpenUrl", title: "Открыть", url: "https://bank.ru" }],
-};
+  type: 'AdaptiveCard',
+  version: '1.5',
+  body: [{ type: 'TextBlock', text: 'Открыть сайт банка?', wrap: true }],
+  actions: [{ type: 'Action.OpenUrl', title: 'Открыть', url: 'https://bank.ru' }],
+}
 const CARD_MANY = {
-  type: "AdaptiveCard",
-  version: "1.5",
-  body: [{ type: "TextBlock", text: "Выберите один из вариантов", wrap: true }],
+  type: 'AdaptiveCard',
+  version: '1.5',
+  body: [{ type: 'TextBlock', text: 'Выберите один из вариантов', wrap: true }],
   actions: Array.from({ length: 12 }, (_, i) => ({
-    type: "Action.Submit",
+    type: 'Action.Submit',
     id: `opt${i + 1}`,
     title: `Вариант ${i + 1}`,
     data: { option: i + 1 },
   })),
-};
+}
+
+function submitCard(text, actions) {
+  return {
+    msgtype: 'kc.adaptive.v1',
+    body: text,
+    adaptive_card: {
+      type: 'AdaptiveCard',
+      version: '1.5',
+      body: [{ type: 'TextBlock', text, wrap: true }],
+      actions: actions.map(([id, title, data]) => ({ type: 'Action.Submit', id, title, data })),
+    },
+  }
+}
+
+const CARD_BURST = [
+  submitCard(
+    'При первом входе в приложение введите данные для регистрации на выбор (номер карты или серию и номер паспорта),  заполните номер телефона и нажмите Войти. Далее задайте код, который будет использоваться для входа  в приложение. Важно! По номеру договора вход невозможен. Используйте, пожалуйста, серию и номер паспорта.',
+    [
+      ['cards', 'Карты', { topic: 'cards' }],
+      ['transfers', 'Переводы', { topic: 'transfers' }],
+    ],
+  ),
+  submitCard('Что случилось с операцией?', [
+    ['declined', 'Отклонена', { issue: 'declined' }],
+    ['pending', 'В обработке', { issue: 'pending' }],
+  ]),
+  submitCard('Как вам удобнее продолжить?', [
+    ['chat', 'В чате', { channel: 'chat' }],
+    ['call', 'Заказать звонок', { channel: 'call' }],
+  ]),
+  submitCard('Создать обращение?', [
+    ['confirm', 'Да', { confirm: true }],
+    ['cancel', 'Нет', { confirm: false }],
+  ]),
+]
 
 function buildCardContent(variant) {
   switch (variant) {
-    case "buttons":
-      return { msgtype: "kc.adaptive.v1", body: "Карточка с кнопками", adaptive_card: CARD_BUTTONS };
-    case "broken":
+    case 'buttons':
+      return { msgtype: 'kc.adaptive.v1', body: 'Карточка с кнопками', adaptive_card: CARD_BUTTONS }
+    case 'broken':
       // Невалидный payload (не AdaptiveCard) — клиент обязан деградировать в текст, не потерять сообщение.
       return {
-        msgtype: "kc.adaptive.v1",
-        body: "Карточка (битый payload)",
-        adaptive_card: { type: "NotAdaptiveCard" },
-      };
-    case "3":
-      return { msgtype: "kc.adaptive.v1", body: "Карточка (3 кнопки)", adaptive_card: CARD_THREE };
-    case "openurl":
-      return { msgtype: "kc.adaptive.v1", body: "Карточка (только OpenUrl)", adaptive_card: CARD_OPENURL };
-    case "many":
-      return { msgtype: "kc.adaptive.v1", body: "Карточка (много кнопок)", adaptive_card: CARD_MANY };
+        msgtype: 'kc.adaptive.v1',
+        body: 'Карточка (битый payload)',
+        adaptive_card: { type: 'NotAdaptiveCard' },
+      }
+    case '3':
+      return { msgtype: 'kc.adaptive.v1', body: 'Карточка (3 кнопки)', adaptive_card: CARD_THREE }
+    case 'openurl':
+      return {
+        msgtype: 'kc.adaptive.v1',
+        body: 'Карточка (только OpenUrl)',
+        adaptive_card: CARD_OPENURL,
+      }
+    case 'many':
+      return {
+        msgtype: 'kc.adaptive.v1',
+        body: 'Карточка (много кнопок)',
+        adaptive_card: CARD_MANY,
+      }
     default:
       // Карточка с Input.Text — деградация в текст (клиент не собирает поля ввода в T-60).
-      return { msgtype: "kc.adaptive.v1", body: "Карточка", adaptive_card: scenario.card };
+      return { msgtype: 'kc.adaptive.v1', body: 'Карточка', adaptive_card: scenario.card }
   }
 }
 
 function operatorRespond(text, ownEventId) {
-  const t = (text || "").trim();
-  if (t.startsWith("/card")) {
-    const variant = t.slice("/card".length).trim();
-    return delay(700, () => push("m.room.message", OP, buildCardContent(variant)));
+  const t = (text || '').trim()
+  if (t === '/cards') {
+    CARD_BURST.forEach((content, index) =>
+      delay(500 + index * 120, () => push('m.room.message', OP, content)),
+    )
+    return
   }
-  if (t.startsWith("/notice")) {
+  if (t.startsWith('/card')) {
+    const variant = t.slice('/card'.length).trim()
+    return delay(700, () => push('m.room.message', OP, buildCardContent(variant)))
+  }
+  if (t.startsWith('/notice')) {
     return delay(500, () =>
-      push("m.room.message", OP, { msgtype: "m.notice", body: "Системное уведомление" })
-    );
+      push('m.room.message', OP, { msgtype: 'm.notice', body: 'Системное уведомление' }),
+    )
   }
-  if (t.startsWith("/left")) {
+  if (t.startsWith('/left')) {
     return delay(500, () => {
       // m.room.member leave — наш findOperator перестаёт видеть оператора.
-      push("m.room.member", OP, { membership: "leave", displayname: "Оля" }, OP);
-      push("kc.operator.left", OP, { operator_id: "olya42", reason: "completed" });
-      push("kc.operator.current", OP, { status: "left", operator_id: null }, "");
-    });
-    return;
+      push('m.room.member', OP, { membership: 'leave', displayname: 'Оля' }, OP)
+      push('kc.operator.left', OP, { operator_id: 'olya42', reason: 'completed' })
+      push('kc.operator.current', OP, { status: 'left', operator_id: null }, '')
+    })
+    return
   }
-  if (t.startsWith("/html")) {
+  if (t.startsWith('/html')) {
     return delay(700, () =>
-      push("m.room.message", OP, {
-        msgtype: "m.text",
-        format: "org.matrix.custom.html",
-        body: "Подробности: ссылка, список, выделение",
+      push('m.room.message', OP, {
+        msgtype: 'm.text',
+        format: 'org.matrix.custom.html',
+        body: 'Подробности: ссылка, список, выделение',
         formatted_body:
           'Подробности на <a href="https://bank.ru">сайте банка</a>.<br>' +
-          "<b>Важно:</b><ul><li>паспорт</li><li>карта</li></ul>",
-      })
-    );
+          '<b>Важно:</b><ul><li>паспорт</li><li>карта</li></ul>',
+      }),
+    )
   }
   // Каждая отправка — новый mediaId: клиент кэширует байты по mxc, и с фиксированным адресом
   // повторный /img брал бы их из кэша, не ходя в сеть. Тогда переключатели режимов отдачи
   // (/failthumb, /pendingmedia, /rejectmedia) молча не действовали бы на второй и далее раз.
-  if (t.startsWith("/img")) {
-    return delay(700, () => push("m.room.message", OP, { ...OPERATOR_IMAGE, url: freshMxc() }));
+  if (t.startsWith('/img')) {
+    return delay(700, () => push('m.room.message', OP, { ...OPERATOR_IMAGE, url: freshMxc() }))
   }
-  if (t.startsWith("/file")) {
-    return delay(700, () => push("m.room.message", OP, { ...OPERATOR_FILE, url: freshMxc() }));
+  if (t.startsWith('/file')) {
+    return delay(700, () => push('m.room.message', OP, { ...OPERATOR_FILE, url: freshMxc() }))
   }
   // Ответ оператора цитатой на последнее сообщение клиента: `/reply`, `/reply img`,
   // `/reply file`. Медиа-варианты проверяют, что m.relates_to переживает маппинг
   // входящего m.image/m.file (у своих черновиков связь ставится локально и баг не виден).
-  if (t.startsWith("/reply")) {
-    const target = lastGuestMessageId(ownEventId);
-    if (!target) return;
+  if (t.startsWith('/reply')) {
+    const target = lastGuestMessageId(ownEventId)
+    if (!target) return
 
-    const kind = t.slice("/reply".length).trim();
+    const kind = t.slice('/reply'.length).trim()
     const base =
-      kind === "img"
+      kind === 'img'
         ? { ...OPERATOR_IMAGE, url: freshMxc() }
-        : kind === "file"
+        : kind === 'file'
           ? { ...OPERATOR_FILE, url: freshMxc() }
-          : { msgtype: "m.text", body: "Отвечаю на ваше сообщение" };
+          : { msgtype: 'm.text', body: 'Отвечаю на ваше сообщение' }
 
     return delay(700, () =>
-      push("m.room.message", OP, {
+      push('m.room.message', OP, {
         ...base,
-        "m.relates_to": { "m.in_reply_to": { event_id: target } },
-      })
-    );
+        'm.relates_to': { 'm.in_reply_to': { event_id: target } },
+      }),
+    )
   }
   // Реакция оператора на последнее сообщение клиента: `/react`, `/react 🔥`.
   // Повторный ввод той же реакции снимает её — так проверяется разбор m.room.redaction.
-  if (t.startsWith("/react")) {
-    const target = lastGuestMessageId(ownEventId);
-    if (!target) return;
+  if (t.startsWith('/react')) {
+    const target = lastGuestMessageId(ownEventId)
+    if (!target) return
 
-    const key = t.slice("/react".length).trim() || "👍";
+    const key = t.slice('/react'.length).trim() || '👍'
 
     return delay(500, () => {
-      const existing = activeOperatorReaction(target, key);
+      const existing = activeOperatorReaction(target, key)
       if (existing) {
-        push("m.room.redaction", OP, { redacts: existing });
-        return;
+        push('m.room.redaction', OP, { redacts: existing })
+        return
       }
-      push("m.reaction", OP, {
-        "m.relates_to": { rel_type: "m.annotation", event_id: target, key },
-      });
-    });
+      push('m.reaction', OP, {
+        'm.relates_to': { rel_type: 'm.annotation', event_id: target, key },
+      })
+    })
   }
   // Возврат оператора после /left — иначе состояние «чат завершён» не откатить без рестарта.
-  if (t.startsWith("/join")) {
+  if (t.startsWith('/join')) {
     return delay(500, () => {
-      push("m.room.member", OP, { membership: "join", displayname: "Оля" }, OP);
-      push("kc.operator.joined", OP, {
-        operator_id: "olya42",
-        displayname: "Оля",
-        role: "human",
-      });
+      push('m.room.member', OP, { membership: 'join', displayname: 'Оля' }, OP)
+      push('kc.operator.joined', OP, {
+        operator_id: 'olya42',
+        displayname: 'Оля',
+        role: 'human',
+      })
       push(
-        "kc.operator.current",
+        'kc.operator.current',
         OP,
-        { status: "active", operator_id: "olya42", displayname: "Оля" },
-        ""
-      );
-    });
+        { status: 'active', operator_id: 'olya42', displayname: 'Оля' },
+        '',
+      )
+    })
   }
   // Одноразовые сбои: следующая отправка / следующая загрузка байт вернут ошибку.
-  if (t.startsWith("/failupload")) {
-    failNextUpload = true;
+  if (t.startsWith('/failupload')) {
+    failNextUpload = true
     return delay(300, () =>
-      push("m.room.message", OP, { msgtype: "m.notice", body: "Следующая загрузка файла упадёт" })
-    );
+      push('m.room.message', OP, { msgtype: 'm.notice', body: 'Следующая загрузка файла упадёт' }),
+    )
   }
-  if (t.startsWith("/rejectupload")) {
-    rejectNextUpload = true;
+  if (t.startsWith('/rejectupload')) {
+    rejectNextUpload = true
     return delay(300, () =>
-      push("m.room.message", OP, {
-        msgtype: "m.notice",
-        body: "Следующая загрузка будет отклонена проверкой",
-      })
-    );
+      push('m.room.message', OP, {
+        msgtype: 'm.notice',
+        body: 'Следующая загрузка будет отклонена проверкой',
+      }),
+    )
   }
   // Подтверждение переключателя системной плашкой — иначе неясно, какой режим активен.
-  const notice = (body) => delay(300, () => push("m.room.message", OP, { msgtype: "m.notice", body }));
+  const notice = (body) =>
+    delay(300, () => push('m.room.message', OP, { msgtype: 'm.notice', body }))
 
   // Режимы отдачи медиа — переключатели: повторный ввод возвращает обычную отдачу байт.
-  if (t.startsWith("/failthumb")) {
-    failThumbnail = !failThumbnail;
-    return notice(`Превью ${failThumbnail ? "отвечает 404" : "снова отдаётся"}`);
+  if (t.startsWith('/failthumb')) {
+    failThumbnail = !failThumbnail
+    return notice(`Превью ${failThumbnail ? 'отвечает 404' : 'снова отдаётся'}`)
   }
-  if (t.startsWith("/pendingmedia")) {
-    mediaMode = mediaMode === "pending" ? "clean" : "pending";
-    return notice(`Медиа: ${mediaMode === "pending" ? "504, файл в карантине" : "готово"}`);
+  if (t.startsWith('/pendingmedia')) {
+    mediaMode = mediaMode === 'pending' ? 'clean' : 'pending'
+    return notice(`Медиа: ${mediaMode === 'pending' ? '504, файл в карантине' : 'готово'}`)
   }
-  if (t.startsWith("/rejectmedia")) {
-    mediaMode = mediaMode === "rejected" ? "clean" : "rejected";
-    return notice(`Медиа: ${mediaMode === "rejected" ? "404, файл отклонён" : "готово"}`);
+  if (t.startsWith('/rejectmedia')) {
+    mediaMode = mediaMode === 'rejected' ? 'clean' : 'rejected'
+    return notice(`Медиа: ${mediaMode === 'rejected' ? '404, файл отклонён' : 'готово'}`)
   }
   // Отдельный флаг от /fail — иначе тест ответа на карточку случайно ловил бы и обычный /fail,
   // выставленный для другого сценария, и наоборот. Проверяем content.msgtype === kc.adaptive.action
   // в самом PUT /send, поэтому команда не мешает следующей текстовой/медиа отправке.
-  if (t.startsWith("/failaction")) {
-    failNextAction = true;
+  if (t.startsWith('/failaction')) {
+    failNextAction = true
     return delay(300, () =>
-      push("m.room.message", OP, { msgtype: "m.notice", body: "Следующий ответ на карточку упадёт" })
-    );
+      push('m.room.message', OP, {
+        msgtype: 'm.notice',
+        body: 'Следующий ответ на карточку упадёт',
+      }),
+    )
   }
-  if (t.startsWith("/fail")) {
-    failNextSend = true;
+  if (t.startsWith('/fail')) {
+    failNextSend = true
     return delay(300, () =>
-      push("m.room.message", OP, { msgtype: "m.notice", body: "Следующая отправка упадёт" })
-    );
+      push('m.room.message', OP, { msgtype: 'm.notice', body: 'Следующая отправка упадёт' }),
+    )
   }
-  if (t.startsWith("/sticker")) {
-    const s = getStickerCatalog()[0].stickers[0];
-    return delay(700, () => push("m.sticker", OP, { body: s.body, info: s.info, url: s.url }));
+  if (t.startsWith('/sticker')) {
+    const s = getStickerCatalog()[0].stickers[0]
+    return delay(700, () => push('m.sticker', OP, { body: s.body, info: s.info, url: s.url }))
   }
   // Три размера рендера эмодзи одной командой: большое, среднее и строчные внутри текста.
-  if (t.startsWith("/emoji")) {
+  if (t.startsWith('/emoji')) {
     // Символы — из встроенного набора мока, иначе байтов для них нет и рисовать нечего.
-    const bodies = ["😀", "😀😂❤️", "Держи 🙃 и ещё 😭 в тексте"];
+    const bodies = ['😀', '😀😂❤️', 'Держи 🙃 и ещё 😭 в тексте']
     return bodies.forEach((body, i) =>
-      delay(400 + i * 300, () => push("m.room.message", OP, { msgtype: "m.text", body })),
-    );
+      delay(400 + i * 300, () => push('m.room.message', OP, { msgtype: 'm.text', body })),
+    )
   }
   // Обычный путь: «печатает…» → ответ.
-  delay(400, () => setTyping([OP]));
+  delay(400, () => setTyping([OP]))
   delay(1700, () => {
-    typing = [];
-    typingVersion++; // wake разбудит push ниже
-    push("m.room.message", OP, scenario.autoReply);
-  });
+    typing = []
+    typingVersion++ // wake разбудит push ниже
+    push('m.room.message', OP, scenario.autoReply)
+  })
 }
 
 function delay(ms, fn) {
-  setTimeout(fn, ms);
+  setTimeout(fn, ms)
 }
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────
-const send = (res, status, body, type = "application/json") => {
+const send = (res, status, body, type = 'application/json') => {
   res.writeHead(status, {
-    "Content-Type": type,
-    "Access-Control-Allow-Origin": "*",
+    'Content-Type': type,
+    'Access-Control-Allow-Origin': '*',
     // Authorization подстановочный знак не покрывает (Fetch spec) — заголовок нужен явно,
     // иначе браузер режет preflight и запрос уходит без токена. Остальные — всё, что шлёт
     // MatrixTransport сверх CORS-safelist: при добавлении нового заголовка дополнить список.
-    "Access-Control-Allow-Headers": "Authorization, Content-Type, traceparent",
-    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
-  });
-  res.end(typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body));
-};
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, traceparent',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
+  })
+  res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body))
+}
 
 function readBody(req) {
   return new Promise((resolve) => {
-    let data = "";
-    req.on("data", (c) => (data += c));
-    req.on("end", () => {
+    let data = ''
+    req.on('data', (c) => (data += c))
+    req.on('end', () => {
       try {
-        resolve(data ? JSON.parse(data) : {});
+        resolve(data ? JSON.parse(data) : {})
       } catch {
-        resolve({});
+        resolve({})
       }
-    });
-  });
+    })
+  })
 }
 
 function svgImage(w, h, label) {
@@ -735,14 +824,14 @@ function svgImage(w, h, label) {
     `<rect width="100%" height="100%" fill="#e7e3ee"/>` +
     `<text x="50%" y="50%" fill="#8c8a94" font-family="sans-serif" font-size="14" ` +
     `text-anchor="middle" dominant-baseline="middle">${label}</text></svg>`
-  );
+  )
 }
 // Один настоящий webm из пака Rubi OTP: VP9 с альфой не синтезируешь, а без файла ветку видео
 // локально не проверить. Читается лениво и один раз — на все позиции пака он один и тот же.
-let stickerWebm = null;
+let stickerWebm = null
 function loadStickerWebm() {
-  stickerWebm ??= readFileSync(join(__dirname, "assets", "sticker.webm"));
-  return stickerWebm;
+  stickerWebm ??= readFileSync(join(__dirname, 'assets', 'sticker.webm'))
+  return stickerWebm
 }
 
 // ── Генерация ассетов эмодзи ─────────────────────────────────────────────────
@@ -751,24 +840,24 @@ function loadStickerWebm() {
 // в node встроенный — зависимостей у мока по-прежнему нет.
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
-  let c = n;
-  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-  return c >>> 0;
-});
+  let c = n
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+  return c >>> 0
+})
 
 function crc32(buf) {
-  let c = 0xffffffff;
-  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
+  let c = 0xffffffff
+  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8)
+  return (c ^ 0xffffffff) >>> 0
 }
 
 function pngChunk(type, data) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length);
-  const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(body));
-  return Buffer.concat([len, body, crc]);
+  const len = Buffer.alloc(4)
+  len.writeUInt32BE(data.length)
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data])
+  const crc = Buffer.alloc(4)
+  crc.writeUInt32BE(crc32(body))
+  return Buffer.concat([len, body, crc])
 }
 
 /**
@@ -777,32 +866,32 @@ function pngChunk(type, data) {
  * инверсия здесь сразу видна на экране: пятно и фон меняются местами.
  */
 function grayPng(seed) {
-  const size = 32;
-  const radius = 12 + (seed % 4);
-  const raw = Buffer.alloc(size * (size + 1));
+  const size = 32
+  const radius = 12 + (seed % 4)
+  const raw = Buffer.alloc(size * (size + 1))
 
   for (let y = 0; y < size; y++) {
-    raw[y * (size + 1)] = 0; // фильтр строки: None
+    raw[y * (size + 1)] = 0 // фильтр строки: None
     for (let x = 0; x < size; x++) {
-      const dx = x - 15.5;
-      const dy = y - 15.5;
-      const inside = dx * dx + dy * dy <= radius * radius;
-      raw[y * (size + 1) + 1 + x] = inside ? 0xff : 0x00;
+      const dx = x - 15.5
+      const dy = y - 15.5
+      const inside = dx * dx + dy * dy <= radius * radius
+      raw[y * (size + 1) + 1 + x] = inside ? 0xff : 0x00
     }
   }
 
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8; // бит на канал
-  ihdr[9] = 0; // grayscale
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(size, 0)
+  ihdr.writeUInt32BE(size, 4)
+  ihdr[8] = 8 // бит на канал
+  ihdr[9] = 0 // grayscale
 
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    pngChunk("IHDR", ihdr),
-    pngChunk("IDAT", deflateSync(raw)),
-    pngChunk("IEND", Buffer.alloc(0)),
-  ]);
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', deflateSync(raw)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ])
 }
 
 /**
@@ -816,17 +905,17 @@ function grayPng(seed) {
  * строит пустой path, и вместо круга рисуется залитый прямоугольник во всю канву.
  */
 function mockLottie(codepoint) {
-  const seed = [...codepoint].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  const hue = seed % 360;
-  const rgb = hslToRgb(hue / 360, 0.7, 0.55);
+  const seed = [...codepoint].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7)
+  const hue = seed % 360
+  const rgb = hslToRgb(hue / 360, 0.7, 0.55)
 
   // Промежуточный keyframe обязан нести кривые i/o. Без них lottie-web не считает значение,
   // трансформ слоя уходит в никуда и не рисуется вообще ничего.
-  const EASE = { i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } };
-  const scale = (t, s) => ({ ...EASE, t, s: [s, s, 100] });
+  const EASE = { i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } }
+  const scale = (t, s) => ({ ...EASE, t, s: [s, s, 100] })
 
   return {
-    v: "5.7.4",
+    v: '5.7.4',
     fr: 30,
     ip: 0,
     op: 30,
@@ -840,7 +929,7 @@ function mockLottie(codepoint) {
         ddd: 0,
         ind: 1,
         ty: 4,
-        nm: "blob",
+        nm: 'blob',
         sr: 1,
         ao: 0,
         ks: {
@@ -859,27 +948,27 @@ function mockLottie(codepoint) {
         },
         shapes: [
           {
-            ty: "gr",
+            ty: 'gr',
             it: [
               {
                 d: 1,
-                ty: "el",
+                ty: 'el',
                 s: { a: 0, k: [300, 300], ix: 2 },
                 p: { a: 0, k: [0, 0], ix: 3 },
-                nm: "Ellipse Path 1",
+                nm: 'Ellipse Path 1',
                 hd: false,
               },
               {
-                ty: "fl",
+                ty: 'fl',
                 c: { a: 0, k: [...rgb, 1], ix: 4 },
                 o: { a: 0, k: 100, ix: 5 },
                 r: 1,
                 bm: 0,
-                nm: "Fill 1",
+                nm: 'Fill 1',
                 hd: false,
               },
               {
-                ty: "tr",
+                ty: 'tr',
                 p: { a: 0, k: [0, 0], ix: 2 },
                 a: { a: 0, k: [0, 0], ix: 1 },
                 s: { a: 0, k: [100, 100], ix: 3 },
@@ -887,10 +976,10 @@ function mockLottie(codepoint) {
                 o: { a: 0, k: 100, ix: 7 },
                 sk: { a: 0, k: 0, ix: 4 },
                 sa: { a: 0, k: 0, ix: 5 },
-                nm: "Transform",
+                nm: 'Transform',
               },
             ],
-            nm: "Ellipse 1",
+            nm: 'Ellipse 1',
             np: 3,
             cix: 2,
             bm: 0,
@@ -905,113 +994,113 @@ function mockLottie(codepoint) {
       },
     ],
     markers: [],
-  };
+  }
 }
 
 function hslToRgb(h, s, l) {
   const f = (n) => {
-    const k = (n + h * 12) % 12;
-    return l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
-  };
-  return [f(0), f(8), f(4)];
+    const k = (n + h * 12) % 12
+    return l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1))
+  }
+  return [f(0), f(8), f(4)]
 }
 
 const server = createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost:${PORT}`);
-  const path = url.pathname;
-  const method = req.method || "GET";
+  const url = new URL(req.url, `http://localhost:${PORT}`)
+  const path = url.pathname
+  const method = req.method || 'GET'
 
-  if (method === "OPTIONS") return send(res, 204, "");
+  if (method === 'OPTIONS') return send(res, 204, '')
 
   // Dev-панель виджета: временно скрыть историю без перезапуска мока.
-  if (path === "/_dev/history-toggle") {
-    if (method === "GET") return send(res, 200, { enabled: historyEnabled });
-    if (method === "POST") {
-      const body = await readBody(req);
-      historyEnabled = body.enabled !== false;
-      console.log(`[matrix-mock] история ${historyEnabled ? "включена" : "выключена"}`);
-      return send(res, 200, { enabled: historyEnabled });
+  if (path === '/_dev/history-toggle') {
+    if (method === 'GET') return send(res, 200, { enabled: historyEnabled })
+    if (method === 'POST') {
+      const body = await readBody(req)
+      historyEnabled = body.enabled !== false
+      console.log(`[matrix-mock] история ${historyEnabled ? 'включена' : 'выключена'}`)
+      return send(res, 200, { enabled: historyEnabled })
     }
   }
 
   // Auth / session
-  if (path.endsWith("/v3/register")) return send(res, 200, scenario.guest);
-  if (path.endsWith("/v3/refresh")) {
+  if (path.endsWith('/v3/register')) return send(res, 200, scenario.guest)
+  if (path.endsWith('/v3/refresh')) {
     return send(res, 200, {
-      access_token: "tok_mock_" + Date.now(),
+      access_token: 'tok_mock_' + Date.now(),
       refresh_token: scenario.guest.refresh_token,
       expires_in_ms: scenario.guest.expires_in_ms,
-    });
+    })
   }
-  if (path.endsWith("/account/whoami")) {
-    return send(res, 200, { user_id: GUEST, device_id: scenario.guest.device_id });
+  if (path.endsWith('/account/whoami')) {
+    return send(res, 200, { user_id: GUEST, device_id: scenario.guest.device_id })
   }
-  if (path.endsWith("/v3/logout")) return send(res, 200, {});
+  if (path.endsWith('/v3/logout')) return send(res, 200, {})
 
   // /sync — long-poll по курсору n.tv.rv
-  if (path.endsWith("/v3/sync")) {
-    const since = url.searchParams.get("since");
-    const timeout = Number(url.searchParams.get("timeout") || "0");
-    const [n, tv, rv] = since ? since.split(".").map(Number) : [0, -1, -1];
+  if (path.endsWith('/v3/sync')) {
+    const since = url.searchParams.get('since')
+    const timeout = Number(url.searchParams.get('timeout') || '0')
+    const [n, tv, rv] = since ? since.split('.').map(Number) : [0, -1, -1]
 
-    const respond = () => send(res, 200, buildSync(n, tv, rv).body);
-    if (!since || buildSync(n, tv, rv).hasDelta || timeout === 0) return respond();
+    const respond = () => send(res, 200, buildSync(n, tv, rv).body)
+    if (!since || buildSync(n, tv, rv).hasDelta || timeout === 0) return respond()
 
-    let done = false;
+    let done = false
     const finish = () => {
-      if (done) return;
-      done = true;
-      respond();
-    };
-    waiters.push(finish);
-    setTimeout(finish, Math.min(timeout, 30_000));
-    return;
+      if (done) return
+      done = true
+      respond()
+    }
+    waiters.push(finish)
+    setTimeout(finish, Math.min(timeout, 30_000))
+    return
   }
 
   // История: GET /rooms/{id}/messages?dir=b&from=&limit=
-  if (/\/rooms\/[^/]+\/messages$/.test(path) && method === "GET") {
+  if (/\/rooms\/[^/]+\/messages$/.test(path) && method === 'GET') {
     // Реальный сервер валидирует limit ∈ [1,100] и dir ∈ {b,f} — ловим косяки клиента здесь же.
-    const limit = Number(url.searchParams.get("limit") ?? "10");
+    const limit = Number(url.searchParams.get('limit') ?? '10')
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-      return send(res, 400, { errcode: "M_INVALID_PARAM", error: `bad limit: ${limit}` });
+      return send(res, 400, { errcode: 'M_INVALID_PARAM', error: `bad limit: ${limit}` })
     }
-    const dir = url.searchParams.get("dir") ?? "b";
-    if (dir !== "b" && dir !== "f") {
-      return send(res, 400, { errcode: "M_INVALID_PARAM", error: `bad dir: ${dir}` });
+    const dir = url.searchParams.get('dir') ?? 'b'
+    if (dir !== 'b' && dir !== 'f') {
+      return send(res, 400, { errcode: 'M_INVALID_PARAM', error: `bad dir: ${dir}` })
     }
 
-    const page = historyPage(url.searchParams.get("from"), limit);
-    return delay(HISTORY_DELAY_MS, () => send(res, 200, page));
+    const page = historyPage(url.searchParams.get('from'), limit)
+    return delay(HISTORY_DELAY_MS, () => send(res, 200, page))
   }
 
   // KC-расширение: POST /createRoom/{txnId}
-  if (/\/createRoom\/[^/]+$/.test(path) && method === "POST") {
-    return send(res, 200, { room_id: ROOM });
+  if (/\/createRoom\/[^/]+$/.test(path) && method === 'POST') {
+    return send(res, 200, { room_id: ROOM })
   }
 
   // PUT /rooms/{id}/send/{type}/{txnId}
-  const sendMatch = path.match(/\/rooms\/[^/]+\/send\/([^/]+)\/([^/]+)$/);
-  if (sendMatch && method === "PUT") {
-    const type = decodeURIComponent(sendMatch[1]);
-    const txnId = decodeURIComponent(sendMatch[2]);
-    const content = await readBody(req);
+  const sendMatch = path.match(/\/rooms\/[^/]+\/send\/([^/]+)\/([^/]+)$/)
+  if (sendMatch && method === 'PUT') {
+    const type = decodeURIComponent(sendMatch[1])
+    const txnId = decodeURIComponent(sendMatch[2])
+    const content = await readBody(req)
 
     // /fail: роняем отправку ДО push — сообщение не попадает в ленту, клиент видит failed
     if (failNextSend) {
-      failNextSend = false;
-      return send(res, 500, { errcode: "M_UNKNOWN", error: "Mock: отправка отклонена" });
+      failNextSend = false
+      return send(res, 500, { errcode: 'M_UNKNOWN', error: 'Mock: отправка отклонена' })
     }
     // /failaction: роняем именно ответ на карточку — cardAnswers.status уходит в failed,
     // кнопки в CardActions разблокируются обратно (см. card.answerFailed в matrixController).
-    if (failNextAction && content.msgtype === "kc.adaptive.action") {
-      failNextAction = false;
-      return send(res, 500, { errcode: "M_UNKNOWN", error: "Mock: ответ на карточку отклонён" });
+    if (failNextAction && content.msgtype === 'kc.adaptive.action') {
+      failNextAction = false
+      return send(res, 500, { errcode: 'M_UNKNOWN', error: 'Mock: ответ на карточку отклонён' })
     }
 
-    const ev = push(type, GUEST, content, undefined, txnId);
+    const ev = push(type, GUEST, content, undefined, txnId)
     // Оператор «прочитал» — ✓✓.
-    if (type === "m.room.message" || type === "m.sticker") {
-      delay(600, () => operatorRead(ev.event_id));
+    if (type === 'm.room.message' || type === 'm.sticker') {
+      delay(600, () => operatorRead(ev.event_id))
     }
     // Вердикт CDR по своему вложению: как на настоящем бэкенде, приходит отдельным событием
     // ПОСЛЕ самого сообщения. Клиент сопоставляет по media_id (один вердикт на файл, не на
@@ -1019,110 +1108,118 @@ const server = createServer(async (req, res) => {
     // бэкенд её не раскрывает, текст пользователю клиент берёт из своего словаря.
     // При mediaMode === "pending" событие не шлём вовсе: конвейер ещё не вынес решения,
     // download продолжает штатно отвечать 504.
-    if (type === "m.room.message" && MEDIA_MSGTYPES.has(content.msgtype) && mediaMode !== "pending") {
-      const mediaId = String(content.url || "").split("/").pop();
+    if (
+      type === 'm.room.message' &&
+      MEDIA_MSGTYPES.has(content.msgtype) &&
+      mediaMode !== 'pending'
+    ) {
+      const mediaId = String(content.url || '')
+        .split('/')
+        .pop()
       if (mediaId) {
         delay(1500, () =>
-          push("kc.media.status", OP, {
+          push('kc.media.status', OP, {
             media_id: mediaId,
             event_id: ev.event_id,
-            status: mediaMode === "rejected" ? "rejected" : "ready",
+            status: mediaMode === 'rejected' ? 'rejected' : 'ready',
           }),
-        );
+        )
       }
     }
     // Авто-ответ на сообщения клиента. У медиа body — это подпись или имя файла,
     // слэш-команды там разбирать нечего: отдаём пустую строку, чтобы ушёл обычный
     // путь «печатает… → autoReply» и на вложение тоже приходил ответ оператора.
-    if (type === "m.room.message" && REPLYABLE_MSGTYPES.has(content.msgtype)) {
-      operatorRespond(content.msgtype === "m.text" ? content.body : "", ev.event_id);
+    if (type === 'm.room.message' && REPLYABLE_MSGTYPES.has(content.msgtype)) {
+      operatorRespond(content.msgtype === 'm.text' ? content.body : '', ev.event_id)
     }
     // Ack на нажатие кнопки карточки — отдельно от generic REPLYABLE_MSGTYPES (см. комментарий
     // выше): это не канед-автоответ, а адресный отклик на конкретный action_id, нужен чтобы
     // вручную проверить ветвление бота и что sending → sent доезжает через реальный /sync-эхо.
-    if (type === "m.room.message" && content.msgtype === "kc.adaptive.action") {
-      const actionId = content.adaptive_action?.action_id ?? "?";
-      delay(500, () => push("m.room.message", OP, { msgtype: "m.text", body: `Принято: ${actionId}` }));
+    if (type === 'm.room.message' && content.msgtype === 'kc.adaptive.action') {
+      const actionId = content.adaptive_action?.action_id ?? '?'
+      delay(500, () =>
+        push('m.room.message', OP, { msgtype: 'm.text', body: `Принято: ${actionId}` }),
+      )
     }
-    return send(res, 200, { event_id: ev.event_id });
+    return send(res, 200, { event_id: ev.event_id })
   }
 
   // receipt / typing / presence — best-effort
   if (/\/receipt\//.test(path) || /\/typing\//.test(path) || /\/presence\//.test(path)) {
-    return send(res, 200, {});
+    return send(res, 200, {})
   }
 
   // Media upload
-  if (path.endsWith("/media/v3/upload")) {
+  if (path.endsWith('/media/v3/upload')) {
     // /rejectupload: отказ fileguard'а (тип не из whitelist, подмена типа, кривое имя).
     // Вердикт детерминированный — клиент не предлагает повтор, только убрать черновик.
     if (rejectNextUpload) {
-      rejectNextUpload = false;
+      rejectNextUpload = false
       return delay(UPLOAD_DELAY_MS, () =>
         send(res, 400, {
-          errcode: "M_INVALID_PARAM",
-          error: "Mock: тип файла не поддерживается",
+          errcode: 'M_INVALID_PARAM',
+          error: 'Mock: тип файла не поддерживается',
         }),
-      );
+      )
     }
     // /failupload: обрываем отдачу байт — черновик остаётся в ленте с текстом ошибки
     // и кнопкой «Повторить», повтор начинается заново с загрузки.
     if (failNextUpload) {
-      failNextUpload = false;
+      failNextUpload = false
       return delay(UPLOAD_DELAY_MS, () =>
-        send(res, 500, { errcode: "M_UNKNOWN", error: "Mock: загрузка отклонена" }),
-      );
+        send(res, 500, { errcode: 'M_UNKNOWN', error: 'Mock: загрузка отклонена' }),
+      )
     }
     // MOCK_UPLOAD_DELAY_MS растягивает ответ, чтобы разглядеть состояние загрузки
     // (прогресс-бар, «Отмена») на маленьком файле. Сам процент так не замедлить —
     // на localhost тело уходит мгновенно, для плавного прогресса нужен throttling в DevTools.
     return delay(UPLOAD_DELAY_MS, () =>
-      send(res, 200, { content_uri: "mxc://bank.ru/mock" + Date.now() }),
-    );
+      send(res, 200, { content_uri: 'mxc://bank.ru/mock' + Date.now() }),
+    )
   }
   // Media download/thumbnail → SVG-заглушка либо ответ статусной машины карантина
-  const mediaMatch = path.match(/\/media\/(download|thumbnail)\/[^/]+\/([^/]+)/);
+  const mediaMatch = path.match(/\/media\/(download|thumbnail)\/[^/]+\/([^/]+)/)
   if (mediaMatch) {
-    const isThumbnail = mediaMatch[1] === "thumbnail";
+    const isThumbnail = mediaMatch[1] === 'thumbnail'
 
-    if (mediaMode === "pending") {
-      return send(res, 504, { errcode: "M_NOT_YET_UPLOADED", error: "Файл проверяется" });
+    if (mediaMode === 'pending') {
+      return send(res, 504, { errcode: 'M_NOT_YET_UPLOADED', error: 'Файл проверяется' })
     }
-    if (mediaMode === "rejected") {
-      return send(res, 404, { errcode: "M_NOT_FOUND", error: "Файл не найден" });
+    if (mediaMode === 'rejected') {
+      return send(res, 404, { errcode: 'M_NOT_FOUND', error: 'Файл не найден' })
     }
     // 404 на превью означает «превью не генерировалось» — клиент обязан уйти на оригинал.
     if (isThumbnail && failThumbnail) {
-      return send(res, 404, { errcode: "M_NOT_FOUND", error: "Превью нет" });
+      return send(res, 404, { errcode: 'M_NOT_FOUND', error: 'Превью нет' })
     }
 
     // Подпись называет отдавший эндпоинт: у /failthumb весь смысл в том, что клиент молча
     // уходит с превью на оригинал, и без метки эта подмена на глаз неотличима.
-    const w = Number(url.searchParams.get("width") || "400");
-    const h = Number(url.searchParams.get("height") || "300");
-    const label = isThumbnail ? `thumbnail ${w}×${h}` : `original ${w}×${h}`;
-    return send(res, 200, svgImage(w, h, label), "image/svg+xml");
+    const w = Number(url.searchParams.get('width') || '400')
+    const h = Number(url.searchParams.get('height') || '300')
+    const label = isThumbnail ? `thumbnail ${w}×${h}` : `original ${w}×${h}`
+    return send(res, 200, svgImage(w, h, label), 'image/svg+xml')
   }
   // Публичные байты стикеров: один маршрут на все три рендиции, как на боевом сервере
-  const stickerMatch = path.match(/\/_matrix\/sticker\/([^/]+)/);
+  const stickerMatch = path.match(/\/_matrix\/sticker\/([^/]+)/)
   if (stickerMatch) {
-    const entry = STICKERS_BY_MEDIA_ID.get(stickerMatch[1]);
-    if (!entry) return send(res, 404, { errcode: "M_NOT_FOUND", error: "no such sticker" });
+    const entry = STICKERS_BY_MEDIA_ID.get(stickerMatch[1])
+    if (!entry) return send(res, 404, { errcode: 'M_NOT_FOUND', error: 'no such sticker' })
 
-    res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+    res.setHeader('Cache-Control', 'public, max-age=604800, immutable')
 
-    if (entry.mimetype === "application/json") {
-      return send(res, 200, mockLottie(`sticker-${stickerMatch[1]}`));
+    if (entry.mimetype === 'application/json') {
+      return send(res, 200, mockLottie(`sticker-${stickerMatch[1]}`))
     }
-    if (entry.mimetype === "video/webm") {
-      return send(res, 200, loadStickerWebm(), "video/webm");
+    if (entry.mimetype === 'video/webm') {
+      return send(res, 200, loadStickerWebm(), 'video/webm')
     }
     // Вместо webp — PNG: клиент ветвится по префиксу image/, путь тот же.
-    return send(res, 200, grayPng(entry.index), "image/png");
+    return send(res, 200, grayPng(entry.index), 'image/png')
   }
   // Каталог стикеров
   if (/stickers\/v1\/packs$/.test(path)) {
-    return send(res, 200, { packs: getStickerCatalog() });
+    return send(res, 200, { packs: getStickerCatalog() })
   }
   // Вкладки пикера эмодзи: счётчики без состава
   if (/emoji\/v1\/categories$/.test(path)) {
@@ -1133,15 +1230,15 @@ const server = createServer(async (req, res) => {
         display_name: c.display_name,
         count: c.emoji.length,
       })),
-    });
+    })
   }
   // Весь пак разом, без силуэтов: по нему лента строит индекс «символ → codepoint».
   if (/emoji\/v1\/packs$/.test(path)) {
     return send(res, 200, {
       packs: [
         {
-          id: "tg-animated",
-          display_name: "Анимированные эмодзи",
+          id: 'tg-animated',
+          display_name: 'Анимированные эмодзи',
           version: EMOJI_PACK_VERSION,
           categories: EMOJI_CATEGORIES.map((c) => ({
             id: c.id,
@@ -1151,13 +1248,13 @@ const server = createServer(async (req, res) => {
           })),
         },
       ],
-    });
+    })
   }
   // Состав одной вкладки — вместе с силуэтами
-  const categoryMatch = path.match(/emoji\/v1\/categories\/([^/]+)$/);
+  const categoryMatch = path.match(/emoji\/v1\/categories\/([^/]+)$/)
   if (categoryMatch) {
-    const category = EMOJI_CATEGORIES.find((c) => c.id === categoryMatch[1]);
-    if (!category) return send(res, 404, { errcode: "M_NOT_FOUND", error: "unknown category" });
+    const category = EMOJI_CATEGORIES.find((c) => c.id === categoryMatch[1])
+    if (!category) return send(res, 404, { errcode: 'M_NOT_FOUND', error: 'unknown category' })
 
     return send(res, 200, {
       id: category.id,
@@ -1166,81 +1263,85 @@ const server = createServer(async (req, res) => {
       emoji: category.emoji.map(([codepoint, e], i) => ({
         codepoint,
         e,
-        p: grayPng(i).toString("base64"),
+        p: grayPng(i).toString('base64'),
       })),
-    });
+    })
   }
   // Батч: пачка анимаций одним ответом. Идёт до одиночного маршрута — иначе «bundle» уехал бы
   // в него как codepoint. Настоящий сервер склеивает gzip-члены встык, здесь просто объект.
   //
   // MOCK_NO_EMOJI_BUNDLE=1 выключает оба батч-маршрута: так проверяется откат клиента на
   // поштучные запросы против сервера, где батча ещё нет.
-  const emojiBundleOff = Boolean(process.env.MOCK_NO_EMOJI_BUNDLE);
-  if (path === "/_matrix/emoji/bundle" && !emojiBundleOff) {
-    const requested = (url.searchParams.get("cp") ?? "").split(",").filter(Boolean);
+  const emojiBundleOff = Boolean(process.env.MOCK_NO_EMOJI_BUNDLE)
+  if (path === '/_matrix/emoji/bundle' && !emojiBundleOff) {
+    const requested = (url.searchParams.get('cp') ?? '').split(',').filter(Boolean)
     if (requested.length > 300) {
-      return send(res, 400, { errcode: "M_INVALID_PARAM", error: "too many codepoints" });
+      return send(res, 400, { errcode: 'M_INVALID_PARAM', error: 'too many codepoints' })
     }
-    const bad = requested.find((cp) => !/^[0-9a-f]{4,5}(-[0-9a-f]{4,5})*$/.test(cp));
+    const bad = requested.find((cp) => !/^[0-9a-f]{4,5}(-[0-9a-f]{4,5})*$/.test(cp))
     if (bad) {
-      return send(res, 400, { errcode: "M_INVALID_PARAM", error: "bad codepoint: " + bad });
+      return send(res, 400, { errcode: 'M_INVALID_PARAM', error: 'bad codepoint: ' + bad })
     }
 
     // Неизвестные codepoint'ы молча выбрасываются — как на боевом сервере: батч это
     // оптимизация загрузки, а не место для 404.
-    const emoji = {};
+    const emoji = {}
     for (const cp of requested) {
-      if (EMOJI_BY_CODEPOINT.has(cp)) emoji[cp] = mockLottie(cp);
+      if (EMOJI_BY_CODEPOINT.has(cp)) emoji[cp] = mockLottie(cp)
     }
 
-    return send(res, 200, { version: EMOJI_PACK_VERSION, emoji });
+    return send(res, 200, { version: EMOJI_PACK_VERSION, emoji })
   }
   // Батч по категории. Клиент им не пользуется (тянул бы всю вкладку целиком), но контракт
   // сервера включает оба маршрута.
-  const bundleCategoryMatch = path.match(/^\/_matrix\/emoji\/bundle\/([^/]+)$/);
+  const bundleCategoryMatch = path.match(/^\/_matrix\/emoji\/bundle\/([^/]+)$/)
   if (bundleCategoryMatch && !emojiBundleOff) {
-    const category = EMOJI_CATEGORIES.find((c) => c.id === bundleCategoryMatch[1]);
-    if (!category) return send(res, 404, { errcode: "M_NOT_FOUND", error: "unknown category" });
+    const category = EMOJI_CATEGORIES.find((c) => c.id === bundleCategoryMatch[1])
+    if (!category) return send(res, 404, { errcode: 'M_NOT_FOUND', error: 'unknown category' })
 
-    const emoji = {};
-    for (const [codepoint] of category.emoji) emoji[codepoint] = mockLottie(codepoint);
+    const emoji = {}
+    for (const [codepoint] of category.emoji) emoji[codepoint] = mockLottie(codepoint)
 
-    return send(res, 200, { version: EMOJI_PACK_VERSION, emoji });
+    return send(res, 200, { version: EMOJI_PACK_VERSION, emoji })
   }
   // Байты анимации. Настоящий сервер отдаёт gzip'нутый .tgs как есть, но заголовок
   // Content-Encoding ставит только под Accept-Encoding — здесь просто отдаём готовый JSON.
-  const emojiMatch = path.match(/^\/_matrix\/emoji\/([^/]+)$/);
+  const emojiMatch = path.match(/^\/_matrix\/emoji\/([^/]+)$/)
   if (emojiMatch) {
-    const codepoint = emojiMatch[1];
+    const codepoint = emojiMatch[1]
     if (!/^[0-9a-f]{4,5}(-[0-9a-f]{4,5})*$/.test(codepoint)) {
-      return send(res, 400, { errcode: "M_INVALID_PARAM", error: "bad codepoint" });
+      return send(res, 400, { errcode: 'M_INVALID_PARAM', error: 'bad codepoint' })
     }
     if (!EMOJI_BY_CODEPOINT.has(codepoint)) {
-      return send(res, 404, { errcode: "M_NOT_FOUND", error: "no such emoji" });
+      return send(res, 404, { errcode: 'M_NOT_FOUND', error: 'no such emoji' })
     }
-    return send(res, 200, mockLottie(codepoint));
+    return send(res, 200, mockLottie(codepoint))
   }
   // Web Push — требует реального браузерного push-сервиса
   if (/kc\/push\/webpush/.test(path)) {
-    return send(res, 404, { errcode: "M_NOT_FOUND", error: "push disabled in mock" });
+    return send(res, 404, { errcode: 'M_NOT_FOUND', error: 'push disabled in mock' })
   }
 
-  return send(res, 404, { errcode: "M_NOT_FOUND", error: "mock: " + path });
-});
+  return send(res, 404, { errcode: 'M_NOT_FOUND', error: 'mock: ' + path })
+})
 
-server.on("error", (err) => {
-  if (err.code === "EADDRINUSE") {
-    console.error(`\n[matrix-mock] Порт ${PORT} занят. Завершите предыдущий процесс или задайте MOCK_PORT=<другой>.\n`);
-    process.exit(1);
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(
+      `\n[matrix-mock] Порт ${PORT} занят. Завершите предыдущий процесс или задайте MOCK_PORT=<другой>.\n`,
+    )
+    process.exit(1)
   }
-  throw err;
-});
+  throw err
+})
 
 server.listen(PORT, () => {
-  console.log(`BankChat mock-сервер: http://localhost:${PORT}`);
-  console.log(`Откройте виджет:     http://localhost:5174`);
-  console.log(`Команды в чате: /card [buttons|3|broken|openurl|many]  /notice  /left  /join  /html`);
-  console.log(`                /img  /file  /sticker  /emoji  /reply [img|file]  /react [эмодзи]`);
-  console.log(`                /fail  /failaction  /failupload  /rejectupload  /failthumb`);
-  console.log(`                /pendingmedia  /rejectmedia`);
-});
+  console.log(`BankChat mock-сервер: http://localhost:${PORT}`)
+  console.log(`Откройте виджет:     http://localhost:5174`)
+  console.log(
+    `Команды в чате: /card [buttons|3|broken|openurl|many]  /cards  /notice  /left  /join  /html`,
+  )
+  console.log(`                /img  /file  /sticker  /emoji  /reply [img|file]  /react [эмодзи]`)
+  console.log(`                /fail  /failaction  /failupload  /rejectupload  /failthumb`)
+  console.log(`                /pendingmedia  /rejectmedia`)
+})

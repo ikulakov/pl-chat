@@ -178,6 +178,23 @@ describe('useChatScroll', () => {
     })
   })
 
+  it('aligns an item taller than the viewport to the top instead of centering it', () => {
+    const { result, container } = setup([message(OPERATOR)])
+    const row = document.createElement('div')
+    row.setAttribute(ITEM_ID_ATTR, 'long-target')
+    row.animate = vi.fn() as unknown as typeof row.animate
+    container.appendChild(row)
+    Object.defineProperty(container, 'clientHeight', { value: 200, configurable: true })
+    Object.defineProperty(row, 'offsetHeight', { value: 300, configurable: true })
+    container.getBoundingClientRect = () => ({ top: 100 }) as DOMRect
+    row.getBoundingClientRect = () => ({ top: 500 }) as DOMRect
+    container.scrollTop = 50
+
+    act(() => result.current.scrollToItem('long-target'))
+
+    expect(container.scrollTop).toBe(450)
+  })
+
   it('scrollToItem returns null and does not scroll when the row is absent', () => {
     const { result, scrollTo } = setup([message(OPERATOR)])
     scrollTo.mockClear()

@@ -1,13 +1,20 @@
 .viewport {
-  position: fixed;
+  position: absolute;
   top: 16px;
   right: 16px;
   left: 16px;
   z-index: var(--z-floating);
   display: flex;
-  justify-content: flex-end;
-  /* пустой регион висит поверх шапки: клики по ней должны проходить насквозь */
+  flex-direction: column;
+  align-items: flex-end;
+  /* пустой регион висит поверх ленты: клики по сообщениям должны проходить насквозь */
   pointer-events: none;
+}
+
+/* Живой регион объявления: без плашки он нулевого размера и раскладку не двигает. */
+.region {
+  display: flex;
+  max-width: 100%;
 }
 
 .toast {
@@ -17,14 +24,24 @@
   width: fit-content;
   max-width: 100%;
   padding: 12px 20px;
-  border: 1px solid var(--c-error-border-soft);
+  border: 1px solid;
   border-radius: var(--radius-lg);
-  background: var(--c-surface-error);
   font-size: 14px;
   line-height: 18px;
-  color: var(--c-error-strong);
   /* наведение ставит автоскрытие на паузу, поэтому указатель нужен именно плашке */
   pointer-events: auto;
+}
+
+.error {
+  border-color: var(--c-error-border-soft);
+  background: var(--c-surface-error);
+  color: var(--c-error-strong);
+}
+
+.success {
+  border-color: var(--c-surface-contrast);
+  background: var(--c-surface-contrast);
+  color: var(--c-text-invert);
 }
 
 /* тост-кнопка: ведёт к сообщению, из-за которого всплыл. Сбрасываем то, что приносит button */

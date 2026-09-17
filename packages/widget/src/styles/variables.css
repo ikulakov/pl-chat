@@ -5,7 +5,8 @@
   --c-text-disabled: #ababab;
   --c-text-placeholder: #909090;
   --c-text-invert: #fff;
-  --c-text-invert-dim: rgba(255, 255, 255, 0.6);
+  --c-text-message-meta: #909090;
+  --c-text-message-own-meta: #525252;
   --c-error: #ea2c45;
   --c-error-strong: #c51e37;
   --c-link: #287cba;
@@ -17,6 +18,7 @@
   --c-surface-tertiary: #f9f9fa;
   --c-surface-tertiary-pressed: #e8eaed;
   --c-surface-accent-soft: #edf6fd;
+  --c-surface-message-own: #d6eafc;
   --c-surface-contrast: #222;
   --c-surface-error: #fff3f0;
 

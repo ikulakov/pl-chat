@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../utils/cn'
-import { ErrorCircleIcon } from '../icons'
+import { CheckmarkIcon, ErrorCircleIcon } from '../icons'
 import styles from './Toast.module.css'
 import type { ToastItem } from './toastStore'
 import { dismissToast } from './toastStore'
@@ -64,10 +64,16 @@ export function Toast({ toast }: Props) {
 
   const content = (
     <>
-      <ErrorCircleIcon className={styles.icon} />
+      {toast.tone === 'success' ? (
+        <CheckmarkIcon className={styles.icon} />
+      ) : (
+        <ErrorCircleIcon className={styles.icon} />
+      )}
       {toast.message}
     </>
   )
+
+  const className = cn(styles.toast, styles[toast.tone])
 
   const shared = {
     onPointerEnter: () => setIsHovered(true),
@@ -78,7 +84,7 @@ export function Toast({ toast }: Props) {
   if (!toast.onClick) {
     return (
       <div
-        className={styles.toast}
+        className={className}
         {...shared}
       >
         {content}
@@ -89,7 +95,7 @@ export function Toast({ toast }: Props) {
   return (
     <button
       type="button"
-      className={cn(styles.toast, styles.clickable)}
+      className={cn(className, styles.clickable)}
       onClick={() => {
         toast.onClick?.()
         dismissToast(toast.id)

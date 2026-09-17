@@ -235,7 +235,7 @@ describe('ChatPanel — повтор с экрана ошибки', () => {
       }),
     )
 
-    // по заголовку, а не по role="alert": у чата свой такой регион, для тостов
+    // Проверяем именно содержимое экрана, а не технические live-region внутри чата.
     expect(screen.queryByText('Не удалось загрузить данные')).not.toBeInTheDocument()
     expect(screen.getByText('Добро пожаловать в чат!')).toBeInTheDocument()
   })

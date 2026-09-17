@@ -21,38 +21,36 @@
 .field {
   display: flex;
   align-items: flex-start;
-  background: var(--c-surface-secondary);
+  background-color: var(--c-surface-secondary);
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
+  padding: 0 3px;
+
+  &:has(textarea:focus) {
+    background-color: var(--c-surface-tertiary-pressed);
+  }
 
   &.error {
     border-color: var(--c-error-border);
   }
 }
 
-.main {
+.inputArea {
   display: flex;
-  gap: 8px;
   flex: 1;
   min-width: 0;
-  padding: 11px 0 11px 11px;
-}
-
-.rightBtns {
-  display: flex;
-  flex-shrink: 0;
+  min-height: 46px;
+  padding: 11px 0;
+  cursor: text;
 }
 
 .slot {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   width: 40px;
   height: 46px;
-
-  &:last-child {
-    width: 44px;
-  }
 }
 
 .sendBtn {

@@ -18,6 +18,4 @@
   padding: 2px 6px;
   border-radius: var(--radius-md);
   background: var(--c-surface-secondary);
-  /* Как и у «большого эмодзи»: пилюля не на пузыре, инвертированное белое здесь не читается. */
-  --meta-own-color: var(--c-text-disabled);
 }

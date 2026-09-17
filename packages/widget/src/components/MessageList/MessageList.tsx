@@ -7,6 +7,7 @@ import { useLoadMoreHistory } from '../../hooks/useLoadMoreHistory'
 import { useSendReadReceipts } from '../../hooks/useSendReadReceipts'
 import { registerTimelineScroll } from '../../shared/timeline/timelineScroll'
 import { Spinner } from '../../shared/ui/Spinner'
+import { ToastOutlet } from '../../shared/ui/Toast'
 import { cn } from '../../shared/utils/cn'
 import {
   selectIsOpen,
@@ -66,8 +67,11 @@ export function MessageList({ userId }: Props) {
 
   return (
     <div className={styles.wrap}>
+      <ToastOutlet />
+
       <div
         ref={messagesListRef}
+        data-testid="message-list"
         className={cn(styles.list, showHistorySpinner && styles.datesBelowSpinner)}
       >
         {timelineGroupedByDate.map(({ key, label, items }) => (

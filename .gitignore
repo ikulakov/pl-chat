@@ -1,6 +1,11 @@
 node_modules/
 dist/
 .turbo/
+playwright-report/
+test-results/
+
+# SBOM (pnpm sbom) — генерируется в корень, версионировать нечего
+/sbom.json
 *.local
 .env
 .DS_Store

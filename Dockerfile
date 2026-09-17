@@ -52,8 +52,13 @@ COPY --from=build /app/packages/widget/dist /usr/share/nginx/html/widget
 # Лоадер — один файл в корне без Sourcemap.
 COPY --from=build /app/packages/loader/dist/loader.js /usr/share/nginx/html/loader.js
 
-# Убрать дефолтный Welcome to nginx из root образа (PL-04).
-RUN rm -f /usr/share/nginx/html/index.html
+# SBOM собирается вместе с виджетом и лежит внутри его dist. Кладём копию в корень
+# образа: TeamCity забирает файл оттуда (docker cp), а из отдаваемой статики он ниже
+# удаляется — точный список версий зависимостей наружу отдавать незачем.
+COPY --from=build /app/packages/widget/dist/sbom.json /sbom.json
+
+# Убрать дефолтный Welcome to nginx из root образа (PL-04) и SBOM из статики.
+RUN rm -f /usr/share/nginx/html/index.html /usr/share/nginx/html/widget/sbom.json
 
 ENV NGINX_PORT=8080 \
     NGINX_ENVSUBST_FILTER=^NGINX_
