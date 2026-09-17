@@ -46,19 +46,6 @@
     }
   }
 
-  &.accent {
-    color: var(--c-text-invert);
-    background-color: var(--c-lime);
-
-    &:not(:disabled):hover {
-      background-color: color-mix(in srgb, var(--c-lime) 90%, #000);
-    }
-
-    &:disabled {
-      background-color: var(--c-surface-secondary);
-    }
-  }
-
   &.contrast {
     color: var(--c-text-invert);
     background-color: var(--c-surface-contrast);

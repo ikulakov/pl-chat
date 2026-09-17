@@ -3,6 +3,7 @@ kind: Ingress
 metadata:
   annotations:
     cert-manager.io/cluster-issuer: privatecloud-pki
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
   name: {{ .Values.deploy.name }}
   labels:
     name: {{ .Values.deploy.name }}
