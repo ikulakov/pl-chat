@@ -281,6 +281,32 @@ export function CopyIcon(props: IconProps) {
   )
 }
 
+/** Копирование с залитым передним листом — для тоста «скопировано» */
+export function CopyFilledIcon(props: IconProps) {
+  return (
+    <Icon
+      size={16}
+      viewBox="0 0 16 16"
+      {...props}
+    >
+      <path
+        d="M10 2H5.33333C3.49238 2 2 3.49238 2 5.33333V10"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+      <rect
+        x="4.66667"
+        y="4.66667"
+        width="9.33333"
+        height="9.33333"
+        rx="2"
+        fill="currentColor"
+      />
+    </Icon>
+  )
+}
+
 export function FileDocIcon(props: IconProps) {
   return (
     <Icon {...props}>

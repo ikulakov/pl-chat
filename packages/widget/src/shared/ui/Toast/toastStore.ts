@@ -1,22 +1,28 @@
+import type { ComponentType } from 'react'
 import { useSyncExternalStore } from 'react'
+import type { IconProps } from '../icons'
 
-export type ToastTone = 'error' | 'success'
+/** Тон задаёт только цвет плашки; иконку выбирает вызывающий */
+export type ToastTone = 'error' | 'neutral'
 
 export interface ToastItem {
   id: number
   message: string
   tone: ToastTone
+  icon?: ComponentType<IconProps>
   /** действие по клику; плашка без него не кликабельна и остаётся неинтерактивной */
   onClick?: () => void
 }
 
 /**
  * Всё, кроме текста, — именованные поля: тон нужен редко, и позиционным третьим аргументом
- * он заставлял бы писать `showToast(text, undefined, 'success')` на каждом вызове без клика.
+ * он заставлял бы писать `showToast(text, undefined, 'neutral')` на каждом вызове без клика.
  */
 export interface ToastOptions {
   /** по умолчанию подтверждение действия; плашка об ошибке помечается явно */
   tone?: ToastTone
+  /** иконка слева от текста; у `error` по умолчанию — знак ошибки, у `neutral` без иконки */
+  icon?: ComponentType<IconProps>
   onClick?: () => void
 }
 
@@ -42,9 +48,12 @@ export function showToast(message: string, options: ToastOptions = {}): void {
   // сразу несколько файлов, и очередь из одинаковых плашек была бы просто задержкой
   if (queue.some((toast) => toast.message === message)) return
 
-  const { tone = 'success', onClick } = options
+  const { tone = 'neutral', icon, onClick } = options
 
-  queue = [...queue, { id: nextId++, message, tone, ...(onClick ? { onClick } : {}) }]
+  queue = [
+    ...queue,
+    { id: nextId++, message, tone, ...(icon ? { icon } : {}), ...(onClick ? { onClick } : {}) },
+  ]
   notify()
 }
 

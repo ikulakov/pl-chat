@@ -9,7 +9,7 @@ import { FEATURES } from '@/shared/features'
 import { Dropdown, type DropdownHandle, DropdownItem } from '@/shared/ui/Dropdown'
 import { IconButton } from '@/shared/ui/IconButton'
 import { showToast } from '@/shared/ui/Toast'
-import { CopyIcon, MoreIcon, ReplyIcon, RetryIcon } from '@/shared/ui/icons'
+import { CopyFilledIcon, CopyIcon, MoreIcon, ReplyIcon, RetryIcon } from '@/shared/ui/icons'
 import { copyText } from '@/shared/utils/clipboard'
 import { selectViewport } from '@/store/selectors'
 import type { Ref } from 'react'
@@ -40,7 +40,7 @@ export function MessageActions({ ref, message, isOwn, reactions }: Props) {
   const handleCopy = (): void => {
     void copyText(message.content.body).then((copied) => {
       if (copied && viewport === 'fullscreen') {
-        showToast(t('chat.action.copied'))
+        showToast(t('chat.action.copied'), { icon: CopyFilledIcon })
       }
     })
   }

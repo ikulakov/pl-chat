@@ -1,5 +1,6 @@
 import { t } from '@/i18n'
 import { FEATURES } from '@/shared/features'
+import { CopyFilledIcon } from '@/shared/ui/icons'
 import { fileItem, textItem } from '@/shared/testUtils/matrixFixtures'
 import { chatStore } from '@/store/store'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -53,7 +54,7 @@ describe('MessageActions', () => {
     expect(showToast).not.toHaveBeenCalled()
   })
 
-  it('shows a success toast after copying in the mobile fullscreen viewport', async () => {
+  it('shows a copied toast after copying in the mobile fullscreen viewport', async () => {
     chatStore.getState().setViewport('fullscreen')
     render(
       <MessageActions
@@ -66,7 +67,11 @@ describe('MessageActions', () => {
     fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
     fireEvent.click(screen.getByText(t('chat.action.copy')))
 
-    await waitFor(() => expect(showToast).toHaveBeenCalledExactlyOnceWith(t('chat.action.copied')))
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledExactlyOnceWith(t('chat.action.copied'), {
+        icon: CopyFilledIcon,
+      }),
+    )
   })
 
   it('a real tap on "Копировать" (pointerdown → click) is not swallowed by the outside-close handler', async () => {

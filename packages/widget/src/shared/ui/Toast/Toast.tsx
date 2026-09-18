@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../utils/cn'
-import { CheckmarkIcon, ErrorCircleIcon } from '../icons'
+import { ErrorCircleIcon } from '../icons'
 import styles from './Toast.module.css'
 import type { ToastItem } from './toastStore'
 import { dismissToast } from './toastStore'
@@ -53,13 +53,11 @@ export function Toast({ toast }: Props) {
     }
   }, [isPaused, toast.id])
 
+  const Icon = toast.icon ?? (toast.tone === 'error' ? ErrorCircleIcon : undefined)
+
   const content = (
     <>
-      {toast.tone === 'success' ? (
-        <CheckmarkIcon className={styles.icon} />
-      ) : (
-        <ErrorCircleIcon className={styles.icon} />
-      )}
+      {Icon && <Icon className={styles.icon} />}
       {toast.message}
     </>
   )

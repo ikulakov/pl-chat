@@ -38,9 +38,9 @@
   color: var(--c-error-strong);
 }
 
-.success {
-  border-color: var(--c-surface-contrast);
-  background: var(--c-surface-contrast);
+.neutral {
+  border-color: var(--c-surface-toast);
+  background: var(--c-surface-toast);
   color: var(--c-text-invert);
 }
 

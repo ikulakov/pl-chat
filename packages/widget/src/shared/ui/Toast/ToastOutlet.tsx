@@ -34,7 +34,7 @@ export function ToastOutlet() {
         className={styles.region}
         role="status"
       >
-        {current?.tone === 'success' && toast}
+        {current?.tone === 'neutral' && toast}
       </div>
     </div>
   )
