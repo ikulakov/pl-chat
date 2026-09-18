@@ -1,4 +1,5 @@
 import { useChatActions } from '@/hooks/useChatActions'
+import type { EventId } from '@/shared/types/ids'
 import { isPreviewableImage, validateFile, type FileRejection } from '@/shared/utils/fileValidation'
 import { readImageDimensions, type ImageDimensions } from '@/shared/utils/imageDimensions'
 import { useCallback, useEffect, useState } from 'react'
@@ -21,7 +22,7 @@ export interface FileAttachment {
 
 interface SendOptions {
   caption?: string | undefined
-  replyToEventId?: string | undefined
+  replyToEventId?: EventId | undefined
 }
 
 export function useAttachmentState(): FileAttachment {

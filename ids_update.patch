@@ -1,0 +1,786 @@
+diff --git a/packages/widget/src/chatController.ts b/packages/widget/src/chatController.ts
+index a80f311..7782d49 100644
+--- a/packages/widget/src/chatController.ts
++++ b/packages/widget/src/chatController.ts
+@@ -9,7 +9,7 @@ import type {
+   StickerItem,
+   StickerPack,
+ } from './domain/emoji'
+-import type { EventId, LocalId, MediaId } from './domain/ids'
++import type { EventId, LocalId, MediaId } from './shared/types/ids'
+ import type { ThumbnailSize } from './domain/media'
+ import type { ReplyTarget } from './domain/reply'
+ import type { CatalogService } from './matrix/catalog/matrixCatalog'
+@@ -115,7 +115,7 @@ export class ChatController {
+     }
+   }
+ 
+-  sendMessage = (text: string, replyToEventId?: string): Promise<void> =>
++  sendMessage = (text: string, replyToEventId?: EventId): Promise<void> =>
+     this.matrix.sendMessage(text, replyToEventId)
+ 
+   replyTo = (target: ReplyTarget): void => {
+diff --git a/packages/widget/src/components/Attachment/useAttachmentState.ts b/packages/widget/src/components/Attachment/useAttachmentState.ts
+index e287ff9..6184355 100644
+--- a/packages/widget/src/components/Attachment/useAttachmentState.ts
++++ b/packages/widget/src/components/Attachment/useAttachmentState.ts
+@@ -1,4 +1,5 @@
+ import { useChatActions } from '@/hooks/useChatActions'
++import type { EventId } from '@/shared/types/ids'
+ import { isPreviewableImage, validateFile, type FileRejection } from '@/shared/utils/fileValidation'
+ import { readImageDimensions, type ImageDimensions } from '@/shared/utils/imageDimensions'
+ import { useCallback, useEffect, useState } from 'react'
+@@ -21,7 +22,7 @@ export interface FileAttachment {
+ 
+ interface SendOptions {
+   caption?: string | undefined
+-  replyToEventId?: string | undefined
++  replyToEventId?: EventId | undefined
+ }
+ 
+ export function useAttachmentState(): FileAttachment {
+diff --git a/packages/widget/src/components/MessageList/MessageList.helpers.ts b/packages/widget/src/components/MessageList/MessageList.helpers.ts
+index 18a0a14..0648fee 100644
+--- a/packages/widget/src/components/MessageList/MessageList.helpers.ts
++++ b/packages/widget/src/components/MessageList/MessageList.helpers.ts
+@@ -1,4 +1,4 @@
+-import type { UserId } from '@/domain/ids'
++import type { EventId, LocalId, UserId } from '@/shared/types/ids'
+ import { replyEventIdOf, replyQuoteOf, type ReplyStickerPreview } from '@/domain/reply'
+ import { isSystem, type MessageTimelineItem, type TimelineItem } from '@/domain/timeline'
+ import { t } from '@/i18n'
+@@ -47,8 +47,10 @@ export function getPosition(
+   return 'last'
+ }
+ 
+-export function indexMessagesByEventId(timeline: TimelineItem[]): Map<string, MessageTimelineItem> {
+-  const index = new Map<string, MessageTimelineItem>()
++export function indexMessagesByEventId(
++  timeline: TimelineItem[],
++): Map<EventId, MessageTimelineItem> {
++  const index = new Map<EventId, MessageTimelineItem>()
+ 
+   for (const item of timeline) {
+     if (!isSystem(item)) index.set(item.eventId, item)
+@@ -60,12 +62,12 @@ export function indexMessagesByEventId(timeline: TimelineItem[]): Map<string, Me
+ export interface ReplyPreviewData {
+   author?: string
+   text: string
+-  targetId?: string
++  targetId?: LocalId
+   sticker?: ReplyStickerPreview
+ }
+ 
+ interface GetReplyPreviewParams {
+-  index: Map<string, MessageTimelineItem>
++  index: Map<EventId, MessageTimelineItem>
+   message: MessageTimelineItem
+   userId: UserId
+ }
+diff --git a/packages/widget/src/components/MessageList/MessageList.tsx b/packages/widget/src/components/MessageList/MessageList.tsx
+index dc88622..1f7662b 100644
+--- a/packages/widget/src/components/MessageList/MessageList.tsx
++++ b/packages/widget/src/components/MessageList/MessageList.tsx
+@@ -1,4 +1,4 @@
+-import type { UserId } from '@/domain/ids'
++import type { UserId } from '@/shared/types/ids'
+ import { readOwnEventIds } from '@/domain/receipts'
+ import { isSystem } from '@/domain/timeline'
+ import { useChatScroll } from '@/hooks/useChatScroll'
+diff --git a/packages/widget/src/components/MessageList/MessageRow/MessageRow.tsx b/packages/widget/src/components/MessageList/MessageRow/MessageRow.tsx
+index 88e3ce8..7b3c8e7 100644
+--- a/packages/widget/src/components/MessageList/MessageRow/MessageRow.tsx
++++ b/packages/widget/src/components/MessageList/MessageRow/MessageRow.tsx
+@@ -1,4 +1,4 @@
+-import type { LocalId, UserId } from '@/domain/ids'
++import type { LocalId, UserId } from '@/shared/types/ids'
+ import { aggregateReactions, type ReactionEntry } from '@/domain/reactions'
+ import { replyTargetOf, type ReplyStickerPreview } from '@/domain/reply'
+ import { type MessageTimelineItem } from '@/domain/timeline'
+@@ -34,7 +34,7 @@ interface Props {
+   replyAuthor: string | undefined
+   replyText: string | undefined
+   replySticker: ReplyStickerPreview | undefined
+-  replyTargetId: string | undefined
++  replyTargetId: LocalId | undefined
+   onReplyClick: (localId: LocalId) => void
+ }
+ 
+diff --git a/packages/widget/src/components/MessageList/SystemMessage.tsx b/packages/widget/src/components/MessageList/SystemMessage.tsx
+index 4e95a68..8c0b455 100644
+--- a/packages/widget/src/components/MessageList/SystemMessage.tsx
++++ b/packages/widget/src/components/MessageList/SystemMessage.tsx
+@@ -1,10 +1,11 @@
+ import type { SystemLabel } from '@/domain/timeline'
++import type { LocalId } from '@/shared/types/ids'
+ import { t } from '@/i18n'
+ import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
+ import styles from './SystemMessage.module.css'
+ 
+ interface Props {
+-  itemId: string
++  itemId: LocalId
+   label: SystemLabel
+ }
+ 
+diff --git a/packages/widget/src/components/ReplyPreview/ReplyPreview.helpers.ts b/packages/widget/src/components/ReplyPreview/ReplyPreview.helpers.ts
+index e69736b..cb09e03 100644
+--- a/packages/widget/src/components/ReplyPreview/ReplyPreview.helpers.ts
++++ b/packages/widget/src/components/ReplyPreview/ReplyPreview.helpers.ts
+@@ -1,4 +1,4 @@
+-import type { UserId } from '@/domain/ids'
++import type { UserId } from '@/shared/types/ids'
+ import type { ReplyQuote, ReplyStickerPreview } from '@/domain/reply'
+ import { t } from '@/i18n'
+ 
+diff --git a/packages/widget/src/domain/adaptiveCards.ts b/packages/widget/src/domain/adaptiveCards.ts
+index 7edfa04..d9c1922 100644
+--- a/packages/widget/src/domain/adaptiveCards.ts
++++ b/packages/widget/src/domain/adaptiveCards.ts
+@@ -1,4 +1,4 @@
+-import type { EventId } from './ids'
++import type { EventId } from '@/shared/types/ids'
+ import type { SendStatus } from './timeline'
+ 
+ export interface AdaptiveCardPayload extends Record<string, unknown> {
+diff --git a/packages/widget/src/domain/emoji.ts b/packages/widget/src/domain/emoji.ts
+index c1cb1aa..ac3eb2d 100644
+--- a/packages/widget/src/domain/emoji.ts
++++ b/packages/widget/src/domain/emoji.ts
+@@ -1,3 +1,5 @@
++import type { MediaId } from '@/shared/types/ids'
++
+ /**
+  * Эмодзи: каталог для пикера и разбор текста для ленты.
+  *
+@@ -59,7 +61,7 @@ export interface StickerItem {
+   id: string
+   /** Эмодзи-подпись стикера, она же alt и текст цитаты. */
+   body: string
+-  mediaId: string
++  mediaId: MediaId
+   /** mxc://… — уезжает в content при отправке. */
+   url: string
+   /** Адрес байтов для показа: отдаётся без токена, поэтому идёт прямо в src. */
+diff --git a/packages/widget/src/domain/mediaVerdict.ts b/packages/widget/src/domain/mediaVerdict.ts
+index fd1458f..d2a34c6 100644
+--- a/packages/widget/src/domain/mediaVerdict.ts
++++ b/packages/widget/src/domain/mediaVerdict.ts
+@@ -1,5 +1,5 @@
+ import { parseMxcUrl } from '@/shared/utils/mxc'
+-import type { MediaId, UserId } from './ids'
++import type { MediaId, UserId } from '@/shared/types/ids'
+ import type { MediaTimelineItem, TimelineItem } from './timeline'
+ import { isMedia } from './timeline'
+ 
+diff --git a/packages/widget/src/domain/operator.ts b/packages/widget/src/domain/operator.ts
+index 697fc5f..16e542f 100644
+--- a/packages/widget/src/domain/operator.ts
++++ b/packages/widget/src/domain/operator.ts
+@@ -1,4 +1,4 @@
+-import type { UserId } from './ids'
++import type { UserId } from '@/shared/types/ids'
+ 
+ export interface OperatorState {
+   isActive: boolean
+diff --git a/packages/widget/src/domain/optimistic.ts b/packages/widget/src/domain/optimistic.ts
+index 0e3de73..bacbf0e 100644
+--- a/packages/widget/src/domain/optimistic.ts
++++ b/packages/widget/src/domain/optimistic.ts
+@@ -1,7 +1,7 @@
+ import { isPreviewableImage, resolveMimeType } from '@/shared/utils/fileValidation'
+ import type { ImageDimensions } from '@/shared/utils/imageDimensions'
+ import type { StickerItem } from './emoji'
+-import type { EventId, LocalId, TxnId, UserId } from './ids'
++import type { EventId, LocalId, TxnId, UserId } from '@/shared/types/ids'
+ import type {
+   MediaTimelineItem,
+   MediaUpload,
+diff --git a/packages/widget/src/domain/reactions.ts b/packages/widget/src/domain/reactions.ts
+index cf54862..5767734 100644
+--- a/packages/widget/src/domain/reactions.ts
++++ b/packages/widget/src/domain/reactions.ts
+@@ -1,4 +1,4 @@
+-import type { EventId, UserId } from './ids'
++import type { EventId, UserId } from '@/shared/types/ids'
+ import { isOptimistic } from './optimistic'
+ 
+ /** Одно событие `m.reaction`: кто и чем отреагировал. */
+diff --git a/packages/widget/src/domain/receipts.ts b/packages/widget/src/domain/receipts.ts
+index 8fb5f36..f35f0f3 100644
+--- a/packages/widget/src/domain/receipts.ts
++++ b/packages/widget/src/domain/receipts.ts
+@@ -1,4 +1,4 @@
+-import type { EventId, UserId } from './ids'
++import type { EventId, UserId } from '@/shared/types/ids'
+ import { isOptimistic } from './optimistic'
+ import { isSystem, type TimelineItem } from './timeline'
+ 
+diff --git a/packages/widget/src/domain/reply.ts b/packages/widget/src/domain/reply.ts
+index 0c97b00..9978b06 100644
+--- a/packages/widget/src/domain/reply.ts
++++ b/packages/widget/src/domain/reply.ts
+@@ -1,5 +1,5 @@
+ import type { StickerFormat } from './emoji'
+-import type { EventId, UserId } from './ids'
++import type { EventId, UserId } from '@/shared/types/ids'
+ import { isOptimistic } from './optimistic'
+ import { isMedia, isSticker, type MessageTimelineItem, type StickerMedia } from './timeline'
+ 
+diff --git a/packages/widget/src/domain/timeline.ts b/packages/widget/src/domain/timeline.ts
+index ed7e8c0..7556516 100644
+--- a/packages/widget/src/domain/timeline.ts
++++ b/packages/widget/src/domain/timeline.ts
+@@ -1,7 +1,7 @@
+ import type { SystemMessageKey } from '@/i18n'
+ import type { AdaptiveCardPayload } from './adaptiveCards'
+ import type { StickerFormat } from './emoji'
+-import type { EventId, LocalId, MediaId, TxnId, UserId } from './ids'
++import type { EventId, LocalId, MediaId, TxnId, UserId } from '@/shared/types/ids'
+ import type { UploadFailure } from './mediaFailure'
+ 
+ export type SendStatus = 'sending' | 'sent' | 'failed'
+diff --git a/packages/widget/src/hooks/useChatScroll.ts b/packages/widget/src/hooks/useChatScroll.ts
+index 3705cb3..9022e8a 100644
+--- a/packages/widget/src/hooks/useChatScroll.ts
++++ b/packages/widget/src/hooks/useChatScroll.ts
+@@ -1,4 +1,4 @@
+-import type { LocalId, UserId } from '@/domain/ids'
++import type { LocalId, UserId } from '@/shared/types/ids'
+ import { isSystem, type TimelineItem } from '@/domain/timeline'
+ import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
+ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+@@ -55,7 +55,7 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
+ 
+   const isAutoScrollingRef = useRef(false)
+   const autoScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+-  const lastMessageIdRef = useRef<string | null>(null)
++  const lastMessageIdRef = useRef<LocalId | null>(null)
+ 
+   // Единственное место снятия флага: и по 'scrollend', и по сторожевому таймеру.
+   const stopAutoScrolling = useCallback(() => {
+diff --git a/packages/widget/src/hooks/useLoadMoreHistory.ts b/packages/widget/src/hooks/useLoadMoreHistory.ts
+index b861c3f..a040cb6 100644
+--- a/packages/widget/src/hooks/useLoadMoreHistory.ts
++++ b/packages/widget/src/hooks/useLoadMoreHistory.ts
+@@ -1,4 +1,5 @@
+ import type { TimelineItem } from '@/domain/timeline'
++import type { LocalId } from '@/shared/types/ids'
+ import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
+ import { selectIsLoadingHistory } from '@/store/selectors'
+ import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
+@@ -76,7 +77,7 @@ export function useLoadMoreHistory({ timeline, containerRef }: UseLoadMoreHistor
+   const isLoadingHistory = useChatStore(selectIsLoadingHistory)
+ 
+   const anchorRef = useRef<Anchor | null>(null)
+-  const firstItemIdRef = useRef<string | null>(null)
++  const firstItemIdRef = useRef<LocalId | null>(null)
+ 
+   const wasAtBottomRef = useRef(true)
+   const [isAtTop, setIsAtTop] = useState(false)
+diff --git a/packages/widget/src/matrix/api/matrixApi.ts b/packages/widget/src/matrix/api/matrixApi.ts
+index c0fe41e..7baf178 100644
+--- a/packages/widget/src/matrix/api/matrixApi.ts
++++ b/packages/widget/src/matrix/api/matrixApi.ts
+@@ -1,5 +1,5 @@
+ import type { EmojiAnimation } from '@/domain/emoji'
+-import type { EventId, MediaId, RoomId, TxnId } from '@/domain/ids'
++import type { EventId, MediaId, RoomId, TxnId } from '@/shared/types/ids'
+ import type { ThumbnailSize } from '@/domain/media'
+ import type { ParsedMxcUrl } from '@/shared/utils/mxc'
+ import type { SetPresence } from '../sync/presence'
+diff --git a/packages/widget/src/matrix/catalog/matrixCatalog.ts b/packages/widget/src/matrix/catalog/matrixCatalog.ts
+index 594b51b..53018c7 100644
+--- a/packages/widget/src/matrix/catalog/matrixCatalog.ts
++++ b/packages/widget/src/matrix/catalog/matrixCatalog.ts
+@@ -5,7 +5,7 @@ import type {
+   EmojiIndex,
+   StickerPack,
+ } from '@/domain/emoji'
+-import type { MediaId } from '@/domain/ids'
++import type { MediaId } from '@/shared/types/ids'
+ import { createBatchedLoader } from '@/shared/lottie/animationBatcher'
+ import type { MatrixApi } from '../api/matrixApi'
+ import { toEmojiCatalog, toEmojiCategory, toEmojiIndex, toStickerPacks } from '../mappers/emoji'
+diff --git a/packages/widget/src/matrix/history/historyLoader.ts b/packages/widget/src/matrix/history/historyLoader.ts
+index a18b773..37370ee 100644
+--- a/packages/widget/src/matrix/history/historyLoader.ts
++++ b/packages/widget/src/matrix/history/historyLoader.ts
+@@ -1,4 +1,4 @@
+-import type { RoomId } from '@/domain/ids'
++import type { RoomId } from '@/shared/types/ids'
+ import { consoleDev } from '@/shared/utils/consoleDev'
+ import { sleep } from '@/shared/utils/sleep'
+ import type { RuntimeAction } from '@/store/state'
+@@ -114,7 +114,7 @@ export class MatrixHistoryLoader {
+   // по сырым событиям, поэтому страница может состоять из m.reaction/m.room.member и т.п.
+   // При throw — retry в load().
+   private async loadVisiblePage(
+-    roomId: string,
++    roomId: RoomId,
+     fromBatch: string,
+     isStale: () => boolean,
+     signal: AbortSignal,
+diff --git a/packages/widget/src/matrix/mappers/outgoing.ts b/packages/widget/src/matrix/mappers/outgoing.ts
+index 4dc5313..b4b662a 100644
+--- a/packages/widget/src/matrix/mappers/outgoing.ts
++++ b/packages/widget/src/matrix/mappers/outgoing.ts
+@@ -1,5 +1,5 @@
+ import type { CardAction } from '@/domain/adaptiveCards'
+-import type { EventId } from '@/domain/ids'
++import type { EventId } from '@/shared/types/ids'
+ import { replyEventIdOf } from '@/domain/reply'
+ import {
+   isMedia,
+diff --git a/packages/widget/src/matrix/matrixController.ts b/packages/widget/src/matrix/matrixController.ts
+index 4bd5364..61ce54b 100644
+--- a/packages/widget/src/matrix/matrixController.ts
++++ b/packages/widget/src/matrix/matrixController.ts
+@@ -1,6 +1,6 @@
+ import type { CardAction } from '@/domain/adaptiveCards'
+ import type { StickerItem } from '@/domain/emoji'
+-import type { EventId, LocalId, RoomId, TxnId, UserId } from '@/domain/ids'
++import type { EventId, LocalId, RoomId, TxnId, UserId } from '@/shared/types/ids'
+ import type { ThumbnailSize } from '@/domain/media'
+ import { MediaUnavailableError } from '@/domain/mediaFailure'
+ import {
+@@ -44,7 +44,7 @@ import { MatrixEventType } from './wire/consts'
+ 
+ export interface SendFileOptions {
+   caption?: string | undefined
+-  replyToEventId?: string | undefined
++  replyToEventId?: EventId | undefined
+   dims?: ImageDimensions | undefined
+ }
+ 
+@@ -107,7 +107,7 @@ export class MatrixController implements MatrixService {
+   private syncFailures = 0
+   private unwatchNetwork: (() => void) | null = null
+ 
+-  private readonly uploads = new Map<string, AbortController>()
++  private readonly uploads = new Map<LocalId, AbortController>()
+ 
+   // Кэш байтов превью, а не object-URL: URL создаёт и освобождает тот компонент, который
+   // рисует картинку — только он знает, когда revoke безопасен. Хранится промис, а не блоб:
+@@ -121,7 +121,7 @@ export class MatrixController implements MatrixService {
+   // txnId незавершённых ответов на карточки, по `${cardEventId}#${actionId}`. Нужен, чтобы
+   // повтор после сетевого сбоя ушёл с тем же ключом идемпотентности; чистится при смене
+   // сессии — в новой комнате прежние event_id уже ничего не адресуют.
+-  private readonly cardActionTxnIds = new Map<string, string>()
++  private readonly cardActionTxnIds = new Map<string, TxnId>()
+ 
+   constructor(deps: MatrixControllerDeps) {
+     this.api = deps.api
+@@ -162,7 +162,7 @@ export class MatrixController implements MatrixService {
+     this.dispatch({ type: 'session.closed' })
+   }
+ 
+-  async sendMessage(text: string, replyToEventId?: string): Promise<void> {
++  async sendMessage(text: string, replyToEventId?: EventId): Promise<void> {
+     const connection = this.requireConnection()
+     if (!connection) return
+ 
+@@ -233,7 +233,7 @@ export class MatrixController implements MatrixService {
+     // вернёт тот же event_id, а не создаст второе kc.adaptive.action — иначе бот ветвился бы
+     // по одной карточке дважды.
+     const txnKey = `${cardEventId}#${action.id}`
+-    const txnId = this.cardActionTxnIds.get(txnKey) ?? crypto.randomUUID()
++    const txnId: TxnId = this.cardActionTxnIds.get(txnKey) ?? crypto.randomUUID()
+     this.cardActionTxnIds.set(txnKey, txnId)
+ 
+     try {
+diff --git a/packages/widget/src/matrix/session/localStorageSessionStore.ts b/packages/widget/src/matrix/session/localStorageSessionStore.ts
+index 1cd9cde..f242ef6 100644
+--- a/packages/widget/src/matrix/session/localStorageSessionStore.ts
++++ b/packages/widget/src/matrix/session/localStorageSessionStore.ts
+@@ -1,4 +1,4 @@
+-import type { UserId } from '@/domain/ids'
++import type { UserId } from '@/shared/types/ids'
+ import type { MatrixSessionStore, SessionInit } from './types'
+ 
+ const LOCAL_KEY = 'plchat.session'
+@@ -27,7 +27,7 @@ export class LocalStorageSessionStore implements MatrixSessionStore {
+     return readSession()?.refreshToken ?? null
+   }
+ 
+-  getUserId(): string | null {
++  getUserId(): UserId | null {
+     return readSession()?.userId ?? null
+   }
+ 
+diff --git a/packages/widget/src/matrix/session/sessionManager.ts b/packages/widget/src/matrix/session/sessionManager.ts
+index 192066e..470bc38 100644
+--- a/packages/widget/src/matrix/session/sessionManager.ts
++++ b/packages/widget/src/matrix/session/sessionManager.ts
+@@ -1,4 +1,4 @@
+-import type { RoomId, UserId } from '@/domain/ids'
++import type { RoomId, UserId } from '@/shared/types/ids'
+ import { sleep } from '@/shared/utils/sleep'
+ import type { MatrixApi } from '../api/matrixApi'
+ import { isMatrixAuthError, MatrixErrCode, MatrixError } from '../api/matrixError'
+diff --git a/packages/widget/src/matrix/session/types.ts b/packages/widget/src/matrix/session/types.ts
+index 9419218..5ce653c 100644
+--- a/packages/widget/src/matrix/session/types.ts
++++ b/packages/widget/src/matrix/session/types.ts
+@@ -1,4 +1,4 @@
+-import type { UserId } from '@/domain/ids'
++import type { UserId } from '@/shared/types/ids'
+ 
+ export interface TokenSource {
+   setTokens(accessToken: string, refreshToken?: string): void
+diff --git a/packages/widget/src/matrix/wire/dto.ts b/packages/widget/src/matrix/wire/dto.ts
+index 894be63..76d41ba 100644
+--- a/packages/widget/src/matrix/wire/dto.ts
++++ b/packages/widget/src/matrix/wire/dto.ts
+@@ -1,3 +1,4 @@
++import type { EventId, RoomId, UserId } from '@/shared/types/ids'
+ import type { MsgType, RelType } from './consts'
+ import type { ClientEvent, JoinedRoom, MediaInfo, WithRelation } from './types'
+ 
+@@ -19,10 +20,10 @@ export interface OutgoingAdaptiveActionContent {
+   body: string
+   adaptive_action: {
+     action_id: string
+-    source_event_id: string
++    source_event_id: EventId
+     data: Record<string, unknown>
+   }
+-  'm.relates_to': { rel_type: 'm.reference'; event_id: string }
++  'm.relates_to': { rel_type: 'm.reference'; event_id: EventId }
+ }
+ 
+ /**
+@@ -45,17 +46,17 @@ export type OutgoingContent =
+ export interface OutgoingReactionContent {
+   'm.relates_to': {
+     rel_type: typeof RelType.Annotation
+-    event_id: string
++    event_id: EventId
+     key: string
+   }
+ }
+ 
+ export interface OutgoingRedactionContent {
+-  redacts: string
++  redacts: EventId
+ }
+ 
+ export interface RegisterResponse {
+-  user_id: string
++  user_id: UserId
+   device_id: string
+   access_token: string
+   refresh_token?: string
+@@ -69,7 +70,7 @@ export interface RefreshResponse {
+ 
+ export interface SyncResponse {
+   next_batch: string
+-  rooms?: { join?: Record<string, JoinedRoom> }
++  rooms?: { join?: Record<RoomId, JoinedRoom> }
+ }
+ 
+ export interface UploadResponse {
+@@ -77,7 +78,7 @@ export interface UploadResponse {
+ }
+ 
+ export interface SendEventResponse {
+-  event_id: string
++  event_id: EventId
+ }
+ 
+ /**
+diff --git a/packages/widget/src/matrix/wire/emoji.ts b/packages/widget/src/matrix/wire/emoji.ts
+index f42c537..282157f 100644
+--- a/packages/widget/src/matrix/wire/emoji.ts
++++ b/packages/widget/src/matrix/wire/emoji.ts
+@@ -1,3 +1,5 @@
++import type { MediaId } from '@/shared/types/ids'
++
+ /**
+  * Wire-DTO каталогов эмодзи и стикеров (KC-расширения `ru.otpbank.kc`).
+  * Перевод в доменные типы — только в `matrix/mappers/emoji.ts`.
+@@ -68,7 +70,7 @@ export interface StickerWire {
+   body: string
+   info: StickerInfoWire
+   url: string
+-  media_id: string
++  media_id: MediaId
+   /** Силуэт-плейсхолдер: 32×32 grayscale PNG в base64, без `data:`-префикса. */
+   p?: string
+ }
+diff --git a/packages/widget/src/matrix/wire/types.ts b/packages/widget/src/matrix/wire/types.ts
+index 8118751..e4acc67 100644
+--- a/packages/widget/src/matrix/wire/types.ts
++++ b/packages/widget/src/matrix/wire/types.ts
+@@ -1,4 +1,4 @@
+-import type { EventId, MediaId, TxnId, UserId } from '@/domain/ids'
++import type { EventId, MediaId, TxnId, UserId } from '@/shared/types/ids'
+ import type { MatrixEventType, MediaScanStatus, MsgType, RelType } from './consts'
+ 
+ interface BaseClientEvent {
+diff --git a/packages/widget/src/shared/testUtils/idContracts.test.ts b/packages/widget/src/shared/testUtils/idContracts.test.ts
+new file mode 100644
+index 0000000..4b52730
+--- /dev/null
++++ b/packages/widget/src/shared/testUtils/idContracts.test.ts
+@@ -0,0 +1,80 @@
++import type { ChatActions, ChatController } from '../../chatController'
++import type { FileAttachment } from '@/components/Attachment/useAttachmentState'
++import type {
++  indexMessagesByEventId,
++  ReplyPreviewData,
++} from '@/components/MessageList/MessageList.helpers'
++import type { StickerItem } from '@/domain/emoji'
++import type { createOptimisticTextMessage } from '@/domain/optimistic'
++import type { MessageTimelineItem } from '@/domain/timeline'
++import type { MatrixApi } from '@/matrix/api/matrixApi'
++import type { MatrixController, SendFileOptions } from '@/matrix/matrixController'
++import type { LocalStorageSessionStore } from '@/matrix/session/localStorageSessionStore'
++import type * as Matrix from '@/matrix/wire'
++import { describe, expectTypeOf, it } from 'vitest'
++import type { EventId, LocalId, MediaId, RoomId, TxnId, UserId } from '../types/ids'
++import type { ParsedMxcUrl } from '../utils/mxc'
++
++// Проверяем конкретные реализации: implements не запрещает расширить параметр до string.
++// Отрицательные вызовы ниже только компилируются и никогда не выполняются.
++describe('ID — сохранение брендов между слоями (pnpm typecheck)', () => {
++  it('сохраняет тип ответа в контроллерах и при отправке файла', () => {
++    expectTypeOf<ChatController['sendMessage']>().toEqualTypeOf<ChatActions['sendMessage']>()
++    expectTypeOf<MatrixController['sendMessage']>().toEqualTypeOf<ChatActions['sendMessage']>()
++    expectTypeOf<SendFileOptions['replyToEventId']>().toEqualTypeOf<EventId | undefined>()
++    type AttachmentOptions = NonNullable<Parameters<FileAttachment['send']>[0]>
++    expectTypeOf<AttachmentOptions['replyToEventId']>().toEqualTypeOf<EventId | undefined>()
++  })
++
++  it('сохраняет типы в ответах API, сессии и медиа', () => {
++    expectTypeOf<Matrix.SendEventResponse['event_id']>().toEqualTypeOf<EventId>()
++    expectTypeOf<Matrix.RegisterResponse['user_id']>().toEqualTypeOf<UserId>()
++    type JoinedRooms = NonNullable<NonNullable<Matrix.SyncResponse['rooms']>['join']>
++    expectTypeOf<keyof JoinedRooms>().toEqualTypeOf<RoomId>()
++    expectTypeOf<ReturnType<LocalStorageSessionStore['getUserId']>>().toEqualTypeOf<UserId | null>()
++    expectTypeOf<StickerItem['mediaId']>().toEqualTypeOf<MediaId>()
++    expectTypeOf<Matrix.StickerWire['media_id']>().toEqualTypeOf<MediaId>()
++    expectTypeOf<ParsedMxcUrl['mediaId']>().toEqualTypeOf<MediaId>()
++  })
++
++  it('различает ключ поиска события, якорь цитаты и ключ идемпотентности', () => {
++    expectTypeOf<ReturnType<typeof indexMessagesByEventId>>().toEqualTypeOf<
++      Map<EventId, MessageTimelineItem>
++    >()
++    expectTypeOf<ReplyPreviewData['targetId']>().toEqualTypeOf<LocalId | undefined>()
++    type Draft = ReturnType<typeof createOptimisticTextMessage>
++    expectTypeOf<Draft['localId']>().toEqualTypeOf<LocalId>()
++    expectTypeOf<Draft['txnId']>().toEqualTypeOf<TxnId>()
++  })
++
++  it('отклоняет неправильные ID на реальных границах вызовов', () => {
++    const checkCalls = (
++      chat: ChatController,
++      matrix: MatrixController,
++      api: MatrixApi,
++      localId: LocalId,
++      eventId: EventId,
++      txnId: TxnId,
++      userId: UserId,
++      roomId: RoomId,
++      messages: ReturnType<typeof indexMessagesByEventId>,
++    ) => {
++      // @ts-expect-error — ответ адресует событие, а не локальный черновик
++      void chat.sendMessage('reply', localId)
++      // @ts-expect-error — конкретная реализация также не должна принимать LocalId
++      void matrix.sendMessage('reply', localId)
++      // @ts-expect-error — вложение сохраняет ту же семантику ответа
++      const options: SendFileOptions = { replyToEventId: localId }
++      // @ts-expect-error — ID события не является ключом идемпотентности
++      void api.sendReaction({ roomId, txnId: eventId, targetEventId: eventId, key: '👍' })
++      // @ts-expect-error — ID пользователя не является ID комнаты
++      void api.sendReadReceipt(userId, eventId)
++      // @ts-expect-error — индекс событий нельзя читать по transaction ID
++      messages.get(txnId)
++      // @ts-expect-error — серверный ответ не может содержать ID транзакции вместо события
++      const response: Matrix.SendEventResponse = { event_id: txnId }
++      return { options, response }
++    }
++    expectTypeOf(checkCalls).toBeFunction()
++  })
++})
+diff --git a/packages/widget/src/shared/testUtils/matrixFixtures.ts b/packages/widget/src/shared/testUtils/matrixFixtures.ts
+index 758aa46..8b98c2a 100644
+--- a/packages/widget/src/shared/testUtils/matrixFixtures.ts
++++ b/packages/widget/src/shared/testUtils/matrixFixtures.ts
+@@ -15,9 +15,10 @@ import type * as Matrix from '@/matrix/wire'
+ import { parseMxcUrl } from '@/shared/utils/mxc'
+ import { MatrixEventType, MediaScanStatus, MsgType, OperatorStatus } from '@/matrix/wire/consts'
+ import { vi } from 'vitest'
++import type { EventId, LocalId, RoomId, UserId } from '../types/ids'
+ 
+-export const ROOM_ID = '!room:bank'
+-export const OPERATOR_ID = '@operator:bank'
++export const ROOM_ID: RoomId = '!room:bank'
++export const OPERATOR_ID: UserId = '@operator:bank'
+ 
+ export function textItem(
+   overrides: Partial<Omit<TextTimelineItem, 'kind' | 'content'>> & { body?: string } = {},
+@@ -65,7 +66,7 @@ export function stickerItem(
+ }
+ 
+ export function systemItem(
+-  overrides: { localId?: string; eventId?: string; ts?: number; body?: string } = {},
++  overrides: { localId?: LocalId; eventId?: EventId; ts?: number; body?: string } = {},
+ ): SystemTimelineItem {
+   return {
+     kind: 'system',
+@@ -77,7 +78,7 @@ export function systemItem(
+ }
+ 
+ export function noticeItem(
+-  overrides: { localId?: string; eventId?: string; ts?: number; body?: string } = {},
++  overrides: { localId?: LocalId; eventId?: EventId; ts?: number; body?: string } = {},
+ ): SystemTimelineItem {
+   return {
+     kind: 'notice',
+@@ -176,13 +177,11 @@ export function makeFile(name: string, size = 1, type = ''): File {
+   return Object.defineProperty(new File([blob], name, { type }), 'size', { value: size })
+ }
+ 
+-export function receiptEvent(
+-  content: Record<string, { 'm.read'?: Record<string, { ts?: number }> }>,
+-): Matrix.EphemeralEvent {
++export function receiptEvent(content: Matrix.ReceiptEvent['content']): Matrix.EphemeralEvent {
+   return { type: 'm.receipt', content }
+ }
+ 
+-export function readReceipt(eventId: string, reader: string, ts = 1): Matrix.EphemeralEvent {
++export function readReceipt(eventId: EventId, reader: UserId, ts = 1): Matrix.EphemeralEvent {
+   return receiptEvent({ [eventId]: { 'm.read': { [reader]: { ts } } } })
+ }
+ 
+@@ -348,7 +347,7 @@ export function deferred<T>() {
+ export function createFakeTokenStore(
+   accessToken: string | null = null,
+   refreshToken: string | null = null,
+-  userId: string | null = null,
++  userId: UserId | null = null,
+ ) {
+   let accessTokenValue = accessToken
+   let refreshTokenValue = refreshToken
+diff --git a/packages/widget/src/shared/timeline/timelineScroll.ts b/packages/widget/src/shared/timeline/timelineScroll.ts
+index 95b9638..91e7c87 100644
+--- a/packages/widget/src/shared/timeline/timelineScroll.ts
++++ b/packages/widget/src/shared/timeline/timelineScroll.ts
+@@ -1,4 +1,4 @@
+-import type { LocalId } from '@/domain/ids'
++import type { LocalId } from '../types/ids'
+ /**
+  * Доступ к прокрутке ленты снаружи дерева React.
+  *
+diff --git a/packages/widget/src/shared/types/ids.test.ts b/packages/widget/src/shared/types/ids.test.ts
+new file mode 100644
+index 0000000..cb7b54d
+--- /dev/null
++++ b/packages/widget/src/shared/types/ids.test.ts
+@@ -0,0 +1,24 @@
++import { describe, expectTypeOf, it } from 'vitest'
++import type { EventId, LocalId, MediaId, RoomId, TxnId, UserId } from './ids'
++
++// Эти проверки выполняет tsc в pnpm typecheck. Один vitest не проверяет типы.
++describe('ID — совместимость типов', () => {
++  it('разрешает строки на внешних границах и использование ID как строки', () => {
++    expectTypeOf<string>().toMatchTypeOf<EventId & LocalId & TxnId & UserId & RoomId & MediaId>()
++    expectTypeOf<EventId | LocalId | TxnId | UserId | RoomId | MediaId>().toMatchTypeOf<string>()
++  })
++
++  it('не позволяет подменять один вид ID другим', () => {
++    expectTypeOf<EventId>().not.toMatchTypeOf<TxnId | UserId | RoomId | MediaId>()
++    expectTypeOf<LocalId>().not.toMatchTypeOf<EventId | TxnId | UserId | RoomId | MediaId>()
++    expectTypeOf<TxnId>().not.toMatchTypeOf<EventId | LocalId | UserId | RoomId | MediaId>()
++    expectTypeOf<UserId>().not.toMatchTypeOf<EventId | LocalId | TxnId | RoomId | MediaId>()
++    expectTypeOf<RoomId>().not.toMatchTypeOf<EventId | LocalId | TxnId | UserId | MediaId>()
++    expectTypeOf<MediaId>().not.toMatchTypeOf<EventId | LocalId | TxnId | UserId | RoomId>()
++  })
++
++  it('позволяет использовать ID события как ключ ленты только в одном направлении', () => {
++    expectTypeOf<EventId>().toMatchTypeOf<LocalId>()
++    expectTypeOf<LocalId>().not.toMatchTypeOf<EventId>()
++  })
++})
+diff --git a/packages/widget/src/domain/ids.ts b/packages/widget/src/shared/types/ids.ts
+similarity index 71%
+rename from packages/widget/src/domain/ids.ts
+rename to packages/widget/src/shared/types/ids.ts
+index 2e120b9..6135d4e 100644
+--- a/packages/widget/src/domain/ids.ts
++++ b/packages/widget/src/shared/types/ids.ts
+@@ -7,12 +7,13 @@
+  * мешает, а цена ошибки — дубль в ленте или незарезолвленный черновик.
+  *
+  * Бренд **мягкий**: поле `__id` необязательное, поэтому обычная строка присваивается любому id
+- * свободно, а вот id одного вида другому — уже нет. Это сознательный размен. Жёсткий бренд
+- * (`unique symbol`) заставил бы обернуть конструктором каждый строковый литерал в тестах и
+- * фикстурах — порядка пятисот мест, — но поймал бы ровно один дополнительный класс ошибки:
+- * свежесочинённую строку не в том поле. В проде такие строки почти не встречаются: id приходят
+- * из мапперов, стора и элементов ленты, то есть уже типизированными, и между собой их путают —
+- * это мягкий бренд и ловит.
++ * свободно, а вот id одного вида другому — уже нет. Это совместимый шаг миграции:
++ * строки из JSON, DOM и тестовых фикстур пока не требуют конструкторов.
++ * Бренд не проверяет формат и не гарантирует происхождение строки. Расширение до `string`,
++ * строковые операции и Object.keys/entries стирают его. Поэтому внутри приложения нужно
++ * сохранять конкретный тип в параметрах, возвращаемых значениях и коллекциях.
++ * Обязательный бренд потребовал бы явного преобразования на каждой внешней границе и
++ * ловил бы также случайное стирание типа. Здесь такой гарантии пока нет.
+  *
+  * Родство видов выражено самим типом: `LocalId` принимает `EventId`, потому что у события с
+  * сервера ключом ленты служит его же id. Обратно — нельзя, и это важная половина: `LocalId`
+@@ -20,7 +21,7 @@
+  */
+ type Id<Kind extends string> = { readonly __id?: Kind }
+ 
+-/** `$abc…` — id события в комнате. У черновика до ответа сервера — `optimistic:{localId}`. */
++/** ID события или `optimistic:…`; сам тип не гарантирует, что событие уже есть на сервере. */
+ export type EventId = string & Id<'EventId'>
+ 
+ /**
+diff --git a/packages/widget/src/shared/utils/mxc.ts b/packages/widget/src/shared/utils/mxc.ts
+index 2b13e8a..b9be1f9 100644
+--- a/packages/widget/src/shared/utils/mxc.ts
++++ b/packages/widget/src/shared/utils/mxc.ts
+@@ -1,4 +1,4 @@
+-import type { MediaId } from '@/domain/ids'
++import type { MediaId } from '../types/ids'
+ 
+ export interface ParsedMxcUrl {
+   serverName: string
+diff --git a/packages/widget/src/store/reducer.ts b/packages/widget/src/store/reducer.ts
+index e8d1fab..91e7613 100644
+--- a/packages/widget/src/store/reducer.ts
++++ b/packages/widget/src/store/reducer.ts
+@@ -1,6 +1,6 @@
+ import { applyCardAnswers } from '@/domain/adaptiveCards'
+ import { applyMediaVerdicts } from '@/domain/mediaVerdict'
+-import type { LocalId } from '@/domain/ids'
++import type { LocalId } from '@/shared/types/ids'
+ import { mergeTimeline, prependTimeline } from '@/domain/mergeTimeline'
+ import {
+   addReaction,
+diff --git a/packages/widget/src/store/selectors.ts b/packages/widget/src/store/selectors.ts
+index 5cbd0a4..f206df6 100644
+--- a/packages/widget/src/store/selectors.ts
++++ b/packages/widget/src/store/selectors.ts
+@@ -1,5 +1,5 @@
+ import type { CardAnswer } from '@/domain/adaptiveCards'
+-import type { EventId, MediaId, UserId } from '@/domain/ids'
++import type { EventId, MediaId, UserId } from '@/shared/types/ids'
+ import type { MediaVerdict } from '@/domain/mediaVerdict'
+ import type { ReactionIndex } from '@/domain/reactions'
+ import type { ReadReceipt } from '@/domain/receipts'
+diff --git a/packages/widget/src/store/state.ts b/packages/widget/src/store/state.ts
+index e5339c9..51326c0 100644
+--- a/packages/widget/src/store/state.ts
++++ b/packages/widget/src/store/state.ts
+@@ -1,5 +1,5 @@
+ import type { CardAnswer } from '@/domain/adaptiveCards'
+-import type { EventId, LocalId, MediaId, RoomId, UserId } from '@/domain/ids'
++import type { EventId, LocalId, MediaId, RoomId, UserId } from '@/shared/types/ids'
+ import type { UploadFailure } from '@/domain/mediaFailure'
+ import type { MediaVerdict, MediaVerdictEntry } from '@/domain/mediaVerdict'
+ import type { OperatorState } from '@/domain/operator'

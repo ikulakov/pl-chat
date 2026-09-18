@@ -1,4 +1,4 @@
-import type { UserId } from '@/domain/ids'
+import type { UserId } from '@/shared/types/ids'
 
 export interface TokenSource {
   setTokens(accessToken: string, refreshToken?: string): void

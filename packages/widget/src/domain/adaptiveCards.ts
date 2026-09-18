@@ -1,4 +1,4 @@
-import type { EventId } from './ids'
+import type { EventId } from '@/shared/types/ids'
 import type { SendStatus } from './timeline'
 
 export interface AdaptiveCardPayload extends Record<string, unknown> {

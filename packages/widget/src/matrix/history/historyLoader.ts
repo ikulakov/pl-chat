@@ -1,4 +1,4 @@
-import type { RoomId } from '@/domain/ids'
+import type { RoomId } from '@/shared/types/ids'
 import { consoleDev } from '@/shared/utils/consoleDev'
 import { sleep } from '@/shared/utils/sleep'
 import type { RuntimeAction } from '@/store/state'
@@ -114,7 +114,7 @@ export class MatrixHistoryLoader {
   // по сырым событиям, поэтому страница может состоять из m.reaction/m.room.member и т.п.
   // При throw — retry в load().
   private async loadVisiblePage(
-    roomId: string,
+    roomId: RoomId,
     fromBatch: string,
     isStale: () => boolean,
     signal: AbortSignal,

@@ -1,7 +1,7 @@
 import { isPreviewableImage, resolveMimeType } from '@/shared/utils/fileValidation'
 import type { ImageDimensions } from '@/shared/utils/imageDimensions'
 import type { StickerItem } from './emoji'
-import type { EventId, LocalId, TxnId, UserId } from './ids'
+import type { EventId, LocalId, TxnId, UserId } from '@/shared/types/ids'
 import type {
   MediaTimelineItem,
   MediaUpload,

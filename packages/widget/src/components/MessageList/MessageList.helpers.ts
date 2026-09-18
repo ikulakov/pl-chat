@@ -1,4 +1,4 @@
-import type { UserId } from '@/domain/ids'
+import type { EventId, LocalId, UserId } from '@/shared/types/ids'
 import { replyEventIdOf, replyQuoteOf, type ReplyStickerPreview } from '@/domain/reply'
 import { isSystem, type MessageTimelineItem, type TimelineItem } from '@/domain/timeline'
 import { t } from '@/i18n'
@@ -47,8 +47,10 @@ export function getPosition(
   return 'last'
 }
 
-export function indexMessagesByEventId(timeline: TimelineItem[]): Map<string, MessageTimelineItem> {
-  const index = new Map<string, MessageTimelineItem>()
+export function indexMessagesByEventId(
+  timeline: TimelineItem[],
+): Map<EventId, MessageTimelineItem> {
+  const index = new Map<EventId, MessageTimelineItem>()
 
   for (const item of timeline) {
     if (!isSystem(item)) index.set(item.eventId, item)
@@ -60,12 +62,12 @@ export function indexMessagesByEventId(timeline: TimelineItem[]): Map<string, Me
 export interface ReplyPreviewData {
   author?: string
   text: string
-  targetId?: string
+  targetId?: LocalId
   sticker?: ReplyStickerPreview
 }
 
 interface GetReplyPreviewParams {
-  index: Map<string, MessageTimelineItem>
+  index: Map<EventId, MessageTimelineItem>
   message: MessageTimelineItem
   userId: UserId
 }

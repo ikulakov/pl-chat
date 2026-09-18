@@ -1,4 +1,4 @@
-import type { UserId } from '@/domain/ids'
+import type { UserId } from '@/shared/types/ids'
 import { readOwnEventIds } from '@/domain/receipts'
 import { isSystem } from '@/domain/timeline'
 import { useChatScroll } from '@/hooks/useChatScroll'

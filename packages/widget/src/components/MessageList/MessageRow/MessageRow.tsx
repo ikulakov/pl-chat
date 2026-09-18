@@ -1,4 +1,4 @@
-import type { LocalId, UserId } from '@/domain/ids'
+import type { LocalId, UserId } from '@/shared/types/ids'
 import { aggregateReactions, type ReactionEntry } from '@/domain/reactions'
 import { replyTargetOf, type ReplyStickerPreview } from '@/domain/reply'
 import { type MessageTimelineItem } from '@/domain/timeline'
@@ -34,7 +34,7 @@ interface Props {
   replyAuthor: string | undefined
   replyText: string | undefined
   replySticker: ReplyStickerPreview | undefined
-  replyTargetId: string | undefined
+  replyTargetId: LocalId | undefined
   onReplyClick: (localId: LocalId) => void
 }
 

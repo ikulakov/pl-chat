@@ -1,7 +1,7 @@
 import type { SystemMessageKey } from '@/i18n'
 import type { AdaptiveCardPayload } from './adaptiveCards'
 import type { StickerFormat } from './emoji'
-import type { EventId, LocalId, MediaId, TxnId, UserId } from './ids'
+import type { EventId, LocalId, MediaId, TxnId, UserId } from '@/shared/types/ids'
 import type { UploadFailure } from './mediaFailure'
 
 export type SendStatus = 'sending' | 'sent' | 'failed'

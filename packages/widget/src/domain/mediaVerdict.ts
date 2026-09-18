@@ -1,5 +1,5 @@
 import { parseMxcUrl } from '@/shared/utils/mxc'
-import type { MediaId, UserId } from './ids'
+import type { MediaId, UserId } from '@/shared/types/ids'
 import type { MediaTimelineItem, TimelineItem } from './timeline'
 import { isMedia } from './timeline'
 

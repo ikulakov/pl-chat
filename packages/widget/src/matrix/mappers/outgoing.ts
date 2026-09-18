@@ -1,5 +1,5 @@
 import type { CardAction } from '@/domain/adaptiveCards'
-import type { EventId } from '@/domain/ids'
+import type { EventId } from '@/shared/types/ids'
 import { replyEventIdOf } from '@/domain/reply'
 import {
   isMedia,

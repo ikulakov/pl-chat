@@ -1,4 +1,4 @@
-import type { LocalId } from '@/domain/ids'
+import type { LocalId } from '../types/ids'
 /**
  * Доступ к прокрутке ленты снаружи дерева React.
  *

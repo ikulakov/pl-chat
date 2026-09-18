@@ -1,4 +1,4 @@
-import type { EventId, UserId } from './ids'
+import type { EventId, UserId } from '@/shared/types/ids'
 import { isOptimistic } from './optimistic'
 import { isSystem, type TimelineItem } from './timeline'
 

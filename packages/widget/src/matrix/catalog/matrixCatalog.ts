@@ -5,7 +5,7 @@ import type {
   EmojiIndex,
   StickerPack,
 } from '@/domain/emoji'
-import type { MediaId } from '@/domain/ids'
+import type { MediaId } from '@/shared/types/ids'
 import { createBatchedLoader } from '@/shared/lottie/animationBatcher'
 import type { MatrixApi } from '../api/matrixApi'
 import { toEmojiCatalog, toEmojiCategory, toEmojiIndex, toStickerPacks } from '../mappers/emoji'

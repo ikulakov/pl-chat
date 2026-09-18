@@ -1,4 +1,4 @@
-import type { MediaId } from '@/domain/ids'
+import type { MediaId } from '../types/ids'
 
 export interface ParsedMxcUrl {
   serverName: string

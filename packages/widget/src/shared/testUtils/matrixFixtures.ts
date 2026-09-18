@@ -15,9 +15,10 @@ import type * as Matrix from '@/matrix/wire'
 import { parseMxcUrl } from '@/shared/utils/mxc'
 import { MatrixEventType, MediaScanStatus, MsgType, OperatorStatus } from '@/matrix/wire/consts'
 import { vi } from 'vitest'
+import type { EventId, LocalId, RoomId, UserId } from '../types/ids'
 
-export const ROOM_ID = '!room:bank'
-export const OPERATOR_ID = '@operator:bank'
+export const ROOM_ID: RoomId = '!room:bank'
+export const OPERATOR_ID: UserId = '@operator:bank'
 
 export function textItem(
   overrides: Partial<Omit<TextTimelineItem, 'kind' | 'content'>> & { body?: string } = {},
@@ -65,7 +66,7 @@ export function stickerItem(
 }
 
 export function systemItem(
-  overrides: { localId?: string; eventId?: string; ts?: number; body?: string } = {},
+  overrides: { localId?: LocalId; eventId?: EventId; ts?: number; body?: string } = {},
 ): SystemTimelineItem {
   return {
     kind: 'system',
@@ -77,7 +78,7 @@ export function systemItem(
 }
 
 export function noticeItem(
-  overrides: { localId?: string; eventId?: string; ts?: number; body?: string } = {},
+  overrides: { localId?: LocalId; eventId?: EventId; ts?: number; body?: string } = {},
 ): SystemTimelineItem {
   return {
     kind: 'notice',
@@ -176,13 +177,11 @@ export function makeFile(name: string, size = 1, type = ''): File {
   return Object.defineProperty(new File([blob], name, { type }), 'size', { value: size })
 }
 
-export function receiptEvent(
-  content: Record<string, { 'm.read'?: Record<string, { ts?: number }> }>,
-): Matrix.EphemeralEvent {
+export function receiptEvent(content: Matrix.ReceiptEvent['content']): Matrix.EphemeralEvent {
   return { type: 'm.receipt', content }
 }
 
-export function readReceipt(eventId: string, reader: string, ts = 1): Matrix.EphemeralEvent {
+export function readReceipt(eventId: EventId, reader: UserId, ts = 1): Matrix.EphemeralEvent {
   return receiptEvent({ [eventId]: { 'm.read': { [reader]: { ts } } } })
 }
 
@@ -348,7 +347,7 @@ export function deferred<T>() {
 export function createFakeTokenStore(
   accessToken: string | null = null,
   refreshToken: string | null = null,
-  userId: string | null = null,
+  userId: UserId | null = null,
 ) {
   let accessTokenValue = accessToken
   let refreshTokenValue = refreshToken

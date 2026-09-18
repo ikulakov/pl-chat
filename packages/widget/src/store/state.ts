@@ -1,5 +1,5 @@
 import type { CardAnswer } from '@/domain/adaptiveCards'
-import type { EventId, LocalId, MediaId, RoomId, UserId } from '@/domain/ids'
+import type { EventId, LocalId, MediaId, RoomId, UserId } from '@/shared/types/ids'
 import type { UploadFailure } from '@/domain/mediaFailure'
 import type { MediaVerdict, MediaVerdictEntry } from '@/domain/mediaVerdict'
 import type { OperatorState } from '@/domain/operator'

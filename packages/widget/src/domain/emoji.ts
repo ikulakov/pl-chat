@@ -1,3 +1,5 @@
+import type { MediaId } from '@/shared/types/ids'
+
 /**
  * Эмодзи: каталог для пикера и разбор текста для ленты.
  *
@@ -59,7 +61,7 @@ export interface StickerItem {
   id: string
   /** Эмодзи-подпись стикера, она же alt и текст цитаты. */
   body: string
-  mediaId: string
+  mediaId: MediaId
   /** mxc://… — уезжает в content при отправке. */
   url: string
   /** Адрес байтов для показа: отдаётся без токена, поэтому идёт прямо в src. */

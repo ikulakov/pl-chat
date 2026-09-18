@@ -1,6 +1,6 @@
 import type { CardAction } from '@/domain/adaptiveCards'
 import type { StickerItem } from '@/domain/emoji'
-import type { EventId, LocalId, RoomId, TxnId, UserId } from '@/domain/ids'
+import type { EventId, LocalId, RoomId, TxnId, UserId } from '@/shared/types/ids'
 import type { ThumbnailSize } from '@/domain/media'
 import { MediaUnavailableError } from '@/domain/mediaFailure'
 import {
@@ -44,7 +44,7 @@ import { MatrixEventType } from './wire/consts'
 
 export interface SendFileOptions {
   caption?: string | undefined
-  replyToEventId?: string | undefined
+  replyToEventId?: EventId | undefined
   dims?: ImageDimensions | undefined
 }
 
@@ -107,7 +107,7 @@ export class MatrixController implements MatrixService {
   private syncFailures = 0
   private unwatchNetwork: (() => void) | null = null
 
-  private readonly uploads = new Map<string, AbortController>()
+  private readonly uploads = new Map<LocalId, AbortController>()
 
   // Кэш байтов превью, а не object-URL: URL создаёт и освобождает тот компонент, который
   // рисует картинку — только он знает, когда revoke безопасен. Хранится промис, а не блоб:
@@ -121,7 +121,7 @@ export class MatrixController implements MatrixService {
   // txnId незавершённых ответов на карточки, по `${cardEventId}#${actionId}`. Нужен, чтобы
   // повтор после сетевого сбоя ушёл с тем же ключом идемпотентности; чистится при смене
   // сессии — в новой комнате прежние event_id уже ничего не адресуют.
-  private readonly cardActionTxnIds = new Map<string, string>()
+  private readonly cardActionTxnIds = new Map<string, TxnId>()
 
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
@@ -162,7 +162,7 @@ export class MatrixController implements MatrixService {
     this.dispatch({ type: 'session.closed' })
   }
 
-  async sendMessage(text: string, replyToEventId?: string): Promise<void> {
+  async sendMessage(text: string, replyToEventId?: EventId): Promise<void> {
     const connection = this.requireConnection()
     if (!connection) return
 
@@ -233,7 +233,7 @@ export class MatrixController implements MatrixService {
     // вернёт тот же event_id, а не создаст второе kc.adaptive.action — иначе бот ветвился бы
     // по одной карточке дважды.
     const txnKey = `${cardEventId}#${action.id}`
-    const txnId = this.cardActionTxnIds.get(txnKey) ?? crypto.randomUUID()
+    const txnId: TxnId = this.cardActionTxnIds.get(txnKey) ?? crypto.randomUUID()
     this.cardActionTxnIds.set(txnKey, txnId)
 
     try {
@@ -355,8 +355,10 @@ export class MatrixController implements MatrixService {
 
     const request = this.fetchMediaBytes(() => this.api.getThumbnail(parsed, size)).catch(
       (err: unknown) => {
-        // Упавший запрос в кэше не держим: следующий mount (или кнопка «повторить») пробует заново.
-        this.previews.delete(key)
+        // Упавший запрос в кэше не держим: следующий mount (или кнопка «повторить») пробует
+        // заново. Сверка по ссылке обязательна: ключ один на файл и размер, и поздний отказ
+        // запроса прежней сессии иначе выбросил бы уже начатый запрос новой.
+        if (this.previews.get(key) === request) this.previews.delete(key)
         throw err
       },
     )

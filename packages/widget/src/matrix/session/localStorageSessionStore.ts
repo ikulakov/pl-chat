@@ -1,4 +1,4 @@
-import type { UserId } from '@/domain/ids'
+import type { UserId } from '@/shared/types/ids'
 import type { MatrixSessionStore, SessionInit } from './types'
 
 const LOCAL_KEY = 'plchat.session'
@@ -27,7 +27,7 @@ export class LocalStorageSessionStore implements MatrixSessionStore {
     return readSession()?.refreshToken ?? null
   }
 
-  getUserId(): string | null {
+  getUserId(): UserId | null {
     return readSession()?.userId ?? null
   }
 

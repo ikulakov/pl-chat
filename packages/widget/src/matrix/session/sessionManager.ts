@@ -1,4 +1,4 @@
-import type { RoomId, UserId } from '@/domain/ids'
+import type { RoomId, UserId } from '@/shared/types/ids'
 import { sleep } from '@/shared/utils/sleep'
 import type { MatrixApi } from '../api/matrixApi'
 import { isMatrixAuthError, MatrixErrCode, MatrixError } from '../api/matrixError'

@@ -1,4 +1,5 @@
 import type { TimelineItem } from '@/domain/timeline'
+import type { LocalId } from '@/shared/types/ids'
 import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
 import { selectIsLoadingHistory } from '@/store/selectors'
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
@@ -76,7 +77,7 @@ export function useLoadMoreHistory({ timeline, containerRef }: UseLoadMoreHistor
   const isLoadingHistory = useChatStore(selectIsLoadingHistory)
 
   const anchorRef = useRef<Anchor | null>(null)
-  const firstItemIdRef = useRef<string | null>(null)
+  const firstItemIdRef = useRef<LocalId | null>(null)
 
   const wasAtBottomRef = useRef(true)
   const [isAtTop, setIsAtTop] = useState(false)

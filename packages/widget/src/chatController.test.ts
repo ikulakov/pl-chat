@@ -177,10 +177,10 @@ describe('ChatController — wiring', () => {
     const matrix = makeMatrix()
     const controller = new ChatController(makeBridge(), client(matrix))
 
-    void controller.sendMessage('hi')
+    void controller.actions.sendMessage('hi')
     controller.reconnect()
 
-    expect(matrix.sendMessage).toHaveBeenCalledWith('hi', undefined)
+    expect(matrix.sendMessage).toHaveBeenCalledWith('hi')
     expect(matrix.connect).toHaveBeenCalledOnce()
   })
 
@@ -189,7 +189,7 @@ describe('ChatController — wiring', () => {
     const controller = new ChatController(makeBridge(), client(matrix))
     const action = { id: 'confirm', title: 'Подтвердить', data: { action: 'confirm' } }
 
-    void controller.sendCardAction('$card', action)
+    void controller.actions.sendCardAction('$card', action)
 
     expect(matrix.sendCardAction).toHaveBeenCalledWith('$card', action)
   })

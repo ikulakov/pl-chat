@@ -1,4 +1,4 @@
-import type { UserId } from '@/domain/ids'
+import type { UserId } from '@/shared/types/ids'
 import type { ReplyQuote, ReplyStickerPreview } from '@/domain/reply'
 import { t } from '@/i18n'
 

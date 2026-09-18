@@ -1,4 +1,4 @@
-import type { LocalId, UserId } from '@/domain/ids'
+import type { LocalId, UserId } from '@/shared/types/ids'
 import { isSystem, type TimelineItem } from '@/domain/timeline'
 import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -55,7 +55,7 @@ export function useChatScroll({ containerRef, bottomRef, timeline, userId }: Use
 
   const isAutoScrollingRef = useRef(false)
   const autoScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastMessageIdRef = useRef<string | null>(null)
+  const lastMessageIdRef = useRef<LocalId | null>(null)
 
   // Единственное место снятия флага: и по 'scrollend', и по сторожевому таймеру.
   const stopAutoScrolling = useCallback(() => {

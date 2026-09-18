@@ -1,4 +1,4 @@
-import type { EventId, MediaId, TxnId, UserId } from '@/domain/ids'
+import type { EventId, MediaId, TxnId, UserId } from '@/shared/types/ids'
 import type { MatrixEventType, MediaScanStatus, MsgType, RelType } from './consts'
 
 interface BaseClientEvent {

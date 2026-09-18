@@ -874,6 +874,36 @@ describe('MatrixController (orchestrator)', () => {
     expect(api.getThumbnail).toHaveBeenCalledTimes(2)
   })
 
+  // Кэш превью хранит промис, и упавший запрос сам себя из него удаляет. Ключ при этом один
+  // на файл и размер, поэтому поздний отказ запроса прежней сессии обязан проверить, его ли
+  // запись лежит под ключом: иначе он выбрасывает уже начатый запрос новой сессии, и картинка
+  // качается заново на каждый ремаунт ряда.
+  it('поздний отказ прежней сессии не выбрасывает кэш новой', async () => {
+    const stale = deferred<Blob>()
+    const fresh = new Blob(['fresh'])
+    const api = makeMatrixApi({
+      getThumbnail: vi
+        .fn<MatrixApi['getThumbnail']>()
+        .mockReturnValueOnce(stale.promise)
+        .mockResolvedValue(fresh),
+    })
+    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
+    const mxcUrl = 'mxc://bank.ru/abc'
+    const size = { width: 320, height: 240 }
+
+    const staleRequest = expect(controller.loadPreview(mxcUrl, size)).rejects.toMatchObject({
+      reason: 'failed',
+    })
+    controller.disconnect()
+    expect(await controller.loadPreview(mxcUrl, size)).toBe(fresh)
+
+    stale.reject(new MatrixError('M_UNKNOWN', 'timeout', undefined, 500))
+    await staleRequest
+
+    expect(await controller.loadPreview(mxcUrl, size)).toBe(fresh)
+    expect(api.getThumbnail).toHaveBeenCalledTimes(2)
+  })
+
   it('cancelUpload aborts the upload and drops the draft from the timeline', async () => {
     const upload = deferred<Awaited<ReturnType<MatrixApi['uploadMedia']>>>()
     let signal: AbortSignal | undefined

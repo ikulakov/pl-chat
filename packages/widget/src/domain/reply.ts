@@ -1,5 +1,5 @@
 import type { StickerFormat } from './emoji'
-import type { EventId, UserId } from './ids'
+import type { EventId, UserId } from '@/shared/types/ids'
 import { isOptimistic } from './optimistic'
 import { isMedia, isSticker, type MessageTimelineItem, type StickerMedia } from './timeline'
 

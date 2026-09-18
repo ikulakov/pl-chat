@@ -1,3 +1,5 @@
+import type { MediaId } from '@/shared/types/ids'
+
 /**
  * Wire-DTO каталогов эмодзи и стикеров (KC-расширения `ru.otpbank.kc`).
  * Перевод в доменные типы — только в `matrix/mappers/emoji.ts`.
@@ -68,7 +70,7 @@ export interface StickerWire {
   body: string
   info: StickerInfoWire
   url: string
-  media_id: string
+  media_id: MediaId
   /** Силуэт-плейсхолдер: 32×32 grayscale PNG в base64, без `data:`-префикса. */
   p?: string
 }

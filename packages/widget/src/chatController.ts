@@ -1,52 +1,25 @@
 import type { HostCommand } from '@bankchat/protocol'
 import type { HostBridge } from './bridge'
-import type { CardAction } from './domain/adaptiveCards'
-import type {
-  EmojiAnimation,
-  EmojiCatalog,
-  EmojiCategory,
-  EmojiIndex,
-  StickerItem,
-  StickerPack,
-} from './domain/emoji'
-import type { EventId, LocalId, MediaId } from './domain/ids'
-import type { ThumbnailSize } from './domain/media'
 import type { ReplyTarget } from './domain/reply'
 import type { CatalogService } from './matrix/catalog/matrixCatalog'
 import { createMatrixClient, type MatrixClient } from './matrix/createMatrixClient'
-import type { MatrixService, SendFileOptions } from './matrix/matrixController'
+import type { MatrixService } from './matrix/matrixController'
 import { chatStore } from './store/store'
-
-export interface ChatActions {
-  sendMessage: (text: string, replyToEventId?: EventId) => Promise<void>
-  sendFile: (file: File, options?: SendFileOptions) => Promise<void>
-  sendSticker: (sticker: StickerItem) => Promise<void>
-  sendCardAction: (cardEventId: EventId, action: CardAction) => Promise<void>
-  loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
-  downloadFile: (mxcUrl: string) => Promise<Blob>
-  loadEmojiCatalog: () => Promise<EmojiCatalog>
-  loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
-  loadEmojiIndex: () => Promise<EmojiIndex>
-  loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
-  loadStickerPacks: () => Promise<StickerPack[]>
-  loadStickerAnimation: (mediaId: MediaId) => Promise<EmojiAnimation>
-  cancelUpload: (localId: LocalId) => void
-  resendMessage: (localId: LocalId) => Promise<void>
+interface PanelActions {
   replyTo: (target: ReplyTarget) => void
   cancelReply: () => void
-  markRead: (eventId: EventId) => Promise<void>
-  toggleReaction: (targetEventId: EventId, key: string) => Promise<void>
-  loadMoreHistory: () => Promise<void>
-  stopLoadingHistory: () => void
   reconnect: () => void
   open: () => void
   close: () => void
 }
 
+export type ChatActions = Omit<MatrixService, 'connect' | 'disconnect'> &
+  CatalogService &
+  PanelActions
+
 export class ChatController {
   private readonly bridge: HostBridge
   private readonly matrix: MatrixService
-  private readonly catalog: CatalogService
 
   // Стабильная ссылка — собирается в конструкторе, не пересоздаётся на рендер.
   readonly actions: ChatActions
@@ -63,29 +36,28 @@ export class ChatController {
       })
 
     this.matrix = matrix
-    this.catalog = catalog
 
     this.actions = {
-      sendMessage: this.sendMessage,
-      sendFile: this.sendFile,
-      sendSticker: this.sendSticker,
-      sendCardAction: this.sendCardAction,
-      loadPreview: this.loadPreview,
-      downloadFile: this.downloadFile,
-      loadEmojiCatalog: this.loadEmojiCatalog,
-      loadEmojiCategory: this.loadEmojiCategory,
-      loadEmojiIndex: this.loadEmojiIndex,
-      loadEmojiAnimation: this.loadEmojiAnimation,
-      loadStickerPacks: this.loadStickerPacks,
-      loadStickerAnimation: this.loadStickerAnimation,
-      cancelUpload: this.cancelUpload,
-      resendMessage: this.resendMessage,
+      sendMessage: (...args) => matrix.sendMessage(...args),
+      sendFile: (...args) => matrix.sendFile(...args),
+      sendSticker: (...args) => matrix.sendSticker(...args),
+      sendCardAction: (...args) => matrix.sendCardAction(...args),
+      loadPreview: (...args) => matrix.loadPreview(...args),
+      downloadFile: (...args) => matrix.downloadFile(...args),
+      cancelUpload: (...args) => matrix.cancelUpload(...args),
+      resendMessage: (...args) => matrix.resendMessage(...args),
+      markRead: (...args) => matrix.markRead(...args),
+      toggleReaction: (...args) => matrix.toggleReaction(...args),
+      loadMoreHistory: (...args) => matrix.loadMoreHistory(...args),
+      stopLoadingHistory: (...args) => matrix.stopLoadingHistory(...args),
+      loadEmojiCatalog: (...args) => catalog.loadEmojiCatalog(...args),
+      loadEmojiCategory: (...args) => catalog.loadEmojiCategory(...args),
+      loadEmojiIndex: (...args) => catalog.loadEmojiIndex(...args),
+      loadEmojiAnimation: (...args) => catalog.loadEmojiAnimation(...args),
+      loadStickerPacks: (...args) => catalog.loadStickerPacks(...args),
+      loadStickerAnimation: (...args) => catalog.loadStickerAnimation(...args),
       replyTo: this.replyTo,
       cancelReply: this.cancelReply,
-      markRead: this.markRead,
-      toggleReaction: this.toggleReaction,
-      loadMoreHistory: this.loadMoreHistory,
-      stopLoadingHistory: this.stopLoadingHistory,
       reconnect: this.reconnect,
       open: this.open,
       close: this.close,
@@ -115,9 +87,6 @@ export class ChatController {
     }
   }
 
-  sendMessage = (text: string, replyToEventId?: string): Promise<void> =>
-    this.matrix.sendMessage(text, replyToEventId)
-
   replyTo = (target: ReplyTarget): void => {
     chatStore.getState().dispatch({ type: 'reply.targeted', target })
   }
@@ -125,47 +94,6 @@ export class ChatController {
   cancelReply = (): void => {
     chatStore.getState().dispatch({ type: 'reply.cleared' })
   }
-
-  sendFile = (file: File, options?: SendFileOptions): Promise<void> =>
-    this.matrix.sendFile(file, options)
-
-  sendSticker = (sticker: StickerItem): Promise<void> => this.matrix.sendSticker(sticker)
-
-  sendCardAction = (cardEventId: EventId, action: CardAction): Promise<void> =>
-    this.matrix.sendCardAction(cardEventId, action)
-
-  loadPreview = (mxcUrl: string, size: ThumbnailSize): Promise<Blob> =>
-    this.matrix.loadPreview(mxcUrl, size)
-
-  downloadFile = (mxcUrl: string): Promise<Blob> => this.matrix.downloadFile(mxcUrl)
-
-  loadEmojiCatalog = (): Promise<EmojiCatalog> => this.catalog.loadEmojiCatalog()
-
-  loadEmojiCategory = (categoryId: string): Promise<EmojiCategory> =>
-    this.catalog.loadEmojiCategory(categoryId)
-
-  loadEmojiIndex = (): Promise<EmojiIndex> => this.catalog.loadEmojiIndex()
-
-  loadEmojiAnimation = (codepoint: string, version: string): Promise<EmojiAnimation> =>
-    this.catalog.loadEmojiAnimation(codepoint, version)
-
-  loadStickerPacks = (): Promise<StickerPack[]> => this.catalog.loadStickerPacks()
-
-  loadStickerAnimation = (mediaId: MediaId): Promise<EmojiAnimation> =>
-    this.catalog.loadStickerAnimation(mediaId)
-
-  cancelUpload = (localId: LocalId): void => this.matrix.cancelUpload(localId)
-
-  resendMessage = (localId: LocalId): Promise<void> => this.matrix.resendMessage(localId)
-
-  markRead = (eventId: EventId): Promise<void> => this.matrix.markRead(eventId)
-
-  toggleReaction = (targetEventId: EventId, key: string): Promise<void> =>
-    this.matrix.toggleReaction(targetEventId, key)
-
-  loadMoreHistory = (): Promise<void> => this.matrix.loadMoreHistory()
-
-  stopLoadingHistory = (): void => this.matrix.stopLoadingHistory()
 
   reconnect = (): void => {
     void this.matrix.connect()

@@ -1,5 +1,5 @@
 import type { EmojiAnimation } from '@/domain/emoji'
-import type { EventId, MediaId, RoomId, TxnId } from '@/domain/ids'
+import type { EventId, MediaId, RoomId, TxnId } from '@/shared/types/ids'
 import type { ThumbnailSize } from '@/domain/media'
 import type { ParsedMxcUrl } from '@/shared/utils/mxc'
 import type { SetPresence } from '../sync/presence'

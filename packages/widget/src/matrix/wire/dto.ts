@@ -1,3 +1,4 @@
+import type { EventId, RoomId, UserId } from '@/shared/types/ids'
 import type { MsgType, RelType } from './consts'
 import type { ClientEvent, JoinedRoom, MediaInfo, WithRelation } from './types'
 
@@ -19,10 +20,10 @@ export interface OutgoingAdaptiveActionContent {
   body: string
   adaptive_action: {
     action_id: string
-    source_event_id: string
+    source_event_id: EventId
     data: Record<string, unknown>
   }
-  'm.relates_to': { rel_type: 'm.reference'; event_id: string }
+  'm.relates_to': { rel_type: 'm.reference'; event_id: EventId }
 }
 
 /**
@@ -45,17 +46,17 @@ export type OutgoingContent =
 export interface OutgoingReactionContent {
   'm.relates_to': {
     rel_type: typeof RelType.Annotation
-    event_id: string
+    event_id: EventId
     key: string
   }
 }
 
 export interface OutgoingRedactionContent {
-  redacts: string
+  redacts: EventId
 }
 
 export interface RegisterResponse {
-  user_id: string
+  user_id: UserId
   device_id: string
   access_token: string
   refresh_token?: string
@@ -69,7 +70,7 @@ export interface RefreshResponse {
 
 export interface SyncResponse {
   next_batch: string
-  rooms?: { join?: Record<string, JoinedRoom> }
+  rooms?: { join?: Record<RoomId, JoinedRoom> }
 }
 
 export interface UploadResponse {
@@ -77,7 +78,7 @@ export interface UploadResponse {
 }
 
 export interface SendEventResponse {
-  event_id: string
+  event_id: EventId
 }
 
 /**
