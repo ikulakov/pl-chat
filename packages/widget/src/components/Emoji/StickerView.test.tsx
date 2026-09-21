@@ -1,4 +1,4 @@
-import { resetAnimationCache } from '@/shared/lottie/animationCache'
+import { resetAnimationCache } from './lottie/animationCache'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StickerView, type StickerViewData } from './StickerView'
@@ -10,7 +10,7 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
 }))
 
 // lottie-web тянет canvas, которого в jsdom нет; здесь проверяется выбор ветки, а не плеер.
-vi.mock<unknown>(import('@/shared/lottie/lottiePlayer'), () => ({
+vi.mock<unknown>(import('./lottie/lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
   createEmojiPlayer: () => ({
     totalFrames: 30,

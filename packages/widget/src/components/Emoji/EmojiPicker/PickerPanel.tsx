@@ -1,7 +1,7 @@
 import type { EmojiCategory } from '@/domain/emoji'
 import { useChatActions } from '@/hooks/useChatActions'
 import { t } from '@/i18n'
-import { getAnimationCache } from '@/shared/lottie/animationCache'
+import { getAnimationCache } from '../lottie/animationCache'
 import { useId, useMemo, useRef, useState } from 'react'
 import { CategoryBar } from './CategoryBar'
 import { EmojiGrid } from './EmojiGrid'

@@ -1,5 +1,5 @@
 import type { EmojiCategory } from '@/domain/emoji'
-import type { LottieCache } from '@/shared/lottie/lottieCache'
+import type { LottieCache } from '../lottie/lottieCache'
 import { FakeIntersectionObserver } from '@/shared/testUtils/intersectionObserver'
 import { render } from '@testing-library/react'
 import { createRef } from 'react'

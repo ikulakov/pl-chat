@@ -1,5 +1,5 @@
 import type { EmojiIndex } from '@/domain/emoji'
-import { ensureEmojiIndex, resetEmojiIndex } from '@/shared/emoji/emojiIndexStore'
+import { ensureEmojiIndex, resetEmojiIndex } from '../../../Emoji/cache/emojiIndexStore'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BubbleMetaData } from '../bubble/BubbleMeta'
@@ -17,7 +17,7 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => {
   return { useChatActions: () => actions }
 })
 
-vi.mock(import('@/shared/lottie/emojiBitmap'), () => ({
+vi.mock(import('../../../Emoji/lottie/emojiBitmap'), () => ({
   getEmojiBitmap: () => Promise.resolve(BITMAP),
 }))
 

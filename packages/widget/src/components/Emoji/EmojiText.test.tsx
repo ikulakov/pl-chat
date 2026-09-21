@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EmojiIndex } from '@/domain/emoji'
-import { ensureEmojiIndex, resetEmojiIndex } from '@/shared/emoji/emojiIndexStore'
+import { ensureEmojiIndex, resetEmojiIndex } from './cache/emojiIndexStore'
 import { EmojiText } from './EmojiText'
 
 const BITMAP = 'data:image/png;base64,AAA'
@@ -17,7 +17,7 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => {
   return { useChatActions: () => actions }
 })
 
-vi.mock(import('@/shared/lottie/emojiBitmap'), () => ({
+vi.mock(import('./lottie/emojiBitmap'), () => ({
   getEmojiBitmap: () => Promise.resolve(BITMAP),
 }))
 

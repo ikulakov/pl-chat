@@ -1,4 +1,4 @@
-import { ensureEmojiIndex } from '@/shared/emoji/emojiIndexStore'
+import { ensureEmojiIndex } from './cache/emojiIndexStore'
 import { FEATURES } from '@/shared/features'
 import { selectUserId } from '@/store/selectors'
 import { useEffect } from 'react'

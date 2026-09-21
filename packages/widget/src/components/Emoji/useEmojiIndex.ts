@@ -1,5 +1,5 @@
 import type { EmojiIndex } from '@/domain/emoji'
-import { getEmojiIndex, subscribeEmojiIndex } from '@/shared/emoji/emojiIndexStore'
+import { getEmojiIndex, subscribeEmojiIndex } from './cache/emojiIndexStore'
 import { useSyncExternalStore } from 'react'
 
 /**

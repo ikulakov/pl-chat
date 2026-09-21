@@ -24,7 +24,7 @@ vi.mock(import('./rasterizeSvg'), () => ({
 // и дописывают после — сам адаптер деградирует до `null` без него.
 const readFrame = vi.fn(() => Promise.resolve<string | null>(null))
 const writeFrame = vi.fn(() => Promise.resolve())
-vi.mock(import('../emoji/emojiDb'), () => ({
+vi.mock(import('../cache/emojiDb'), () => ({
   readFrame: (...args: unknown[]) => readFrame(...(args as [])),
   writeFrame: (...args: unknown[]) => writeFrame(...(args as [])),
 }))

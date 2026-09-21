@@ -1,5 +1,5 @@
 import type { EmojiAnimation } from '@/domain/emoji'
-import { consoleDev } from '../utils/consoleDev'
+import { consoleDev } from '@/shared/utils/consoleDev'
 
 /**
  * Склейка загрузок эмодзи в пачки.

@@ -1,5 +1,5 @@
-import { resetAnimationCache } from '@/shared/lottie/animationCache'
-import type { AcquireOptions } from '@/shared/lottie/lottiePool'
+import { resetAnimationCache } from './lottie/animationCache'
+import type { AcquireOptions } from './lottie/lottiePool'
 import { FakeIntersectionObserver } from '@/shared/testUtils/intersectionObserver'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -24,16 +24,16 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => {
   return { useChatActions: () => actions }
 })
 
-vi.mock(import('@/shared/lottie/emojiBitmap'), () => ({
+vi.mock(import('./lottie/emojiBitmap'), () => ({
   getEmojiBitmap: () => Promise.resolve('data:image/png;base64,AAA'),
 }))
 
-vi.mock<unknown>(import('@/shared/lottie/lottiePlayer'), () => ({
+vi.mock<unknown>(import('./lottie/lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
   createEmojiPlayer: (...args: unknown[]) => createEmojiPlayer(...(args as [])),
 }))
 
-vi.mock<unknown>(import('@/shared/lottie/lottiePool'), () => ({
+vi.mock<unknown>(import('./lottie/lottiePool'), () => ({
   lottiePool: { acquire: (player: unknown, options?: AcquireOptions) => acquire(player, options) },
 }))
 

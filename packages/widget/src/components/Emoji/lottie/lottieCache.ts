@@ -1,5 +1,5 @@
 import type { EmojiAnimation } from '@/domain/emoji'
-import { evictOldest } from '../utils/evictOldest'
+import { evictOldest } from '@/shared/utils/evictOldest'
 
 // Разжатая анимация — это разобранный JSON на десятки килобайт. Потолок в записях, а не в
 // байтах: позиции пака однородны (512×512, ≤64 КБ в сжатом виде), поэтому число записей и

@@ -2,7 +2,7 @@ import type { EmojiIndex } from '@/domain/emoji'
 import type { MessageTimelineItem } from '@/domain/timeline'
 import { LONG_PRESS_MS } from './useMessageGestures'
 import { t } from '@/i18n'
-import { ensureEmojiIndex, resetEmojiIndex } from '@/shared/emoji/emojiIndexStore'
+import { ensureEmojiIndex, resetEmojiIndex } from '../../Emoji/cache/emojiIndexStore'
 import { textItem } from '@/shared/testUtils/matrixFixtures'
 import { TestPointerEvent, touch } from '@/shared/testUtils/pointer'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -29,7 +29,7 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => {
   return { useChatActions: () => actions }
 })
 
-vi.mock(import('@/shared/lottie/emojiBitmap'), () => ({
+vi.mock(import('../../Emoji/lottie/emojiBitmap'), () => ({
   getEmojiBitmap: () => Promise.resolve('data:image/png;base64,AAA'),
 }))
 
