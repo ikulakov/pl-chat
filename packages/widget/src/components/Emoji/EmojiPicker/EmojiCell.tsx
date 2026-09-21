@@ -1,12 +1,12 @@
 import type { EmojiItem } from '@/domain/emoji'
-import { useEmojiBitmap } from '@/hooks/useEmojiBitmap'
+import { useEmojiBitmap } from '../useEmojiBitmap'
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
 import type { LottieCache } from '@/shared/lottie/lottieCache'
 import { createEmojiPlayer, loadLottiePlayer } from '@/shared/lottie/lottiePlayer'
 import { lottiePool } from '@/shared/lottie/lottiePool'
 import { consoleDev } from '@/shared/utils/consoleDev'
 import { useEffect, useRef, useState } from 'react'
-import { Silhouette } from '../../Silhouette/Silhouette'
+import { Silhouette } from '../Silhouette'
 import styles from './EmojiPicker.module.css'
 
 interface Props {

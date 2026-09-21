@@ -19,7 +19,7 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
 
 // Пикер подменён кнопкой-заглушкой: здесь проверяется только то, что делает композер с
 // выбранным символом. Поведение самой панели покрыто EmojiPickerButton.test.tsx.
-vi.mock(import('./EmojiPicker/EmojiPickerButton'), () => ({
+vi.mock(import('../Emoji/EmojiPicker/EmojiPickerButton'), () => ({
   EmojiPickerButton: ({ onSelectEmoji }: { onSelectEmoji: (char: string) => void }) => (
     <button
       type="button"

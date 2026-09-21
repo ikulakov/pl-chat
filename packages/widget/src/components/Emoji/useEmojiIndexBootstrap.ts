@@ -2,8 +2,8 @@ import { ensureEmojiIndex } from '@/shared/emoji/emojiIndexStore'
 import { FEATURES } from '@/shared/features'
 import { selectUserId } from '@/store/selectors'
 import { useEffect } from 'react'
-import { useChatActions } from './useChatActions'
-import { useChatStore } from './useChatStore'
+import { useChatActions } from '@/hooks/useChatActions'
+import { useChatStore } from '@/hooks/useChatStore'
 
 /**
  * Тянет индекс пака эмодзи один раз на вкладку. Лента и цитаты его только читают.

@@ -7,7 +7,7 @@ import { createEmojiPlayer, loadLottiePlayer } from '@/shared/lottie/lottiePlaye
 import { lottiePool } from '@/shared/lottie/lottiePool'
 import { cn } from '@/shared/utils/cn'
 import { useEffect, useRef, useState } from 'react'
-import { Silhouette } from '../Silhouette/Silhouette'
+import { Silhouette } from './Silhouette'
 import styles from './Sticker.module.css'
 
 /**

@@ -3,7 +3,7 @@ import { t } from '@/i18n'
 import { cn } from '@/shared/utils/cn'
 import type { ReactNode } from 'react'
 import { EmojiText } from '../Emoji/EmojiText'
-import { StickerView } from '../Sticker/StickerView'
+import { StickerView } from '../Emoji/StickerView'
 import styles from './ReplyPreview.module.css'
 
 /** Со строку текста цитаты: стикер здесь — иконка, а не картинка. */

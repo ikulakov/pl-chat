@@ -1,4 +1,4 @@
-import { useEmojiBitmap } from '@/hooks/useEmojiBitmap'
+import { useEmojiBitmap } from './useEmojiBitmap'
 import styles from './Emoji.module.css'
 
 interface Props {

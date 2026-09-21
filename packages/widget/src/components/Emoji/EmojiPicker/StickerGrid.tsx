@@ -3,7 +3,7 @@ import { useChatActions } from '@/hooks/useChatActions'
 import { t } from '@/i18n'
 import { consoleDev } from '@/shared/utils/consoleDev'
 import { useEffect, useState } from 'react'
-import { StickerView } from '../../Sticker/StickerView'
+import { StickerView } from '../StickerView'
 import styles from './EmojiPicker.module.css'
 
 interface Props {

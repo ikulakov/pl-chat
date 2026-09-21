@@ -2,7 +2,7 @@ import { getAnimationCache } from '@/shared/lottie/animationCache'
 import { getEmojiBitmap } from '@/shared/lottie/emojiBitmap'
 import type { EmojiBitmapSize } from '@/shared/lottie/types'
 import { useEffect, useState } from 'react'
-import { useChatActions } from './useChatActions'
+import { useChatActions } from '@/hooks/useChatActions'
 
 /**
  * Первый кадр эмодзи картинкой. `null`, пока кадра нет — вызывающий рисует символ шрифтом

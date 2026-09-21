@@ -12,7 +12,7 @@ import { ReplyPreview } from '../ReplyPreview/ReplyPreview'
 import { replyAuthorLabel, replyQuoteView } from '../ReplyPreview/ReplyPreview.helpers'
 import { AttachmentPreview } from './AttachmentPreview'
 import styles from './Composer.module.css'
-import { EmojiPickerButton } from './EmojiPicker'
+import { EmojiPickerButton } from '../Emoji/EmojiPicker'
 import { FilePickerButton } from './FilePickerButton'
 import { MAX_MESSAGE_LENGTH, MessageTextarea } from './MessageTextarea'
 
