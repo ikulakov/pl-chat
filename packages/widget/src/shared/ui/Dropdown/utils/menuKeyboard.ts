@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react'
-import { resolveRoot } from '../../utils/resolveRoot'
+import { resolveRoot } from '../../../utils/resolveRoot'
 
 /** Навигация по пунктам меню: стрелки по кругу, Home и End — к краям. Вешается на `role="menu"`. */
 export function handleMenuKeyDown(event: KeyboardEvent<HTMLElement>): void {

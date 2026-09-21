@@ -11,9 +11,9 @@ import { cn } from '../../utils/cn'
 import { resolvePortalContainer } from '../floating/portal'
 import { useDismiss } from '../floating/useDismiss'
 import { readViewport } from '../floating/viewport'
-import type { TooltipPlacement } from './computeTooltipPosition'
-import { computeTooltipPosition } from './computeTooltipPosition'
-import { isInDelayGroup, markTooltipClosed, markTooltipOpened } from './delayGroup'
+import type { TooltipPlacement } from './utils/computeTooltipPosition'
+import { computeTooltipPosition } from './utils/computeTooltipPosition'
+import { isInDelayGroup, markTooltipClosed, markTooltipOpened } from './utils/delayGroup'
 import styles from './Tooltip.module.css'
 
 const OPEN_DELAY_MS = 400

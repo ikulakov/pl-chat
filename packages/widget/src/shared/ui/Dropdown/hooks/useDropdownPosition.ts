@@ -1,6 +1,6 @@
 import { type RefObject, useLayoutEffect, useState } from 'react'
-import { readViewport } from '../floating/viewport'
-import { computeDropdownPosition } from './computeDropdownPosition'
+import { readViewport } from '../../floating/viewport'
+import { computeDropdownPosition } from '../utils/computeDropdownPosition'
 
 interface Params {
   isOpen: boolean

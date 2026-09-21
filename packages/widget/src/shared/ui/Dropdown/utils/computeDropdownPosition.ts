@@ -1,4 +1,4 @@
-import { VIEWPORT_MARGIN } from '../floating/viewport'
+import { VIEWPORT_MARGIN } from '../../floating/viewport'
 
 // отступ меню от триггера
 export const GAP = 4

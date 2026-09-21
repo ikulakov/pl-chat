@@ -290,6 +290,9 @@ export default tseslint.config(
         'error',
         {
           patterns: [
+            // Только `@/`-форма: относительный выход из слоя и так роняет local/layer-boundary,
+            // а шаблон вида `**/hooks/**` ловил бы и собственные папки слайсов shared/ui
+            // (`Dropdown/hooks/`).
             {
               group: [
                 '@/components/**',
@@ -298,12 +301,6 @@ export default tseslint.config(
                 '@/store/**',
                 '@/matrix/**',
                 '@/middleware/**',
-                '**/components/**',
-                '**/domain/**',
-                '**/hooks/**',
-                '**/store/**',
-                '**/matrix/**',
-                '**/middleware/**',
               ],
               message:
                 'shared/ — нижний слой: он не знает ни домена, ни стора, ни контроллера, ни компонентов. Нужен верхний слой — значит модуль не shared: положи его рядом с потребителем.',

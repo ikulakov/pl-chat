@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { VIEWPORT_MARGIN } from '../floating/viewport'
+import { VIEWPORT_MARGIN } from '../../floating/viewport'
 import { GAP, computeDropdownPosition } from './computeDropdownPosition'
 
 const VIEWPORT = { width: 400, height: 600 }

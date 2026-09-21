@@ -14,14 +14,14 @@ import { resolvePortalContainer } from '../floating/portal'
 import { useDismiss } from '../floating/useDismiss'
 import { DropdownContext } from './context'
 import styles from './Dropdown.module.css'
-import { handleMenuKeyDown } from './menuKeyboard'
+import { handleMenuKeyDown } from './utils/menuKeyboard'
 import type {
   DropdownCloseOptions,
   DropdownHandle,
   DropdownOpenOptions,
   DropdownTriggerProps,
 } from './types'
-import { useDropdownPosition } from './useDropdownPosition'
+import { useDropdownPosition } from './hooks/useDropdownPosition'
 
 interface Props {
   ref?: Ref<DropdownHandle> | undefined

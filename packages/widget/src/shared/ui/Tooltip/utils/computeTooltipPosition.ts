@@ -1,4 +1,4 @@
-import { VIEWPORT_MARGIN } from '../floating/viewport'
+import { VIEWPORT_MARGIN } from '../../floating/viewport'
 
 // зазор между триггером и тултипом; курсор проходит его насквозь, поэтому закрытие идёт с
 // задержкой (CLOSE_DELAY_MS) — иначе тултип исчезал бы на полпути к нему
