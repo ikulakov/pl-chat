@@ -2,7 +2,7 @@ import type { MediaTimelineItem } from '@/domain/timeline'
 import { consoleDev } from '@/shared/utils/consoleDev'
 import { downloadBlob } from '@/shared/utils/downloadBlob'
 import { useCallback, useState } from 'react'
-import { useChatActions } from './useChatActions'
+import { useChatActions } from '@/hooks/useChatActions'
 
 interface MediaDownload {
   download: () => void

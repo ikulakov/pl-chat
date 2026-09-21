@@ -13,7 +13,7 @@ import { CopyFilledIcon, CopyIcon, MoreIcon, ReplyIcon, RetryIcon } from '@/shar
 import { copyText } from '@/shared/utils/clipboard'
 import { selectViewport } from '@/store/selectors'
 import type { Ref } from 'react'
-import { ReactionPicker } from './ReactionPicker'
+import { ReactionPicker } from './reactions/ReactionPicker'
 
 interface Props {
   ref?: Ref<DropdownHandle>

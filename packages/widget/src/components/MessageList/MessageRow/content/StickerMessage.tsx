@@ -1,7 +1,7 @@
 import type { StickerTimelineItem } from '@/domain/timeline'
 import type { ReactNode } from 'react'
-import { StickerView } from '../../Sticker/StickerView'
-import { BubbleMeta, type BubbleMetaData } from './BubbleMeta'
+import { StickerView } from '../../../Sticker/StickerView'
+import { BubbleMeta, type BubbleMetaData } from '../bubble/BubbleMeta'
 import styles from './StickerMessage.module.css'
 
 interface Props {

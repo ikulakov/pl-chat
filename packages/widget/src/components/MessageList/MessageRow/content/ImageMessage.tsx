@@ -1,12 +1,12 @@
 import type { ImageTimelineItem } from '@/domain/timeline'
 import { useChatActions } from '@/hooks/useChatActions'
-import { useMediaDownload } from '@/hooks/useMediaDownload'
+import { useMediaDownload } from '../media/useMediaDownload'
 import type { ReactNode } from 'react'
-import { BubbleMeta, type BubbleMetaData } from './BubbleMeta'
+import { BubbleMeta, type BubbleMetaData } from '../bubble/BubbleMeta'
 import styles from './ImageMessage.module.css'
-import { MediaCaption } from './MediaCaption'
-import { MediaImage } from './MediaImage'
-import { useMediaUploadView } from './useMediaUploadView'
+import { MediaCaption } from '../media/MediaCaption'
+import { MediaImage } from '../media/MediaImage'
+import { useMediaUploadView } from '../media/useMediaUploadView'
 
 interface Props {
   item: ImageTimelineItem

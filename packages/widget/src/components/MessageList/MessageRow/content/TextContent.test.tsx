@@ -2,7 +2,7 @@ import type { EmojiIndex } from '@/domain/emoji'
 import { ensureEmojiIndex, resetEmojiIndex } from '@/shared/emoji/emojiIndexStore'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BubbleMetaData } from './BubbleMeta'
+import type { BubbleMetaData } from '../bubble/BubbleMeta'
 import { TextContent } from './TextContent'
 
 const BITMAP = 'data:image/png;base64,AAA'

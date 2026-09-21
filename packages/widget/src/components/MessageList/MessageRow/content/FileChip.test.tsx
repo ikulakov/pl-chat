@@ -3,7 +3,7 @@ import { fileItem } from '@/shared/testUtils/matrixFixtures'
 import { chatStore } from '@/store/store'
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { BubbleMetaData } from './BubbleMeta'
+import type { BubbleMetaData } from '../bubble/BubbleMeta'
 import { FileChip } from './FileChip'
 
 const cancelUpload = vi.fn()
