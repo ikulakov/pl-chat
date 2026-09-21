@@ -1,8 +1,8 @@
 import type { TimelineItem } from '@/domain/timeline'
-import { RECEIPT_ID_ATTR } from '@/shared/timeline/domAttributes'
+import { RECEIPT_ID_ATTR } from './domAttributes'
 import { trailingThrottle } from '@/shared/utils/trailingThrottle'
 import { useEffect, useEffectEvent } from 'react'
-import { useChatActions } from './useChatActions'
+import { useChatActions } from '@/hooks/useChatActions'
 
 export const SCAN_THROTTLE_MS = 500
 

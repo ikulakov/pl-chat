@@ -1,8 +1,8 @@
 import type { LocalId, UserId } from '@/shared/types/ids'
 import { isSystem, type TimelineItem } from '@/domain/timeline'
-import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
+import { ITEM_ID_ATTR } from './domAttributes'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useIntersectionObserver } from './useIntersectionObserver'
+import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
 
 const NEAR_BOTTOM_PX = 80
 const SMOOTH_TAIL_PX = 200

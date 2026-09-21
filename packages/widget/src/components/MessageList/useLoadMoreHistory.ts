@@ -1,10 +1,10 @@
 import type { TimelineItem } from '@/domain/timeline'
 import type { LocalId } from '@/shared/types/ids'
-import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
+import { ITEM_ID_ATTR } from './domAttributes'
 import { selectIsLoadingHistory } from '@/store/selectors'
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
-import { useChatActions } from './useChatActions'
-import { useChatStore } from './useChatStore'
+import { useChatActions } from '@/hooks/useChatActions'
+import { useChatStore } from '@/hooks/useChatStore'
 
 // Допуск на дробные scrollTop/округления у краёв.
 const SCROLL_EDGE_EPS_PX = 4

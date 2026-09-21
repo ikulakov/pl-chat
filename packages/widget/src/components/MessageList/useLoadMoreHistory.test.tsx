@@ -1,6 +1,6 @@
 import type { TimelineItem } from '@/domain/timeline'
 import { textItem } from '@/shared/testUtils/matrixFixtures'
-import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
+import { ITEM_ID_ATTR } from './domAttributes'
 import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '@/store/initialState'
 import { chatStore } from '@/store/store'
 import { act, renderHook } from '@testing-library/react'
@@ -10,7 +10,7 @@ import { useLoadMoreHistory } from './useLoadMoreHistory'
 // Экшены дёргают ChatController → MatrixService, которые в этом тесте не поднимаются
 const loadMoreHistory = vi.fn()
 const stopLoadingHistory = vi.fn()
-vi.mock<unknown>(import('./useChatActions'), () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({ loadMoreHistory, stopLoadingHistory }),
 }))
 

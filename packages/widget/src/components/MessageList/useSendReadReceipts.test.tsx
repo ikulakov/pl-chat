@@ -1,11 +1,11 @@
 import type { TimelineItem } from '@/domain/timeline'
-import { RECEIPT_ID_ATTR } from '@/shared/timeline/domAttributes'
+import { RECEIPT_ID_ATTR } from './domAttributes'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SCAN_THROTTLE_MS, useSendReadReceipts } from './useSendReadReceipts'
 
 const { markRead } = vi.hoisted(() => ({ markRead: vi.fn() }))
-vi.mock<unknown>(import('./useChatActions'), () => ({ useChatActions: () => ({ markRead }) }))
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({ useChatActions: () => ({ markRead }) }))
 
 const FOLD = 500 // нижняя кромка ленты
 
