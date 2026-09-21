@@ -13,13 +13,13 @@ import {
   selectUserId,
   selectViewport,
 } from '@/store/selectors'
-import { AttachmentProvider } from './Attachment/AttachmentProvider'
+import { AttachmentProvider } from '../Attachment'
 import chatStyles from './ChatPanel.module.css'
-import { Composer } from './Composer'
-import { DevOperatorTools } from './dev/DevOperatorTools'
-import { ErrorBoundary } from './ErrorBoundary'
-import { Header } from './Header'
-import { MessageList } from './MessageList/MessageList'
+import { Composer } from '../Composer'
+import { DevOperatorTools } from '../DevOperatorTools'
+import { ErrorBoundary } from '../ErrorBoundary'
+import { Header } from '../Header'
+import { MessageList } from '../MessageList'
 
 export function ChatPanel() {
   const view = useChatStore(selectPanelView)

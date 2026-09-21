@@ -3,7 +3,7 @@ import { replyEventIdOf, replyQuoteOf, type ReplyStickerPreview } from '@/domain
 import { isSystem, type MessageTimelineItem, type TimelineItem } from '@/domain/timeline'
 import { t } from '@/i18n'
 import { formatDateLabel, startOfDay } from '@/shared/utils/formatDate'
-import { replyAuthorLabel, replyQuoteView } from '../ReplyPreview/ReplyPreview.helpers'
+import { replyAuthorLabel, replyQuoteView } from '../ReplyPreview'
 import type { BubblePosition } from './MessageRow'
 
 interface DayGroup {

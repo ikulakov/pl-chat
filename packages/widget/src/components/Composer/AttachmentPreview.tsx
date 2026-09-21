@@ -5,7 +5,7 @@ import { CloseIcon, FileDocIcon } from '@/shared/ui/icons'
 import { cn } from '@/shared/utils/cn'
 import { getFileExtension, type FileRejection } from '@/shared/utils/fileValidation'
 import { formatSize } from '@/shared/utils/formatSize'
-import type { PendingAttachment } from '../Attachment/useAttachmentState'
+import type { PendingAttachment } from '../Attachment'
 import styles from './AttachmentPreview.module.css'
 
 interface Props {

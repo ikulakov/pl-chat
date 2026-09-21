@@ -71,6 +71,56 @@ const layerBoundary = {
   },
 }
 
+const COMPONENTS = path.join(WIDGET_SRC, 'components')
+
+/** Слайс — папка первого уровня в components/; null — вне components/ или сама папка components. */
+function sliceOf(absolutePath) {
+  const relative = path.relative(COMPONENTS, absolutePath)
+  if (relative === '' || relative.startsWith('..')) return null
+  return relative.split(path.sep)[0]
+}
+
+/**
+ * Снаружи в слайс components/ ходят только через его index.ts. Слайс кладётся по правилу
+ * «файл — в самой глубокой папке, где все его потребители», и index.ts — единственное, что
+ * он обещает соседям; остальное можно переставлять, не трогая чужой код. Без линта баррели
+ * расползаются: соседу проще взять файл напрямую, и через месяц index.ts врёт.
+ *
+ * Прод-код только: тестам законно нужно к соседу внутрь — засеять стор индекса эмодзи,
+ * замокать lottie-плеер (см. ignores в подключении ниже).
+ */
+const sliceBoundary = {
+  meta: {
+    type: 'problem',
+    docs: { description: 'импорт в чужой слайс components/ — только через его index.ts' },
+    schema: [],
+  },
+  create(context) {
+    function check(node) {
+      const request = node.source?.value
+      if (typeof request !== 'string') return
+
+      let target
+      if (request.startsWith('@/')) target = path.join(WIDGET_SRC, request.slice(2))
+      else if (request.startsWith('.')) target = path.resolve(path.dirname(context.filename), request)
+      else return
+
+      const targetSlice = sliceOf(target)
+      if (!targetSlice || targetSlice === sliceOf(context.filename)) return
+
+      const sliceRoot = path.join(COMPONENTS, targetSlice)
+      if (target === sliceRoot || /^index(\.tsx?)?$/.test(path.relative(sliceRoot, target))) return
+
+      context.report({
+        node: node.source,
+        message: `Слайс components/${targetSlice} берётся только через его index.ts: нужного там нет — добавь экспорт в index.ts, а не ходи к файлу напрямую.`,
+      })
+    }
+
+    return { ImportDeclaration: check, ExportNamedDeclaration: check, ExportAllDeclaration: check }
+  },
+}
+
 export default tseslint.config(
   {
     ignores: ['**/dist/**', '**/node_modules/**', '**/.turbo/**', 'pnpm-lock.yaml'],
@@ -141,8 +191,18 @@ export default tseslint.config(
   // записи для них тот же.
   {
     files: ['packages/widget/src/**/*.{ts,tsx}'],
-    plugins: { local: { rules: { 'layer-boundary': layerBoundary } } },
+    plugins: {
+      local: { rules: { 'layer-boundary': layerBoundary, 'slice-boundary': sliceBoundary } },
+    },
     rules: { 'local/layer-boundary': 'error' },
+  },
+
+  // Публичный API слайсов components/ — index.ts (см. sliceBoundary выше). Тесты и testUtils
+  // исключены: фикстурам и мокам нужно к соседу внутрь, и это не утечка устройства в прод.
+  {
+    files: ['packages/widget/src/**/*.{ts,tsx}'],
+    ignores: ['packages/widget/src/shared/testUtils/**', '**/*.test.{ts,tsx}'],
+    rules: { 'local/slice-boundary': 'error' },
   },
 
   {

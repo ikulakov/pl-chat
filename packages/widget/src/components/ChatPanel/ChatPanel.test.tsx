@@ -5,7 +5,7 @@ import { chatStore } from '@/store/store'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatPanel } from './ChatPanel'
-import type * as MessageListModule from './MessageList/MessageList'
+import type * as MessageListModule from '../MessageList/MessageList'
 
 // Панель тянет за собой ленту и композер, которым нужен живой ChatController —
 // в этом тесте нас интересует только подпись в шапке.
@@ -13,7 +13,7 @@ const reconnect = vi.hoisted(() => vi.fn())
 // Переключатель падения ленты: в остальных тестах она рендерится как есть.
 const listCrash = vi.hoisted(() => ({ enabled: false }))
 
-vi.mock(import('./MessageList/MessageList'), async (importOriginal) => {
+vi.mock(import('../MessageList/MessageList'), async (importOriginal) => {
   const actual = await importOriginal<typeof MessageListModule>()
 
   return {

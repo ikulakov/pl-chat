@@ -1,4 +1,4 @@
-import { EmojiText } from '../../../Emoji/EmojiText'
+import { EmojiText } from '../../../Emoji'
 import { BubbleMeta, type BubbleMetaData } from '../bubble/BubbleMeta'
 import styles from './MediaCaption.module.css'
 
