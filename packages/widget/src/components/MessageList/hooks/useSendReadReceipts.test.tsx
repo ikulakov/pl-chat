@@ -1,5 +1,5 @@
 import type { TimelineItem } from '@/domain/timeline'
-import { RECEIPT_ID_ATTR } from './domAttributes'
+import { RECEIPT_ID_ATTR } from '../utils/domAttributes'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SCAN_THROTTLE_MS, useSendReadReceipts } from './useSendReadReceipts'

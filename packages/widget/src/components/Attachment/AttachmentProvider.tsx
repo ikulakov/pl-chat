@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from 'react'
 import { AttachmentContext } from './AttachmentContext'
 import { DropZone } from './DropZone'
-import { useAttachmentState } from './useAttachmentState'
+import { useAttachmentState } from './hooks/useAttachmentState'
 
 interface Props extends PropsWithChildren {
   dropZoneEnabled?: boolean

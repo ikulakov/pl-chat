@@ -4,8 +4,8 @@ import {
   readCachedCatalog,
   writeCachedCatalog,
   writeCachedCategory,
-} from '../cache/emojiCatalogCache'
-import { syncPackVersion } from '../cache/emojiDb'
+} from '../../cache/emojiCatalogCache'
+import { syncPackVersion } from '../../cache/emojiDb'
 import { consoleDev } from '@/shared/utils/consoleDev'
 import { useCallback, useEffect, useRef, useState } from 'react'
 

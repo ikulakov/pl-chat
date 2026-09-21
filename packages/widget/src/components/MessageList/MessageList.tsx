@@ -1,10 +1,10 @@
 import type { UserId } from '@/shared/types/ids'
 import { readOwnEventIds } from '@/domain/receipts'
 import { isSystem } from '@/domain/timeline'
-import { useChatScroll } from './useChatScroll'
+import { useChatScroll } from './hooks/useChatScroll'
 import { useChatStore } from '@/hooks/useChatStore'
-import { useLoadMoreHistory } from './useLoadMoreHistory'
-import { useSendReadReceipts } from './useSendReadReceipts'
+import { useLoadMoreHistory } from './hooks/useLoadMoreHistory'
+import { useSendReadReceipts } from './hooks/useSendReadReceipts'
 import { registerTimelineScroll } from '@/shared/timeline/timelineScroll'
 import { Spinner } from '@/shared/ui/Spinner'
 import { ToastOutlet } from '@/shared/ui/Toast'
@@ -21,7 +21,7 @@ import {
   getReplyPreview,
   groupTimelineByDate,
   indexMessagesByEventId,
-} from './MessageList.helpers'
+} from './utils/MessageList.helpers'
 import styles from './MessageList.module.css'
 import { MessageRow } from './MessageRow'
 import { ScrollToBottomButton } from './ScrollToBottomButton'

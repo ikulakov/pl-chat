@@ -7,8 +7,8 @@ import { CloseIcon, DownloadIcon, ImageIcon, RetryIcon } from '@/shared/ui/icons
 import { cn } from '@/shared/utils/cn'
 import { useEffect, useState } from 'react'
 import styles from './MediaImage.module.css'
-import { pickThumbnailSize } from './thumbnailSize'
-import { useMediaSource } from './useMediaSource'
+import { pickThumbnailSize } from '../utils/thumbnailSize'
+import { useMediaSource } from '../hooks/useMediaSource'
 
 interface Props {
   item: ImageTimelineItem

@@ -8,8 +8,8 @@ import { EmojiGrid } from './EmojiGrid'
 import styles from './EmojiPicker.module.css'
 import { PickerTabs, type PickerTab } from './PickerTabs'
 import { StickerGrid } from './StickerGrid'
-import { useCategoryNav } from './useCategoryNav'
-import { useEmojiCatalog } from './useEmojiCatalog'
+import { useCategoryNav } from './hooks/useCategoryNav'
+import { useEmojiCatalog } from './hooks/useEmojiCatalog'
 
 interface Props {
   ref: React.RefObject<HTMLDivElement | null>

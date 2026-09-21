@@ -11,7 +11,7 @@ import { cn } from '@/shared/utils/cn'
 import { memo, useMemo, useRef, type ReactNode } from 'react'
 import { useEmojiSegments } from '../../Emoji'
 import { ReplyPreview } from '../../ReplyPreview'
-import { ITEM_ID_ATTR, RECEIPT_ID_ATTR } from '../domAttributes'
+import { ITEM_ID_ATTR, RECEIPT_ID_ATTR } from '../utils/domAttributes'
 import type { BubbleMetaData } from './bubble/BubbleMeta'
 import { MessageBubble, type BubblePosition } from './bubble/MessageBubble'
 import { AdaptiveCardActions } from './content/AdaptiveCardActions'
@@ -23,7 +23,7 @@ import { TextContent } from './content/TextContent'
 import { MessageActions } from './MessageActions'
 import styles from './MessageRow.module.css'
 import { ReactionBar } from './reactions/ReactionBar'
-import { useMessageGestures } from './useMessageGestures'
+import { useMessageGestures } from './hooks/useMessageGestures'
 
 interface Props {
   message: MessageTimelineItem

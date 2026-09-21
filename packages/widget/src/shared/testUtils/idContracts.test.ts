@@ -1,9 +1,9 @@
 import type { ChatActions } from '../../chatController'
-import type { FileAttachment } from '@/components/Attachment/useAttachmentState'
+import type { FileAttachment } from '@/components/Attachment/hooks/useAttachmentState'
 import type {
   indexMessagesByEventId,
   ReplyPreviewData,
-} from '@/components/MessageList/MessageList.helpers'
+} from '@/components/MessageList/utils/MessageList.helpers'
 import type { StickerItem } from '@/domain/emoji'
 import type { createOptimisticTextMessage } from '@/domain/optimistic'
 import type { MessageTimelineItem } from '@/domain/timeline'

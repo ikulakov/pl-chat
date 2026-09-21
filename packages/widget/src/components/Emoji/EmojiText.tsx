@@ -1,4 +1,4 @@
-import { useEmojiSegments } from './useEmojiSegments'
+import { useEmojiSegments } from './hooks/useEmojiSegments'
 import { Fragment } from 'react'
 import { InlineEmoji } from './InlineEmoji'
 

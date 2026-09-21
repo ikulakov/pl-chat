@@ -1,5 +1,5 @@
 import { useChatActions } from '@/hooks/useChatActions'
-import { useEmojiBitmap } from './useEmojiBitmap'
+import { useEmojiBitmap } from './hooks/useEmojiBitmap'
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
 import { getAnimationCache } from './lottie/animationCache'
 import { createEmojiPlayer, loadLottiePlayer } from './lottie/lottiePlayer'

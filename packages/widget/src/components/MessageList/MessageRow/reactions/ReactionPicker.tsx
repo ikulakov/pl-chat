@@ -2,7 +2,7 @@ import type { ReactionSummary } from '@/domain/reactions'
 import { t } from '@/i18n'
 import { cn } from '@/shared/utils/cn'
 import { useRef } from 'react'
-import { QUICK_REACTIONS } from './quickReactions'
+import { QUICK_REACTIONS } from '../utils/quickReactions'
 import styles from './ReactionPicker.module.css'
 
 interface Props {

@@ -1,6 +1,6 @@
 import type { EmojiIndex } from '@/domain/emoji'
 import type { MessageTimelineItem } from '@/domain/timeline'
-import { LONG_PRESS_MS } from './useMessageGestures'
+import { LONG_PRESS_MS } from './hooks/useMessageGestures'
 import { t } from '@/i18n'
 import { ensureEmojiIndex, resetEmojiIndex } from '../../Emoji/cache/emojiIndexStore'
 import { textItem } from '@/shared/testUtils/matrixFixtures'

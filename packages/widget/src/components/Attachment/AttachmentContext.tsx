@@ -1,5 +1,5 @@
 import { createContext, use } from 'react'
-import type { FileAttachment } from './useAttachmentState'
+import type { FileAttachment } from './hooks/useAttachmentState'
 
 export const AttachmentContext = createContext<FileAttachment | null>(null)
 

@@ -2,7 +2,7 @@ import { isRetryableFailure, type UploadFailure } from '@/domain/mediaFailure'
 import type { FileTimelineItem } from '@/domain/timeline'
 import { useChatActions } from '@/hooks/useChatActions'
 import { useChatStore } from '@/hooks/useChatStore'
-import { useMediaDownload } from '../media/useMediaDownload'
+import { useMediaDownload } from '../hooks/useMediaDownload'
 import { t } from '@/i18n'
 import { ProgressRing } from '@/shared/ui/ProgressRing'
 import { Spinner } from '@/shared/ui/Spinner'
@@ -15,7 +15,7 @@ import { selectMediaVerdicts } from '@/store/selectors'
 import { BubbleMeta, type BubbleMetaData } from '../bubble/BubbleMeta'
 import styles from './FileChip.module.css'
 import { MediaCaption } from '../media/MediaCaption'
-import { useMediaUploadView } from '../media/useMediaUploadView'
+import { useMediaUploadView } from '../hooks/useMediaUploadView'
 
 interface Props {
   item: FileTimelineItem

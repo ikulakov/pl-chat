@@ -1,5 +1,5 @@
 import type { EmojiItem } from '@/domain/emoji'
-import { useEmojiBitmap } from '../useEmojiBitmap'
+import { useEmojiBitmap } from '../hooks/useEmojiBitmap'
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
 import type { LottieCache } from '../lottie/lottieCache'
 import { createEmojiPlayer, loadLottiePlayer } from '../lottie/lottiePlayer'

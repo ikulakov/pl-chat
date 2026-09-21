@@ -4,7 +4,7 @@ import { IconButton } from '@/shared/ui/IconButton'
 import { StickerIcon } from '@/shared/ui/icons'
 import styles from './EmojiPicker.module.css'
 import { PickerPanel } from './PickerPanel'
-import { usePickerDismiss } from './usePickerDismiss'
+import { usePickerDismiss } from './hooks/usePickerDismiss'
 
 interface Props {
   onSelectEmoji: (char: string) => void
