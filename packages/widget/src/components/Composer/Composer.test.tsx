@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string -- якорь заглушки пикера, не UI-текст */
 import { t } from '@/i18n'
-import { FEATURES } from '@/shared/features'
+import { FEATURES } from '@/shared/constants/features'
 import { makeFile } from '@/shared/testUtils/matrixFixtures'
 import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '@/store/initialState'
 import { chatStore } from '@/store/store'
