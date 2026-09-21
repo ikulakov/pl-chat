@@ -26,6 +26,7 @@ import styles from './MessageList.module.css'
 import { MessageRow } from '../../MessageRow'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { SystemMessage } from './SystemMessage'
+import { TimelineRow } from './TimelineRow'
 
 interface Props {
   userId: UserId
@@ -90,11 +91,12 @@ export function MessageList({ userId }: Props) {
             {items.map((item, index, arr) => {
               if (isSystem(item)) {
                 return (
-                  <SystemMessage
+                  <TimelineRow
                     key={item.localId}
                     itemId={item.localId}
-                    label={item.label}
-                  />
+                  >
+                    <SystemMessage label={item.label} />
+                  </TimelineRow>
                 )
               }
               const position = getPosition(arr[index - 1], item, arr[index + 1])
@@ -104,19 +106,25 @@ export function MessageList({ userId }: Props) {
                 userId,
               })
               return (
-                <MessageRow
+                <TimelineRow
                   key={item.localId}
-                  userId={userId}
-                  message={item}
-                  position={position}
-                  readByOperator={readByOperatorIds.has(item.eventId)}
-                  reactions={reactions[item.eventId]}
-                  replyAuthor={reply?.author}
-                  replyText={reply?.text}
-                  replySticker={reply?.sticker}
-                  replyTargetId={reply?.targetId}
-                  onReplyClick={scrollToItem}
-                />
+                  itemId={item.localId}
+                  // Своё подтверждать нечего; optimistic-черновик всегда свой и отсекается здесь же
+                  receiptEventId={item.sender !== userId ? item.eventId : undefined}
+                >
+                  <MessageRow
+                    userId={userId}
+                    message={item}
+                    position={position}
+                    readByOperator={readByOperatorIds.has(item.eventId)}
+                    reactions={reactions[item.eventId]}
+                    replyAuthor={reply?.author}
+                    replyText={reply?.text}
+                    replySticker={reply?.sticker}
+                    replyTargetId={reply?.targetId}
+                    onReplyClick={scrollToItem}
+                  />
+                </TimelineRow>
               )
             })}
           </div>

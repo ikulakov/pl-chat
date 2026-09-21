@@ -11,7 +11,6 @@ import { cn } from '@/shared/utils/cn'
 import { memo, useMemo, useRef, type ReactNode } from 'react'
 import { useEmojiSegments } from '../../Emoji'
 import { ReplyPreview } from '../../ReplyPreview'
-import { ITEM_ID_ATTR, RECEIPT_ID_ATTR } from '@/shared/timeline/domAttributes'
 import type { BubbleMetaData } from './bubble/BubbleMeta'
 import { MessageBubble, type BubblePosition } from './bubble/MessageBubble'
 import { AdaptiveCardActions } from './content/AdaptiveCardActions'
@@ -178,10 +177,7 @@ export const MessageRow = memo(
           isGroupStart && styles.groupStart,
           isSwiping && styles.swiping,
         )}
-        // Маркер для учета прочитанных сообщений клиентом
-        {...{ [RECEIPT_ID_ATTR]: !isOwn ? message.eventId : undefined }}
-        // Якорь удержания позиции при подгрузке истории
-        {...{ [ITEM_ID_ATTR]: message.localId }}
+        data-role="message-row"
       >
         <MessageActions
           ref={dropdownRef}

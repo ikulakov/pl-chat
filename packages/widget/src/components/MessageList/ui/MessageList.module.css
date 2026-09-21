@@ -56,7 +56,8 @@
   display: flex;
   flex-direction: column;
 
-  & > .dateSeparator:first-child + * {
+  /* первый ряд дня: отступ живёт на самом ряде, внутри обёртки TimelineRow */
+  & > .dateSeparator:first-child + * > * {
     margin-top: 0;
   }
 }

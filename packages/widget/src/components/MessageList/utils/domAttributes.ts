@@ -1,8 +1,8 @@
 /**
  * Атрибуты разметки ряда ленты: по ним хуки ленты находят строку в DOM, не имея ссылки на
- * компонент. Вешают MessageRow и SystemMessage, читают useChatScroll, useLoadMoreHistory и
- * useSendReadReceipts. Это контракт двух слайсов — MessageRow пишет, MessageList читает, — поэтому
- * он лежит здесь, а не в одном из них.
+ * компонент. Вешает обёртка TimelineRow, читают useChatScroll, useLoadMoreHistory и
+ * useSendReadReceipts — весь контракт внутри ленты. Сами ряды (MessageRow, SystemMessage) о нём
+ * не знают.
  */
 
 // Метка ряда ленты: якорь удержания позиции при догрузке истории и цель прокрутки к сообщению.

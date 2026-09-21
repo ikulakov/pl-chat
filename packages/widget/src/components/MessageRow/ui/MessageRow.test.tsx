@@ -97,7 +97,7 @@ describe('MessageRow: сообщение из одних эмодзи', () => {
 })
 
 describe('MessageRow: долгое нажатие', () => {
-  const ROW = '[data-item-id]'
+  const ROW = '[data-role="message-row"]'
 
   beforeEach(() => {
     vi.stubGlobal('PointerEvent', TestPointerEvent)

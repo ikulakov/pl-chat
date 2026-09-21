@@ -1,6 +1,6 @@
 import type { TimelineItem } from '@/domain/timeline'
 import { textItem } from '@/shared/testUtils/matrixFixtures'
-import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
+import { ITEM_ID_ATTR } from '../utils/domAttributes'
 import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '@/store/initialState'
 import { chatStore } from '@/store/store'
 import { act, renderHook } from '@testing-library/react'

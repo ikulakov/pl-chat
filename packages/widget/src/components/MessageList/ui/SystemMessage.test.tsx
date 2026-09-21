@@ -8,7 +8,6 @@ describe('SystemMessage', () => {
     // теперь склейка ключа с params живёт здесь, и без теста она осталась бы непокрытой
     render(
       <SystemMessage
-        itemId="sys1"
         label={{ source: 'i18n', key: 'system.operatorJoinedHuman', params: { name: 'Оля' } }}
       />,
     )
@@ -17,12 +16,7 @@ describe('SystemMessage', () => {
   })
 
   it('серверный текст выводится как есть, без обращения к словарю', () => {
-    render(
-      <SystemMessage
-        itemId="sys2"
-        label={{ source: 'literal', body: 'Ищем оператора' }}
-      />,
-    )
+    render(<SystemMessage label={{ source: 'literal', body: 'Ищем оператора' }} />)
 
     expect(screen.getByText('Ищем оператора')).toBeInTheDocument()
   })
