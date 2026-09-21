@@ -10,7 +10,7 @@ const destroy = vi.fn()
 const player = { destroy }
 const release = vi.fn()
 
-const createEmojiPlayer = vi.fn(() => player)
+const createLottieAnimation = vi.fn(() => player)
 const acquire = vi.fn((_player: unknown, _options?: AcquireOptions) => release)
 
 /** Пул зовёт `onComplete`, когда одиночный прогон дошёл до последнего кадра. */
@@ -30,7 +30,7 @@ vi.mock(import('../lottie/emojiBitmap'), () => ({
 
 vi.mock<unknown>(import('../lottie/lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
-  createEmojiPlayer: (...args: unknown[]) => createEmojiPlayer(...(args as [])),
+  createLottieAnimation: (...args: unknown[]) => createLottieAnimation(...(args as [])),
 }))
 
 vi.mock<unknown>(import('../lottie/lottiePool'), () => ({
@@ -65,7 +65,7 @@ describe('AnimatedEmoji', () => {
     becomeVisible(false)
 
     await waitFor(() => expect(container.querySelector('img')).not.toBeNull())
-    expect(createEmojiPlayer).not.toHaveBeenCalled()
+    expect(createLottieAnimation).not.toHaveBeenCalled()
   })
 
   it('во вьюпорте ставит плеер в общий пул, а при уходе снимает и уничтожает', async () => {

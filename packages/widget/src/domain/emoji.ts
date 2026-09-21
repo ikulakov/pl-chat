@@ -82,7 +82,7 @@ export interface StickerPack {
  * Lottie-JSON анимации. Клиент его не разбирает — байты проходят от сети до плеера как есть,
  * поэтому структура намеренно непрозрачна.
  */
-export type EmojiAnimation = Record<string, unknown>
+export type LottieAnimation = Record<string, unknown>
 
 /**
  * Плоский индекс пака для рендера ленты: символ (без вариационного селектора) → codepoint.
@@ -99,18 +99,12 @@ export type EmojiSegment =
   | { kind: 'text'; text: string }
   | { kind: 'emoji'; char: string; codepoint: string }
 
-/** Размер отрисовки: `big` и `mid` — для сообщений из одних эмодзи, `inline` — со строку. */
-export type EmojiLayout = 'big' | 'mid' | 'inline'
-
 // Вариационный селектор VS16: в тексте ❤️ приезжает как 2764 fe0f, а в паке лежит как 2764.
 const VARIATION_SELECTOR = /️/g
 
 // Дешёвый отсев: в подавляющем большинстве сообщений эмодзи нет вовсе, и до сегментера
 // доходить незачем.
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u
-
-// Сколько эмодзи в сообщении без текста ещё рисуются крупно.
-const MAX_LARGE_EMOJI = 3
 
 let segmenter: Intl.Segmenter | null | undefined
 
@@ -156,28 +150,6 @@ export function splitEmoji(text: string, index: EmojiIndex | null): EmojiSegment
   if (pending) segments.push({ kind: 'text', text: pending })
 
   return segments
-}
-
-/**
- * Размер отрисовки по составу сообщения: одно эмодзи без текста — большое, два-три — средние,
- * всё остальное — строчный размер.
- */
-export function emojiLayout(segments: EmojiSegment[]): EmojiLayout {
-  let count = 0
-
-  for (const segment of segments) {
-    if (segment.kind === 'emoji') {
-      count += 1
-      continue
-    }
-    // Пробелы и переносы между эмодзи не делают сообщение текстовым.
-    if (segment.text.trim() !== '') return 'inline'
-  }
-
-  if (count === 1) return 'big'
-  if (count > 1 && count <= MAX_LARGE_EMOJI) return 'mid'
-
-  return 'inline'
 }
 
 function asText(text: string): EmojiSegment[] {

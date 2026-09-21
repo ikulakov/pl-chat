@@ -1,4 +1,4 @@
-import type { EmojiAnimation } from '@/domain/emoji'
+import type { LottieAnimation } from '@/domain/emoji'
 import type { EventId, MediaId, RoomId, TxnId } from '@/shared/types/ids'
 import type { ThumbnailSize } from '@/domain/media'
 import type { ParsedMxcUrl } from '@/shared/utils/mxc'
@@ -186,7 +186,7 @@ export function createMatrixApi(transport: MatrixTransport) {
      * `v` — cache-buster: без него после переseed'а пака клиент неделю получал бы из
      * immutable-кэша старую анимацию.
      */
-    getEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
+    getEmojiAnimation(codepoint: string, version: string): Promise<LottieAnimation> {
       return transport.request(Endpoints.EMOJI_LOTTIE({ codepoint }), {
         searchParams: { v: version },
         signal: emojiDeadline(),
@@ -216,7 +216,7 @@ export function createMatrixApi(transport: MatrixTransport) {
      * `Content-Encoding: gzip`, браузер разжимает сам. Дедлайн обязателен — промис оседает
      * в кэше на всю сессию.
      */
-    getStickerAnimation(mediaId: MediaId): Promise<EmojiAnimation> {
+    getStickerAnimation(mediaId: MediaId): Promise<LottieAnimation> {
       return transport.request(Endpoints.STICKER_BYTES({ mediaId }), { signal: emojiDeadline() })
     },
 

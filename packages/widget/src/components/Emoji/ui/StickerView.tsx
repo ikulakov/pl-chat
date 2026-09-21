@@ -3,7 +3,7 @@ import type { StickerMedia } from '@/domain/timeline'
 import { useChatActions } from '@/hooks/useChatActions'
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
 import { getAnimationCache } from '../lottie/animationCache'
-import { createEmojiPlayer, loadLottiePlayer } from '../lottie/lottiePlayer'
+import { createLottieAnimation, loadLottiePlayer } from '../lottie/lottiePlayer'
 import { lottiePool } from '../lottie/lottiePool'
 import { cn } from '@/shared/utils/cn'
 import { useEffect, useRef, useState } from 'react'
@@ -108,7 +108,7 @@ function LottieSticker({
         const container = containerRef.current
         if (disposed || !container) return
 
-        const instance = createEmojiPlayer(lottie, { container, animationData })
+        const instance = createLottieAnimation(lottie, { container, animationData })
         player = instance
         release = lottiePool.acquire(instance)
         setPlaying(true)

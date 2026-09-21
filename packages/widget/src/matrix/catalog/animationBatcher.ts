@@ -1,4 +1,4 @@
-import type { EmojiAnimation } from '@/domain/emoji'
+import type { LottieAnimation } from '@/domain/emoji'
 import { consoleDev } from '@/shared/utils/consoleDev'
 
 /**
@@ -30,20 +30,20 @@ const MAX_BATCH = 100
 const MAX_FAILURES = 3
 
 export interface BatchedLoaderDeps {
-  loadBatch: (codepoints: string[], version: string) => Promise<Record<string, EmojiAnimation>>
-  loadOne: (codepoint: string, version: string) => Promise<EmojiAnimation>
+  loadBatch: (codepoints: string[], version: string) => Promise<Record<string, LottieAnimation>>
+  loadOne: (codepoint: string, version: string) => Promise<LottieAnimation>
   /** Подменяется в тестах: иначе каждая проверка ждала бы реальные 16 мс. */
   schedule?: (flush: () => void) => void
 }
 
 interface Pending {
-  resolve: (animation: EmojiAnimation) => void
+  resolve: (animation: LottieAnimation) => void
   reject: (err: unknown) => void
 }
 
 export function createBatchedLoader(
   deps: BatchedLoaderDeps,
-): (codepoint: string, version: string) => Promise<EmojiAnimation> {
+): (codepoint: string, version: string) => Promise<LottieAnimation> {
   const schedule = deps.schedule ?? ((flush: () => void) => setTimeout(flush, WINDOW_MS))
 
   // Заявки текущего окна. Версия в ключе окна, а не заявки: пачка уходит одним `v`, и мешать
@@ -103,7 +103,7 @@ export function createBatchedLoader(
     // Смена версии пака посреди окна: отправляем набранное сразу, не подмешивая чужой `v`.
     if (waiting.size > 0 && waitingVersion !== version) flush()
 
-    return new Promise<EmojiAnimation>((resolve, reject) => {
+    return new Promise<LottieAnimation>((resolve, reject) => {
       waitingVersion = version
 
       const listeners = waiting.get(codepoint)

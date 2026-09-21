@@ -14,7 +14,7 @@ interface UseSendReadReceiptsParams {
 
 /**
  * Отправка m.read по прочтению сообщений оператора.
- * Элементы берутся из DOM по data-receipt-id — его вешает MessageRow.
+ * Элементы берутся из DOM по data-receipt-id — его вешает TimelineRow.
  */
 export function useSendReadReceipts({ timeline, isOpen, containerRef }: UseSendReadReceiptsParams) {
   const { markRead } = useChatActions()

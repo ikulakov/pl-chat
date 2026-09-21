@@ -1,5 +1,5 @@
 import type { AnimationItem, LottiePlayer } from 'lottie-web'
-import type { EmojiAnimation } from '@/domain/emoji'
+import type { LottieAnimation } from '@/domain/emoji'
 
 let playerPromise: Promise<LottiePlayer> | null = null
 
@@ -30,10 +30,10 @@ export function loadLottiePlayer(): Promise<LottiePlayer> {
 
 export interface CreatePlayerParams {
   container: HTMLElement
-  animationData: EmojiAnimation
+  animationData: LottieAnimation
 }
 
-export function createEmojiPlayer(
+export function createLottieAnimation(
   lottie: LottiePlayer,
   { container, animationData }: CreatePlayerParams,
 ): AnimationItem {

@@ -1,4 +1,4 @@
-import type { EmojiAnimation } from '@/domain/emoji'
+import type { LottieAnimation } from '@/domain/emoji'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBatchedLoader } from './animationBatcher'
 
@@ -21,11 +21,11 @@ function makeWindow() {
 const VERSION = 'mock-1'
 
 const loadBatch = vi.fn(
-  (codepoints: string[]): Promise<Record<string, EmojiAnimation>> =>
+  (codepoints: string[]): Promise<Record<string, LottieAnimation>> =>
     Promise.resolve(Object.fromEntries(codepoints.map((cp) => [cp, { nm: cp }]))),
 )
 const loadOne = vi.fn(
-  (codepoint: string): Promise<EmojiAnimation> => Promise.resolve({ nm: `single-${codepoint}` }),
+  (codepoint: string): Promise<LottieAnimation> => Promise.resolve({ nm: `single-${codepoint}` }),
 )
 
 function makeLoader(window = makeWindow()) {

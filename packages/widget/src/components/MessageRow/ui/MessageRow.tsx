@@ -12,7 +12,8 @@ import { memo, useMemo, useRef, type ReactNode } from 'react'
 import { useEmojiSegments } from '../../Emoji'
 import { ReplyPreview } from '../../ReplyPreview'
 import type { BubbleMetaData } from './bubble/BubbleMeta'
-import { MessageBubble, type BubblePosition } from './bubble/MessageBubble'
+import type { MessageGroupPosition } from '../types'
+import { MessageBubble } from './bubble/MessageBubble'
 import { AdaptiveCardActions } from './content/AdaptiveCardActions'
 import { EmojiMessage } from './content/EmojiMessage'
 import { FileChip } from './content/FileChip'
@@ -27,7 +28,7 @@ import { useMessageGestures } from '../hooks/useMessageGestures'
 interface Props {
   message: MessageTimelineItem
   userId: UserId
-  position: BubblePosition
+  position: MessageGroupPosition
   readByOperator: boolean
   reactions: ReactionEntry[] | undefined
   replyAuthor: string | undefined

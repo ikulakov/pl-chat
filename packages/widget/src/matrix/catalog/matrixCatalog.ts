@@ -1,5 +1,5 @@
 import type {
-  EmojiAnimation,
+  LottieAnimation,
   EmojiCatalog,
   EmojiCategory,
   EmojiIndex,
@@ -23,9 +23,9 @@ export interface CatalogService {
   loadEmojiCatalog: () => Promise<EmojiCatalog>
   loadEmojiCategory: (categoryId: string) => Promise<EmojiCategory>
   loadEmojiIndex: () => Promise<EmojiIndex>
-  loadEmojiAnimation: (codepoint: string, version: string) => Promise<EmojiAnimation>
+  loadEmojiAnimation: (codepoint: string, version: string) => Promise<LottieAnimation>
   loadStickerPacks: () => Promise<StickerPack[]>
-  loadStickerAnimation: (mediaId: MediaId) => Promise<EmojiAnimation>
+  loadStickerAnimation: (mediaId: MediaId) => Promise<LottieAnimation>
 }
 
 type CatalogApi = Pick<
@@ -48,7 +48,7 @@ export class MatrixCatalog implements CatalogService {
 
   // Склейка загрузок эмодзи в пачки. Заводится в конструкторе: батчер держит окно сбора заявок,
   // и общий он должен быть на весь каталог, а не на вызов.
-  private readonly emojiAnimations: (codepoint: string, version: string) => Promise<EmojiAnimation>
+  private readonly emojiAnimations: (codepoint: string, version: string) => Promise<LottieAnimation>
 
   constructor(api: CatalogApi) {
     this.api = api
@@ -88,7 +88,7 @@ export class MatrixCatalog implements CatalogService {
    * Анимация одного эмодзи — но в сеть уходит пачка: заявки соседних ячеек пикера и соседних
    * сообщений ленты склеиваются в один запрос к `/bundle`, см. `animationBatcher`.
    */
-  loadEmojiAnimation(codepoint: string, version: string): Promise<EmojiAnimation> {
+  loadEmojiAnimation(codepoint: string, version: string): Promise<LottieAnimation> {
     return this.emojiAnimations(codepoint, version)
   }
 
@@ -96,7 +96,7 @@ export class MatrixCatalog implements CatalogService {
     return toStickerPacks(await this.api.getStickerPacks())
   }
 
-  loadStickerAnimation(mediaId: MediaId): Promise<EmojiAnimation> {
+  loadStickerAnimation(mediaId: MediaId): Promise<LottieAnimation> {
     return this.api.getStickerAnimation(mediaId)
   }
 }

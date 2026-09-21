@@ -1,5 +1,5 @@
 import type { ChatActions } from '../../chatController'
-import type { FileAttachment } from '@/components/Attachment/hooks/useAttachmentState'
+import type { FileAttachment } from '@/components/Attachment/types'
 import type {
   indexMessagesByEventId,
   ReplyPreviewData,

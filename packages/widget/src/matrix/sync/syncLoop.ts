@@ -1,5 +1,6 @@
 import { sleep } from '@/shared/utils/sleep'
 import type { MatrixApi } from '../api/matrixApi'
+import { isRateLimitedError } from '../api/matrixError'
 import type * as Matrix from '../wire'
 import { currentPresence } from './presence'
 
@@ -20,6 +21,14 @@ const MAX_BACKOFF_MS = 30_000
 
 function jittered(ms: number): number {
   return ms * (0.5 + Math.random() / 2)
+}
+
+// На 429 сервер сам говорит, сколько ждать, и раньше этого повтор бессмысленен: он получит
+// тот же 429. Своя лесенка остаётся нижней границей — подсказка её только удлиняет.
+function retryDelay(err: unknown, backoff: number): number {
+  const delay = jittered(backoff)
+  const serverHint = isRateLimitedError(err) ? (err.retryAfterMs ?? 0) : 0
+  return Math.max(delay, serverHint)
 }
 
 type SyncApi = Pick<MatrixApi, 'longPollSync'>
@@ -92,7 +101,7 @@ export class MatrixSyncLoop {
         this.onError?.(err, { since: cursor, backoff })
         if (!this.isCurrentRun(runId)) break
 
-        await sleep(jittered(backoff), abort.signal)
+        await sleep(retryDelay(err, backoff), abort.signal)
         backoff = Math.min(backoff * 2, MAX_BACKOFF_MS)
       }
     }

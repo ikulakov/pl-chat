@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emojiLayout, splitEmoji, type EmojiIndex } from './emoji'
+import { splitEmoji, type EmojiIndex } from './emoji'
 
 // Пак хранит символы без вариационного селектора — как их отдаёт сервер.
 const index: EmojiIndex = {
@@ -56,28 +56,5 @@ describe('splitEmoji', () => {
 
   it('на пустой строке отдаёт пустой список', () => {
     expect(splitEmoji('', index)).toEqual([])
-  })
-})
-
-describe('emojiLayout', () => {
-  it('одно эмодзи без текста — большое', () => {
-    expect(emojiLayout(splitEmoji('😋', index))).toBe('big')
-  })
-
-  it('два-три эмодзи без текста — средние', () => {
-    expect(emojiLayout(splitEmoji('😋😀', index))).toBe('mid')
-    expect(emojiLayout(splitEmoji('😋 😀 ❤️', index))).toBe('mid')
-  })
-
-  it('четыре и больше — строчные', () => {
-    expect(emojiLayout(splitEmoji('😋😀❤️😋', index))).toBe('inline')
-  })
-
-  it('эмодзи вместе с текстом — строчные', () => {
-    expect(emojiLayout(splitEmoji('да 😋', index))).toBe('inline')
-  })
-
-  it('текст без эмодзи — строчный', () => {
-    expect(emojiLayout(splitEmoji('просто текст', index))).toBe('inline')
   })
 })

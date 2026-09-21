@@ -8,14 +8,14 @@ import { ProgressRing } from '@/shared/ui/ProgressRing'
 import { Spinner } from '@/shared/ui/Spinner'
 import { CloseIcon, DownloadIcon, FileDocIcon, RetryIcon } from '@/shared/ui/icons'
 import { cn } from '@/shared/utils/cn'
-import { getFileExtension } from '@/shared/utils/fileValidation'
+import { getFileExtension } from '@/shared/utils/fileExtension'
 import { formatSize } from '@/shared/utils/formatSize'
 import { parseMxcUrl } from '@/shared/utils/mxc'
 import { selectMediaVerdicts } from '@/store/selectors'
 import { BubbleMeta, type BubbleMetaData } from '../bubble/BubbleMeta'
 import styles from './FileChip.module.css'
 import { MediaCaption } from '../media/MediaCaption'
-import { useMediaUploadView } from '../../hooks/useMediaUploadView'
+import { getMediaUploadView } from '../../utils/mediaUploadView'
 
 interface Props {
   item: FileTimelineItem
@@ -25,7 +25,7 @@ interface Props {
 export function FileChip({ item, meta }: Props) {
   const { cancelUpload, resendMessage } = useChatActions()
   const { download, isLoading } = useMediaDownload(item)
-  const { uploadPct, failure, uploadFailed, isStatusHidden } = useMediaUploadView(item)
+  const { uploadPct, failure, uploadFailed, isStatusHidden } = getMediaUploadView(item)
   const isUploading = uploadPct !== null
 
   const { body, filename, info, url } = item.content

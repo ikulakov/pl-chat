@@ -3,4 +3,4 @@
 // пока смонтирована панель.
 export { useAttachment } from './AttachmentContext'
 export { AttachmentProvider } from './ui/AttachmentProvider'
-export type { PendingAttachment } from './hooks/useAttachmentState'
+export type { PendingAttachment } from './types'

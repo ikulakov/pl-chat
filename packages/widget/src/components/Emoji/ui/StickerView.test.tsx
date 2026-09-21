@@ -12,7 +12,7 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
 // lottie-web тянет canvas, которого в jsdom нет; здесь проверяется выбор ветки, а не плеер.
 vi.mock<unknown>(import('../lottie/lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
-  createEmojiPlayer: () => ({
+  createLottieAnimation: () => ({
     totalFrames: 30,
     frameRate: 30,
     goToAndStop: vi.fn(),

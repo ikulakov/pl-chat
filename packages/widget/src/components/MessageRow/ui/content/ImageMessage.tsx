@@ -6,7 +6,7 @@ import { BubbleMeta, type BubbleMetaData } from '../bubble/BubbleMeta'
 import styles from './ImageMessage.module.css'
 import { MediaCaption } from '../media/MediaCaption'
 import { MediaImage } from '../media/MediaImage'
-import { useMediaUploadView } from '../../hooks/useMediaUploadView'
+import { getMediaUploadView } from '../../utils/mediaUploadView'
 
 interface Props {
   item: ImageTimelineItem
@@ -27,7 +27,7 @@ interface Props {
 export function ImageMessage({ item, meta, reply, reactions }: Props) {
   const { cancelUpload, resendMessage } = useChatActions()
   const { download, isLoading } = useMediaDownload(item)
-  const { uploadPct, failure, isStatusHidden } = useMediaUploadView(item)
+  const { uploadPct, failure, isStatusHidden } = getMediaUploadView(item)
 
   const { body } = item.content
   const hasCaption = body.length > 0

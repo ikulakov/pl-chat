@@ -10,9 +10,6 @@ interface Props {
   onEscape?: (() => void) | undefined
 }
 
-/** Лимит отправки */
-export const MAX_MESSAGE_LENGTH = 2048
-
 /** Лимит ввода текстового сообщения */
 const MAX_INPUT_LENGTH = 32_000
 

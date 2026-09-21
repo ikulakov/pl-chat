@@ -21,7 +21,7 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
 }))
 
 const destroyPlayer = vi.fn()
-const createEmojiPlayer = vi.fn(() => ({
+const createLottieAnimation = vi.fn(() => ({
   totalFrames: 30,
   frameRate: 30,
   goToAndStop: vi.fn(),
@@ -32,7 +32,7 @@ const createEmojiPlayer = vi.fn(() => ({
 // а не сам плеер — у него свои тесты в Emoji/lottie.
 vi.mock<unknown>(import('../../lottie/lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
-  createEmojiPlayer: () => createEmojiPlayer(),
+  createLottieAnimation: () => createLottieAnimation(),
 }))
 
 // Статичный кадр ячейки: в jsdom его не нарисовать (нет ни canvas, ни загрузки ресурсов в
@@ -59,7 +59,7 @@ async function scrollIntoView() {
 describe('EmojiPickerButton', () => {
   beforeEach(() => {
     FakeIntersectionObserver.instances.length = 0
-    createEmojiPlayer.mockClear()
+    createLottieAnimation.mockClear()
     destroyPlayer.mockClear()
     loadEmojiCatalog.mockResolvedValue({
       version: 'v1',
@@ -203,10 +203,10 @@ describe('EmojiPickerButton', () => {
 
     const cell = await screen.findByRole('button', { name: '😀' })
     // Раньше плеер заводила каждая видимая ячейка — открытая панель крутила десятки анимаций.
-    expect(createEmojiPlayer).not.toHaveBeenCalled()
+    expect(createLottieAnimation).not.toHaveBeenCalled()
 
     fireEvent.pointerEnter(cell)
-    await waitFor(() => expect(createEmojiPlayer).toHaveBeenCalledOnce())
+    await waitFor(() => expect(createLottieAnimation).toHaveBeenCalledOnce())
 
     fireEvent.pointerLeave(cell)
     await waitFor(() => expect(destroyPlayer).toHaveBeenCalledOnce())

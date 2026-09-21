@@ -1,5 +1,5 @@
-import type { EmojiLayout, EmojiSegment } from '@/domain/emoji'
-import { AnimatedEmoji } from '../../../Emoji'
+import type { EmojiSegment } from '@/domain/emoji'
+import { AnimatedEmoji, type EmojiLayout } from '../../../Emoji'
 import { BubbleMeta, type BubbleMetaData } from '../bubble/BubbleMeta'
 import styles from './EmojiMessage.module.css'
 

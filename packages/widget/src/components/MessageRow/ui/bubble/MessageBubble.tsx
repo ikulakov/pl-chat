@@ -1,13 +1,13 @@
 import { cn } from '@/shared/utils/cn'
 import type { ReactNode } from 'react'
+import type { MessageGroupPosition } from '../../types'
 import styles from './MessageBubble.module.css'
 
 type BubbleType = 'operator' | 'user'
-export type BubblePosition = 'single' | 'first' | 'middle' | 'last'
 
 interface Props {
   type: BubbleType
-  position?: BubblePosition
+  position?: MessageGroupPosition
   reply?: ReactNode
   reactions?: ReactNode
   children: ReactNode

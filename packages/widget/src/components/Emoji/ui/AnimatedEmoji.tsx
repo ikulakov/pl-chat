@@ -2,7 +2,7 @@ import { useChatActions } from '@/hooks/useChatActions'
 import { useEmojiBitmap } from '../hooks/useEmojiBitmap'
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
 import { getAnimationCache } from '../lottie/animationCache'
-import { createEmojiPlayer, loadLottiePlayer } from '../lottie/lottiePlayer'
+import { createLottieAnimation, loadLottiePlayer } from '../lottie/lottiePlayer'
 import { lottiePool, type PoolPlayer } from '../lottie/lottiePool'
 import { cn } from '@/shared/utils/cn'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -56,7 +56,7 @@ export function AnimatedEmoji({ char, codepoint, version, size }: Props) {
         const container = containerRef.current
         if (disposed || !container) return
 
-        const instance = createEmojiPlayer(lottie, { container, animationData })
+        const instance = createLottieAnimation(lottie, { container, animationData })
         player = instance
         playerRef.current = instance
 

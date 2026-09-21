@@ -1,3 +1,5 @@
+import { getFileExtension } from './fileExtension'
+
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
@@ -20,11 +22,6 @@ export const FILE_ACCEPT = ALLOWED_EXTENSIONS.map((ext) => `.${ext}`).join(',')
 export type FileRejection = 'badType' | 'tooLarge'
 
 export type FileValidation = { ok: true } | { ok: false; reason: FileRejection }
-
-export function getFileExtension(filename: string): string {
-  const dot = filename.lastIndexOf('.')
-  return dot >= 0 ? filename.slice(dot + 1).toLowerCase() : ''
-}
 
 export function resolveMimeType(file: File): string {
   return MIME_BY_EXTENSION[getFileExtension(file.name)] ?? (file.type || 'application/octet-stream')

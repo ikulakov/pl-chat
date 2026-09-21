@@ -1,32 +1,16 @@
 import { useChatActions } from '@/hooks/useChatActions'
-import type { EventId } from '@/shared/types/ids'
-import { isPreviewableImage, validateFile, type FileRejection } from '@/shared/utils/fileValidation'
+import { isPreviewableImage, validateFile } from '@/shared/utils/fileValidation'
 import { readImageDimensions, type ImageDimensions } from '@/shared/utils/imageDimensions'
 import { useCallback, useEffect, useState } from 'react'
+import type { FileAttachment, PendingAttachment, SendOptions } from '../types'
 
-export interface PendingAttachment {
-  file: File
-  previewUrl?: string
-  /** отбраковка при выборе (формат, размер): файл виден в композере, но отправить нельзя */
-  error?: FileRejection
-  /** декодирование картинки, начатое при выборе; у обычных файлов размеров нет */
+interface PendingState extends PendingAttachment {
+  /** декодирование картинки, начатое при выборе; у обычных файлов размеров нет. Нужно только send */
   dimsPromise?: Promise<ImageDimensions | null>
 }
 
-export interface FileAttachment {
-  pending: PendingAttachment | null
-  pickFile: (file: File) => void
-  cancel: () => void
-  send: (options?: SendOptions) => void
-}
-
-interface SendOptions {
-  caption?: string | undefined
-  replyToEventId?: EventId | undefined
-}
-
 export function useAttachmentState(): FileAttachment {
-  const [pending, setPending] = useState<PendingAttachment | null>(null)
+  const [pending, setPending] = useState<PendingState | null>(null)
   const { sendFile } = useChatActions()
 
   // Освобождаем object-URL превью при смене вложения и при размонтировании.

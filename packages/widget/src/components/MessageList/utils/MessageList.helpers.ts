@@ -4,7 +4,7 @@ import { isSystem, type MessageTimelineItem, type TimelineItem } from '@/domain/
 import { t } from '@/i18n'
 import { formatDateLabel, startOfDay } from '@/shared/utils/formatDate'
 import { replyAuthorLabel, replyQuoteView } from '../../ReplyPreview'
-import type { BubblePosition } from '../../MessageRow'
+import type { MessageGroupPosition } from '../../MessageRow'
 
 interface DayGroup {
   key: string
@@ -34,7 +34,7 @@ export function getPosition(
   prev: TimelineItem | undefined,
   current: MessageTimelineItem,
   next: TimelineItem | undefined,
-): BubblePosition {
+): MessageGroupPosition {
   const isSameSender = (item?: TimelineItem): boolean =>
     item !== undefined && !isSystem(item) && item.sender === current.sender
 

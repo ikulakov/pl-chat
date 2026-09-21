@@ -13,7 +13,9 @@ import { ReplyPreview, replyAuthorLabel, replyQuoteView } from '../ReplyPreview'
 import { AttachmentPreview } from './AttachmentPreview'
 import styles from './Composer.module.css'
 import { FilePickerButton } from './FilePickerButton'
-import { MAX_MESSAGE_LENGTH, MessageTextarea } from './MessageTextarea'
+import { MessageTextarea } from './MessageTextarea'
+
+export const MAX_MESSAGE_LENGTH = 2048
 
 export function Composer() {
   const [text, setText] = useState('')

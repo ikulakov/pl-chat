@@ -6,7 +6,7 @@ import { ReplyPreview } from './ReplyPreview'
 // lottie-web поднимает плеер, которого в jsdom нет; здесь проверяется разметка цитаты.
 vi.mock<unknown>(import('../../Emoji/lottie/lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
-  createEmojiPlayer: () => ({ goToAndStop: vi.fn(), destroy: vi.fn() }),
+  createLottieAnimation: () => ({ goToAndStop: vi.fn(), destroy: vi.fn() }),
 }))
 
 describe('ReplyPreview', () => {

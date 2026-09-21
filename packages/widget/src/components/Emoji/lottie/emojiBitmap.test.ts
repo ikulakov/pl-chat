@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmojiAnimation } from '@/domain/emoji'
+import type { LottieAnimation } from '@/domain/emoji'
 import { clearEmojiBitmaps, getEmojiBitmap } from './emojiBitmap'
 
 const destroy = vi.fn()
@@ -8,7 +8,7 @@ const goToAndStop = vi.fn()
 // Плеер рисует кадр в контейнер: подкладываем туда пустой <svg>, из которого берётся разметка.
 vi.mock<unknown>(import('./lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
-  createEmojiPlayer: (_lottie: unknown, { container }: { container: HTMLElement }) => {
+  createLottieAnimation: (_lottie: unknown, { container }: { container: HTMLElement }) => {
     container.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
     return { goToAndStop, destroy }
   },
@@ -38,7 +38,7 @@ beforeEach(() => {
 })
 
 function makeLoader(): ReturnType<typeof vi.fn> {
-  return vi.fn(() => Promise.resolve({} as EmojiAnimation))
+  return vi.fn(() => Promise.resolve({} as LottieAnimation))
 }
 
 describe('getEmojiBitmap', () => {

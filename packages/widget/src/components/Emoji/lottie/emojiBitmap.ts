@@ -1,9 +1,9 @@
-import type { EmojiAnimation } from '@/domain/emoji'
+import type { LottieAnimation } from '@/domain/emoji'
 import { readFrame, writeFrame } from '../cache/emojiDb'
 import { evictOldest } from '@/shared/utils/evictOldest'
 import { createTaskQueue } from '@/shared/utils/taskQueue'
 import type { AnimationLoader } from './lottieCache'
-import { createEmojiPlayer, loadLottiePlayer } from './lottiePlayer'
+import { createLottieAnimation, loadLottiePlayer } from './lottiePlayer'
 import { rasterizeSvg } from './rasterizeSvg'
 import type { EmojiBitmapSize } from './types'
 
@@ -88,7 +88,7 @@ export function clearEmojiBitmaps(): void {
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
 async function renderFirstFrame(
-  animationData: EmojiAnimation,
+  animationData: LottieAnimation,
   size: EmojiBitmapSize,
 ): Promise<string> {
   const lottie = await loadLottiePlayer()
@@ -101,7 +101,7 @@ async function renderFirstFrame(
   document.body.appendChild(host)
 
   let markup: string
-  const player = createEmojiPlayer(lottie, { container: host, animationData })
+  const player = createLottieAnimation(lottie, { container: host, animationData })
 
   try {
     player.goToAndStop(0, true)

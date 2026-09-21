@@ -18,7 +18,7 @@ export interface MediaUploadView {
   isStatusHidden: boolean
 }
 
-export function useMediaUploadView(item: MediaTimelineItem): MediaUploadView {
+export function getMediaUploadView(item: MediaTimelineItem): MediaUploadView {
   // upload есть только у своего черновика; pct null — загрузка не идёт (упала)
   const pct = item.upload?.pct ?? null
   const uploadPct = pct !== null && item.sendStatus === 'sending' ? pct : null

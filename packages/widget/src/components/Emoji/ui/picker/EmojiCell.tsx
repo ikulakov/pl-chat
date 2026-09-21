@@ -2,7 +2,7 @@ import type { EmojiItem } from '@/domain/emoji'
 import { useEmojiBitmap } from '../../hooks/useEmojiBitmap'
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
 import type { LottieCache } from '../../lottie/lottieCache'
-import { createEmojiPlayer, loadLottiePlayer } from '../../lottie/lottiePlayer'
+import { createLottieAnimation, loadLottiePlayer } from '../../lottie/lottiePlayer'
 import { lottiePool } from '../../lottie/lottiePool'
 import { consoleDev } from '@/shared/utils/consoleDev'
 import { useEffect, useRef, useState } from 'react'
@@ -62,7 +62,7 @@ export function EmojiCell({ item, version, cache, scrollRef, onSelect }: Props) 
         const container = canvasRef.current
         if (disposed || !container) return
 
-        const instance = createEmojiPlayer(lottie, { container, animationData })
+        const instance = createLottieAnimation(lottie, { container, animationData })
         player = instance
         release = lottiePool.acquire(instance)
         setAnimated(true)

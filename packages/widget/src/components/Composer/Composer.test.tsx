@@ -7,8 +7,7 @@ import { chatStore } from '@/store/store'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AttachmentProvider } from '../Attachment/ui/AttachmentProvider'
-import { Composer } from './Composer'
-import { MAX_MESSAGE_LENGTH } from './MessageTextarea'
+import { Composer, MAX_MESSAGE_LENGTH } from './Composer'
 
 const sendMessage = vi.fn()
 const sendFile = vi.fn()
