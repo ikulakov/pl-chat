@@ -20,6 +20,8 @@
   --c-surface-accent-soft: #edf6fd;
   --c-surface-message-own: #d6eafc;
   --c-surface-contrast: #222;
+  --c-surface-contrast-hover: color-mix(in srgb, #222 80%, #fff);
+  --c-surface-contrast-pressed: color-mix(in srgb, #222 80%, #000);
   --c-surface-toast: #8b8b8b;
   --c-surface-error: #fff3f0;
 
@@ -29,8 +31,10 @@
   --c-error-border: #f7d7cf;
   --c-error-border-soft: #fae1db;
 
-  /* Оттенок подложки иконки (адаптируется к currentColor) */
-  --c-icon-tint: color-mix(in srgb, currentColor 12%, transparent);
+  /* Подложка иконки: тёмная для тёмного текста, красная — для состояния ошибки. */
+  --c-icon-tint: color-mix(in srgb, #000 12%, transparent);
+  --c-icon-tint-hover: color-mix(in srgb, #000 24%, transparent);
+  --c-error-tint: color-mix(in srgb, #ea2c45 12%, transparent); /* --c-error */
 
   /* Accent */
   --c-orange: #ff7f32;

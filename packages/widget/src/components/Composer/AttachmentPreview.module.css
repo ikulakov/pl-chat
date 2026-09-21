@@ -30,6 +30,7 @@
 
 .iconError {
   color: var(--c-error);
+  background: var(--c-error-tint);
 }
 
 .info {

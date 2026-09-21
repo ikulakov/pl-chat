@@ -5,6 +5,10 @@
   /* `mask-mode: luminance` обязателен: в PNG нет альфы, форму задаёт яркость.
      Если браузер режим не поддержит, маска сработает по альфе — выйдет ровный серый
      квадрат вместо фигуры. Это заметно лучше, чем чёрный квадрат оригинала. */
+  /* Беспрефиксные mask-* до Chromium 120 поддержаны частично — поэтому ниже
+     продублировано -webkit-. Пара «свойство + префикс» и есть фолбэк, линтер
+     видит только первую половину. */
+  /* stylelint-disable plugin/no-unsupported-browser-features */
   mask-image: var(--silhouette);
   mask-mode: luminance;
   mask-repeat: no-repeat;
@@ -15,4 +19,5 @@
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-position: center;
   -webkit-mask-size: contain;
+  /* stylelint-enable plugin/no-unsupported-browser-features */
 }

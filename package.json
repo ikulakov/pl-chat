@@ -12,22 +12,26 @@
     "test": "turbo run test",
     "test:e2e": "playwright test",
     "typecheck": "turbo run typecheck && tsc --noEmit -p e2e",
-    "lint": "turbo run lint",
+    "lint": "turbo run lint && pnpm lint:css",
     "sbom": "turbo run build --filter=@bankchat/widget && node -e \"require('fs').copyFileSync('packages/widget/dist/sbom.json', 'sbom.json')\"",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "lint:css": "stylelint \"packages/**/src/**/*.css\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-compat": "^7.0.2",
     "eslint-plugin-i18next": "^6.1.4",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
     "prettier": "^3.8.4",
+    "stylelint": "^17.15.0",
+    "stylelint-no-unsupported-browser-features": "^8.1.2",
     "turbo": "^2.9.18",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.1"

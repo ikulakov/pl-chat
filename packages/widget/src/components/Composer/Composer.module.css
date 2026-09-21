@@ -26,6 +26,8 @@
   border-radius: var(--radius-md);
   padding: 0 3px;
 
+  /* На Firefox 114–120 без :has() поле при фокусе не подсвечивается — косметика. */
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
   &:has(textarea:focus) {
     background-color: var(--c-surface-tertiary-pressed);
   }

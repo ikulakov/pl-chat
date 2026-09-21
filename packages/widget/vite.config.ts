@@ -38,6 +38,10 @@ export default defineConfig({
     },
   },
   base: '/widget',
+  build: {
+    // Менять только вместе с .browserslistrc в корне.
+    target: ['chrome108', 'edge108', 'firefox114', 'safari16', 'ios16'],
+  },
   server: {
     port: 5174,
     proxy: {

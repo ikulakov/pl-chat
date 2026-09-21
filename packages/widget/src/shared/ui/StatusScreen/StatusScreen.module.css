@@ -98,10 +98,10 @@
   transition: background-color var(--dur-fast);
 
   &:not(:disabled, [aria-disabled='true']):hover {
-    background: color-mix(in srgb, var(--c-surface-contrast) 80%, #fff);
+    background: var(--c-surface-contrast-hover);
   }
 
   &:not(:disabled, [aria-disabled='true']):active {
-    background: color-mix(in srgb, var(--c-surface-contrast) 80%, #000);
+    background: var(--c-surface-contrast-pressed);
   }
 }

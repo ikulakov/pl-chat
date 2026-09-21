@@ -13,10 +13,9 @@
   font-size: 14px;
   line-height: 18px;
   overflow-wrap: anywhere;
-  /* ровняет строки по длине, иначе на второй остаётся одно слово. Опережает планку браузеров
-     (Chromium 114, Safari 17.5, Firefox 121)й: старый браузер переносит
-     текст как обычно, вёрстка не меняется */
-  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+  /* Ровняет строки по длине, иначе на второй остаётся одно слово. Опережает планку
+     (Chromium 114, Safari 17.4), stylelint этого не видит: старый браузер переносит текст
+     как обычно, вёрстка не меняется. */
   text-wrap: balance;
 }
 

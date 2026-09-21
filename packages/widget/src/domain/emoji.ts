@@ -186,10 +186,12 @@ function asText(text: string): EmojiSegment[] {
 
 function getSegmenter(): Intl.Segmenter | null {
   // Считаем один раз: конструктор сегментера дорогой, а результат от вызова к вызову не меняется.
+  /* eslint-disable compat/compat -- гард по typeof, фолбэк на null в splitEmoji */
   segmenter ??=
     typeof Intl.Segmenter === 'function'
       ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
       : null
+  /* eslint-enable compat/compat */
 
   return segmenter
 }

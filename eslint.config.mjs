@@ -1,4 +1,5 @@
 import prettier from 'eslint-config-prettier'
+import compat from 'eslint-plugin-compat'
 import i18next from 'eslint-plugin-i18next'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
@@ -162,6 +163,21 @@ export default tseslint.config(
         },
       ],
     },
+  },
+
+  // Браузерные API новее минимальной поддерживаемой версии. Планка — .browserslistrc,
+  // она обязана совпадать с build.target в packages/widget/vite.config.ts.
+  // Покрываем ВСЕ пакеты, а не только виджет: loader грузится на каждом просмотре
+  // страницы хоста, а protocol вкомпилирован в оба, и его код исполняется на
+  // странице банка. Обоснование планки — docs/adr/browser-support.md.
+  //
+  // Охват неполный по устройству плагина: он надёжно видит глобалы и статические
+  // методы (AbortSignal.timeout, crypto.randomUUID), но не методы экземпляра —
+  // тип получателя ему неизвестен, поэтому array.at() и array.findLast() он
+  // пропустит. Зелёный линтер не отменяет ревью, см. rules/frontend.md.
+  {
+    ...compat.configs['flat/recommended'],
+    files: ['packages/*/src/**/*.{ts,tsx}'],
   },
 
   // Граница ACL: wire-форма Matrix живёт только в matrix/. Перевод протокола в доменные

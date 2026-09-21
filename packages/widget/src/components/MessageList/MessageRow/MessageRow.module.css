@@ -84,6 +84,9 @@
   min-width: 0;
   max-width: 380px;
 
+  /* Firefox 114–120 контент с карточкой не
+     растянется на всю ширину, останется max-width: 380px */
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
   &:has(> [data-role='card-actions']) {
     width: 100%;
   }
