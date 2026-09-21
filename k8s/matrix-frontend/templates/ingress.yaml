@@ -3,7 +3,6 @@ kind: Ingress
 metadata:
   annotations:
     cert-manager.io/cluster-issuer: privatecloud-pki
-    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
   name: {{ .Values.deploy.name }}
   labels:
     name: {{ .Values.deploy.name }}
@@ -25,6 +24,33 @@ spec:
         backend:
           service:
             name: {{ .Values.deploy.name }}
+            port:
+              number: 8080
+  tls:
+  - hosts:
+    - {{ .Values.deploy.namecluster }}
+    secretName: {{ .Values.deploy.namecluster }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: privatecloud-pki
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  name: {{ .Values.deploy.name }}-media-upload
+  labels:
+    name: {{ .Values.deploy.name }}
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: {{ .Values.deploy.namecluster }}
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/_matrix/media/v3/upload"
+        backend:
+          service:
+            name: {{ .Values.matrixkc.serviceName }}
             port:
               number: 8080
   tls:

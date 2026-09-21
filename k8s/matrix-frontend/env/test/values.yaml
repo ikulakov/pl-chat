@@ -1,3 +1,5 @@
+replicaCount: 1
+
 matrixkc:
   serviceName: matrixkc
 
