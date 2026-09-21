@@ -13,7 +13,7 @@ const mockIframeClose = vi.fn()
 const mockIframeToggle = vi.fn()
 const mockIframeLoad = vi.fn()
 
-vi.mock('../iframe', () => ({
+vi.mock(import('../iframe'), () => ({
   IframeView: vi.fn().mockImplementation(() => ({
     mount: vi.fn(),
     open: mockIframeOpen,

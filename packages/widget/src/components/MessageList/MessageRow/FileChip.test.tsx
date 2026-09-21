@@ -10,7 +10,7 @@ const cancelUpload = vi.fn()
 const resendMessage = vi.fn()
 const downloadFile = vi.fn(() => Promise.resolve(new Blob(['bytes'])))
 
-vi.mock('@/hooks/useChatActions', () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({ cancelUpload, resendMessage, downloadFile }),
 }))
 

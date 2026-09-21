@@ -10,7 +10,7 @@ import { useLoadMoreHistory } from './useLoadMoreHistory'
 // Экшены дёргают ChatController → MatrixService, которые в этом тесте не поднимаются
 const loadMoreHistory = vi.fn()
 const stopLoadingHistory = vi.fn()
-vi.mock('./useChatActions', () => ({
+vi.mock<unknown>(import('./useChatActions'), () => ({
   useChatActions: () => ({ loadMoreHistory, stopLoadingHistory }),
 }))
 

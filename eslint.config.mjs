@@ -120,6 +120,15 @@ export default tseslint.config(
           message:
             "wire-типы импортируй неймспейсом через баррель: import type * as Matrix from '…/wire' и читай как Matrix.ClientEvent. Именованно берутся только wire/consts и wire/guards — там значения.",
         },
+        // Строку в vi.mock не проверяют ни tsc, ни линт: после переноса файла мок молча
+        // перестаёт применяться, а тест продолжает проходить на настоящем модуле (так жил
+        // мок lottiePlayer в ReplyPreview.test). Путь внутри import() компилятор резолвит.
+        {
+          selector:
+            "CallExpression[callee.object.name='vi'][callee.property.name=/^(mock|doMock|unmock|doUnmock)$/] > Literal.arguments:first-child",
+          message:
+            "Путь мока передавай через import(): vi.mock(import('./x'), …) — его проверит tsc. Фабрика с частичной заглушкой — vi.mock<unknown>(import('./x'), …).",
+        },
       ],
     },
   },

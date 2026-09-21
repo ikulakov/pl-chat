@@ -6,7 +6,7 @@ const destroy = vi.fn()
 const goToAndStop = vi.fn()
 
 // Плеер рисует кадр в контейнер: подкладываем туда пустой <svg>, из которого берётся разметка.
-vi.mock('./lottiePlayer', () => ({
+vi.mock<unknown>(import('./lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
   createEmojiPlayer: (_lottie: unknown, { container }: { container: HTMLElement }) => {
     container.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
@@ -16,7 +16,7 @@ vi.mock('./lottiePlayer', () => ({
 
 // jsdom не грузит ресурсы в <img>, поэтому растеризация подменена целиком — см. rasterizeSvg.
 const DATA_URL = 'data:image/png;base64,test'
-vi.mock('./rasterizeSvg', () => ({
+vi.mock(import('./rasterizeSvg'), () => ({
   rasterizeSvg: () => Promise.resolve(DATA_URL),
 }))
 
@@ -24,7 +24,7 @@ vi.mock('./rasterizeSvg', () => ({
 // и дописывают после — сам адаптер деградирует до `null` без него.
 const readFrame = vi.fn(() => Promise.resolve<string | null>(null))
 const writeFrame = vi.fn(() => Promise.resolve())
-vi.mock('../emoji/emojiDb', () => ({
+vi.mock(import('../emoji/emojiDb'), () => ({
   readFrame: (...args: unknown[]) => readFrame(...(args as [])),
   writeFrame: (...args: unknown[]) => writeFrame(...(args as [])),
 }))

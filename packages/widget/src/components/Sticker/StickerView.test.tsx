@@ -5,12 +5,12 @@ import { StickerView, type StickerViewData } from './StickerView'
 
 const loadStickerAnimation = vi.fn()
 
-vi.mock('@/hooks/useChatActions', () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({ loadStickerAnimation }),
 }))
 
 // lottie-web тянет canvas, которого в jsdom нет; здесь проверяется выбор ветки, а не плеер.
-vi.mock('@/shared/lottie/lottiePlayer', () => ({
+vi.mock<unknown>(import('@/shared/lottie/lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
   createEmojiPlayer: () => ({
     totalFrames: 30,

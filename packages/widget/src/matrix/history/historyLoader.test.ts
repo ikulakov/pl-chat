@@ -14,7 +14,7 @@ import { MatrixError } from '../api/matrixError'
 import type * as Matrix from '../wire'
 import { MatrixHistoryLoader } from './historyLoader'
 
-vi.mock('@/shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock(import('@/shared/utils/sleep'), () => ({ sleep: () => Promise.resolve() }))
 
 const ROOM_ID = '!r:bank'
 

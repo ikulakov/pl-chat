@@ -6,7 +6,7 @@ import { createRef } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EmojiGrid } from './EmojiGrid'
 
-vi.mock('./EmojiCell', () => ({ EmojiCell: () => null }))
+vi.mock<unknown>(import('./EmojiCell'), () => ({ EmojiCell: () => null }))
 
 const pending: EmojiCategory = { id: 'faces', title: 'Faces', count: 3, items: null }
 

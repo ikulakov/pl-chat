@@ -8,7 +8,7 @@ const { mediaSource } = vi.hoisted(() => ({
   mediaSource: vi.fn(() => ({ status: 'ready', url: 'blob:preview' }) as unknown),
 }))
 
-vi.mock('./useMediaSource', () => ({ useMediaSource: () => mediaSource() }))
+vi.mock<unknown>(import('./useMediaSource'), () => ({ useMediaSource: () => mediaSource() }))
 
 function imageItem(overrides: Partial<ImageTimelineItem> = {}): ImageTimelineItem {
   return {

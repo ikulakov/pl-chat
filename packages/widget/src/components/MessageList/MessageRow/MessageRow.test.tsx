@@ -20,7 +20,7 @@ const index: EmojiIndex = {
   ]),
 }
 
-vi.mock('@/hooks/useChatActions', () => {
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => {
   const actions = {
     resendMessage: vi.fn(),
     replyTo: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock('@/hooks/useChatActions', () => {
   return { useChatActions: () => actions }
 })
 
-vi.mock('@/shared/lottie/emojiBitmap', () => ({
+vi.mock(import('@/shared/lottie/emojiBitmap'), () => ({
   getEmojiBitmap: () => Promise.resolve('data:image/png;base64,AAA'),
 }))
 

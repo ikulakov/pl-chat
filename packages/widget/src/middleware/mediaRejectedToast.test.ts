@@ -8,8 +8,8 @@ import type { Dispatch } from '@/store/store'
 const scrollTimelineTo = vi.hoisted(() => vi.fn())
 const showToast = vi.hoisted(() => vi.fn())
 
-vi.mock('@/shared/timeline/timelineScroll', () => ({ scrollTimelineTo }))
-vi.mock('@/shared/ui/Toast', () => ({ showToast }))
+vi.mock(import('@/shared/timeline/timelineScroll'), () => ({ scrollTimelineTo }))
+vi.mock(import('@/shared/ui/Toast'), () => ({ showToast }))
 
 const OWN = '@me:bank.ru'
 

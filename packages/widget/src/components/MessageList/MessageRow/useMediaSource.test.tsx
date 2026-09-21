@@ -6,7 +6,7 @@ import { useMediaSource } from './useMediaSource'
 
 const loadPreview = vi.fn(() => Promise.resolve(new Blob(['bytes'])))
 
-vi.mock('@/hooks/useChatActions', () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({ loadPreview }),
 }))
 

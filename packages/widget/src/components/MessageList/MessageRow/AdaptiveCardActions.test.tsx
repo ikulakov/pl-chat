@@ -13,7 +13,7 @@ const sendCardAction = vi.fn((cardEventId: string, action: CardAction) => {
   return Promise.resolve()
 })
 
-vi.mock('@/hooks/useChatActions', () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({ sendCardAction }),
 }))
 

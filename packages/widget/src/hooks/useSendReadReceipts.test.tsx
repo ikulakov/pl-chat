@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SCAN_THROTTLE_MS, useSendReadReceipts } from './useSendReadReceipts'
 
 const { markRead } = vi.hoisted(() => ({ markRead: vi.fn() }))
-vi.mock('./useChatActions', () => ({ useChatActions: () => ({ markRead }) }))
+vi.mock<unknown>(import('./useChatActions'), () => ({ useChatActions: () => ({ markRead }) }))
 
 const FOLD = 500 // нижняя кромка ленты
 

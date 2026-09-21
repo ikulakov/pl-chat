@@ -19,21 +19,21 @@ function finishPlayback(): void {
   act(() => options?.onComplete?.())
 }
 
-vi.mock('@/hooks/useChatActions', () => {
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => {
   const actions = { loadEmojiAnimation: () => Promise.resolve({}) }
   return { useChatActions: () => actions }
 })
 
-vi.mock('@/shared/lottie/emojiBitmap', () => ({
+vi.mock(import('@/shared/lottie/emojiBitmap'), () => ({
   getEmojiBitmap: () => Promise.resolve('data:image/png;base64,AAA'),
 }))
 
-vi.mock('@/shared/lottie/lottiePlayer', () => ({
+vi.mock<unknown>(import('@/shared/lottie/lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
   createEmojiPlayer: (...args: unknown[]) => createEmojiPlayer(...(args as [])),
 }))
 
-vi.mock('@/shared/lottie/lottiePool', () => ({
+vi.mock<unknown>(import('@/shared/lottie/lottiePool'), () => ({
   lottiePool: { acquire: (player: unknown, options?: AcquireOptions) => acquire(player, options) },
 }))
 

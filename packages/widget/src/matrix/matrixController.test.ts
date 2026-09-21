@@ -18,7 +18,7 @@ import { MatrixError } from './api/matrixError'
 import { MatrixController } from './matrixController'
 import { MatrixSessionManager } from './session/sessionManager'
 
-vi.mock('@/shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock(import('@/shared/utils/sleep'), () => ({ sleep: () => Promise.resolve() }))
 
 const IDENTITY: Identity = { userId: '@u:bank', roomId: '!r:bank' }
 

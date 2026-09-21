@@ -13,7 +13,7 @@ const reconnect = vi.hoisted(() => vi.fn())
 // Переключатель падения ленты: в остальных тестах она рендерится как есть.
 const listCrash = vi.hoisted(() => ({ enabled: false }))
 
-vi.mock('./MessageList/MessageList', async (importOriginal) => {
+vi.mock(import('./MessageList/MessageList'), async (importOriginal) => {
   const actual = await importOriginal<typeof MessageListModule>()
 
   return {
@@ -24,7 +24,7 @@ vi.mock('./MessageList/MessageList', async (importOriginal) => {
   }
 })
 
-vi.mock('@/hooks/useChatActions', () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({
     reconnect,
     loadEmojiIndex: vi.fn(),

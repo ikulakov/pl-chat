@@ -12,11 +12,11 @@ const replyTo = vi.fn()
 const toggleReaction = vi.fn()
 const showToast = vi.hoisted(() => vi.fn())
 
-vi.mock('@/hooks/useChatActions', () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({ resendMessage, replyTo, toggleReaction }),
 }))
 
-vi.mock('@/shared/ui/Toast', () => ({ showToast }))
+vi.mock(import('@/shared/ui/Toast'), () => ({ showToast }))
 
 describe('MessageActions', () => {
   beforeEach(() => {

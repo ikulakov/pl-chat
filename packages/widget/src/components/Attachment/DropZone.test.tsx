@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DropZone } from './DropZone'
 
 const pickFile = vi.fn()
-vi.mock('./AttachmentContext', () => ({
+vi.mock<unknown>(import('./AttachmentContext'), () => ({
   useAttachment: () => ({ pickFile }),
 }))
 

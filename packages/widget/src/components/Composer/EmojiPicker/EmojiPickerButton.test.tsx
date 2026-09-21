@@ -10,7 +10,7 @@ const loadEmojiAnimation = vi.fn()
 const loadStickerPacks = vi.fn()
 const sendSticker = vi.fn()
 
-vi.mock('@/hooks/useChatActions', () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({
     loadEmojiCatalog,
     loadEmojiCategory,
@@ -30,14 +30,14 @@ const createEmojiPlayer = vi.fn(() => ({
 
 // lottie-web тянет canvas, которого в jsdom нет; здесь проверяется поведение панели,
 // а не сам плеер — у него свои тесты в shared/lottie.
-vi.mock('@/shared/lottie/lottiePlayer', () => ({
+vi.mock<unknown>(import('@/shared/lottie/lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
   createEmojiPlayer: () => createEmojiPlayer(),
 }))
 
 // Статичный кадр ячейки: в jsdom его не нарисовать (нет ни canvas, ни загрузки ресурсов в
 // <img>), а тесты панели про него и не спрашивают — им важно, что плеера в ячейке нет.
-vi.mock('@/shared/lottie/emojiBitmap', () => ({
+vi.mock(import('@/shared/lottie/emojiBitmap'), () => ({
   getEmojiBitmap: () => Promise.resolve('data:image/png;base64,AAA'),
 }))
 

@@ -13,13 +13,13 @@ import { MAX_MESSAGE_LENGTH } from './MessageTextarea'
 const sendMessage = vi.fn()
 const sendFile = vi.fn()
 const cancelReply = vi.fn()
-vi.mock('@/hooks/useChatActions', () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({ sendMessage, sendFile, cancelReply }),
 }))
 
 // Пикер подменён кнопкой-заглушкой: здесь проверяется только то, что делает композер с
 // выбранным символом. Поведение самой панели покрыто EmojiPickerButton.test.tsx.
-vi.mock('./EmojiPicker/EmojiPickerButton', () => ({
+vi.mock(import('./EmojiPicker/EmojiPickerButton'), () => ({
   EmojiPickerButton: ({ onSelectEmoji }: { onSelectEmoji: (char: string) => void }) => (
     <button
       type="button"

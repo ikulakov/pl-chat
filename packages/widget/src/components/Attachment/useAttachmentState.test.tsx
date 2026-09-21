@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAttachmentState } from './useAttachmentState'
 
 const sendFile = vi.fn()
-vi.mock('@/hooks/useChatActions', () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({ sendFile }),
 }))
 
 // jsdom не грузит <img> → readImageDimensions зависла бы. Мокаем интринсик-размеры.
-vi.mock('@/shared/utils/imageDimensions', () => ({
+vi.mock(import('@/shared/utils/imageDimensions'), () => ({
   readImageDimensions: vi.fn().mockResolvedValue({ w: 800, h: 600 }),
 }))
 

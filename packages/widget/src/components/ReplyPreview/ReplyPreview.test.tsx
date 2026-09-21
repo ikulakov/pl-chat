@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ReplyPreview } from './ReplyPreview'
 
 // lottie-web поднимает плеер, которого в jsdom нет; здесь проверяется разметка цитаты.
-vi.mock('../shared/lottie/lottiePlayer', () => ({
+vi.mock<unknown>(import('@/shared/lottie/lottiePlayer'), () => ({
   loadLottiePlayer: () => Promise.resolve({}),
   createEmojiPlayer: () => ({ goToAndStop: vi.fn(), destroy: vi.fn() }),
 }))

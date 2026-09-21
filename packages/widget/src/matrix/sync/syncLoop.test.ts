@@ -5,7 +5,7 @@ import type * as Matrix from '../wire'
 import { SetPresence } from './presence'
 import { MatrixSyncLoop, type SyncTick } from './syncLoop'
 
-vi.mock('@/shared/utils/sleep', () => ({ sleep: () => Promise.resolve() }))
+vi.mock(import('@/shared/utils/sleep'), () => ({ sleep: () => Promise.resolve() }))
 
 type LongPoll = MatrixApi['longPollSync']
 

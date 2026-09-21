@@ -10,7 +10,7 @@ const ME = '@me:bank'
 
 // Экшены дёргают ChatController → MatrixService, которые в этом тесте не поднимаются
 const loadMoreHistory = vi.fn()
-vi.mock('@/hooks/useChatActions', () => ({
+vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({
     resendMessage: vi.fn(),
     markRead: vi.fn(),
