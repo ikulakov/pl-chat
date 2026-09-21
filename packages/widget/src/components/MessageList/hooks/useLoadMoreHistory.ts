@@ -1,6 +1,6 @@
 import type { TimelineItem } from '@/domain/timeline'
 import type { LocalId } from '@/shared/types/ids'
-import { ITEM_ID_ATTR } from '../utils/domAttributes'
+import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
 import { selectIsLoadingHistory } from '@/store/selectors'
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { useChatActions } from '@/hooks/useChatActions'

@@ -4,7 +4,7 @@ import { isSystem, type MessageTimelineItem, type TimelineItem } from '@/domain/
 import { t } from '@/i18n'
 import { formatDateLabel, startOfDay } from '@/shared/utils/formatDate'
 import { replyAuthorLabel, replyQuoteView } from '../../ReplyPreview'
-import type { BubblePosition } from '../MessageRow'
+import type { BubblePosition } from '../../MessageRow'
 
 interface DayGroup {
   key: string

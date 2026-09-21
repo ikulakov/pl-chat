@@ -1,7 +1,7 @@
 import type { TimelineItem } from '@/domain/timeline'
 import { FakeIntersectionObserver } from '@/shared/testUtils/intersectionObserver'
 import { textItem } from '@/shared/testUtils/matrixFixtures'
-import { ITEM_ID_ATTR } from '../utils/domAttributes'
+import { ITEM_ID_ATTR } from '@/shared/timeline/domAttributes'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useChatScroll } from './useChatScroll'

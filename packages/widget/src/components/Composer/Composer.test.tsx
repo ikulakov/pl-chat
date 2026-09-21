@@ -6,7 +6,7 @@ import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '@/store/initialState'
 import { chatStore } from '@/store/store'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AttachmentProvider } from '../Attachment/AttachmentProvider'
+import { AttachmentProvider } from '../Attachment/ui/AttachmentProvider'
 import { Composer } from './Composer'
 import { MAX_MESSAGE_LENGTH } from './MessageTextarea'
 
@@ -19,7 +19,7 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
 
 // Пикер подменён кнопкой-заглушкой: здесь проверяется только то, что делает композер с
 // выбранным символом. Поведение самой панели покрыто EmojiPickerButton.test.tsx.
-vi.mock(import('../Emoji/EmojiPicker/EmojiPickerButton'), () => ({
+vi.mock(import('../Emoji/ui/picker/EmojiPickerButton'), () => ({
   EmojiPickerButton: ({ onSelectEmoji }: { onSelectEmoji: (char: string) => void }) => (
     <button
       type="button"

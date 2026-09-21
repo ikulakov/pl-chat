@@ -1,3 +1,3 @@
 // Публичный API слайса: лента целиком. Строки, скролл, догрузка истории и прочтения —
 // её внутреннее устройство.
-export { MessageList } from './MessageList'
+export { MessageList } from './ui/MessageList'

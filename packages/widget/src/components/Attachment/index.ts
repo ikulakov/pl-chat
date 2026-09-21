@@ -2,5 +2,5 @@
 // Состояние раздаётся контекстом, а не стором: File, AbortController и object-URL живут,
 // пока смонтирована панель.
 export { useAttachment } from './AttachmentContext'
-export { AttachmentProvider } from './AttachmentProvider'
+export { AttachmentProvider } from './ui/AttachmentProvider'
 export type { PendingAttachment } from './hooks/useAttachmentState'
