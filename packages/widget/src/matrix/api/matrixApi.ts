@@ -95,7 +95,7 @@ export function createMatrixApi(transport: MatrixTransport) {
     getRoomHistory(
       roomId: RoomId,
       from: string,
-      signal?: AbortSignal,
+      options?: { signal?: AbortSignal | undefined },
     ): Promise<Matrix.MessagesResponse> {
       return transport.request(Endpoints.LOAD_HISTORY({ roomId }), {
         searchParams: {
@@ -103,7 +103,7 @@ export function createMatrixApi(transport: MatrixTransport) {
           from,
           limit: HISTORY_PAGE_SIZE,
         },
-        signal,
+        signal: options?.signal,
       })
     },
 

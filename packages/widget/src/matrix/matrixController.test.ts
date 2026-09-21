@@ -1537,7 +1537,7 @@ describe('MatrixController — подгрузка истории вверх', ()
     const inFlight = controller.loadMoreHistory()
     controller.disconnect()
 
-    const signal = vi.mocked(api.getRoomHistory).mock.calls[0]![2]
+    const signal = vi.mocked(api.getRoomHistory).mock.calls[0]![2]?.signal
     expect(signal!.aborted).toBe(true)
     expect(getState().room.isLoadingHistory).toBe(false)
 
@@ -1567,7 +1567,7 @@ describe('MatrixController — подгрузка истории вверх', ()
     const inFlight = controller.loadMoreHistory()
     await controller.sendMessage('hi')
 
-    const signal = vi.mocked(api.getRoomHistory).mock.calls[0]![2]
+    const signal = vi.mocked(api.getRoomHistory).mock.calls[0]![2]?.signal
     expect(signal!.aborted).toBe(true)
 
     page.resolve(messagesResponse([roomMessageEvent({ event_id: '$old' })], 'p2'))

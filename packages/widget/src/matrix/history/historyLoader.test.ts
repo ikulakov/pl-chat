@@ -78,11 +78,9 @@ describe('MatrixHistoryLoader', () => {
 
     await load()
 
-    expect(api.getRoomHistory).toHaveBeenCalledExactlyOnceWith(
-      ROOM_ID,
-      'p1',
-      expect.any(AbortSignal),
-    )
+    expect(api.getRoomHistory).toHaveBeenCalledExactlyOnceWith(ROOM_ID, 'p1', {
+      signal: expect.any(AbortSignal),
+    })
     expect(getState().room.timeline.map((item) => item.eventId)).toEqual(['$old'])
     expect(getState().room.prevBatch).toBe('p2')
   })
@@ -99,7 +97,9 @@ describe('MatrixHistoryLoader', () => {
 
     await load()
 
-    expect(api.getRoomHistory).toHaveBeenNthCalledWith(2, ROOM_ID, 'p2', expect.any(AbortSignal))
+    expect(api.getRoomHistory).toHaveBeenNthCalledWith(2, ROOM_ID, 'p2', {
+      signal: expect.any(AbortSignal),
+    })
     expect(getState().room.timeline.map((item) => item.eventId)).toEqual(['$old'])
     expect(getState().room.prevBatch).toBe('p3')
   })
@@ -176,7 +176,9 @@ describe('MatrixHistoryLoader', () => {
 
     await load()
 
-    expect(api.getRoomHistory).toHaveBeenNthCalledWith(3, ROOM_ID, 'p2', expect.any(AbortSignal))
+    expect(api.getRoomHistory).toHaveBeenNthCalledWith(3, ROOM_ID, 'p2', {
+      signal: expect.any(AbortSignal),
+    })
     expect(getState().room.timeline.map((item) => item.eventId)).toEqual(['$old'])
     expect(getState().room.prevBatch).toBe('p3')
   })
@@ -216,7 +218,7 @@ describe('MatrixHistoryLoader', () => {
     const inFlight = load()
     loader.stop()
 
-    const signal = vi.mocked(api.getRoomHistory).mock.calls[0]![2]
+    const signal = vi.mocked(api.getRoomHistory).mock.calls[0]![2]?.signal
     expect(signal!.aborted).toBe(true)
 
     page.resolve(messagesResponse([]))

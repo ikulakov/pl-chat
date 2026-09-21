@@ -87,7 +87,7 @@ describe('createMatrixApi — форма запросов', () => {
     const { transport, request } = fakeTransport()
     const signal = new AbortController().signal
 
-    await createMatrixApi(transport).getRoomHistory('!room:bank', 't-99', signal)
+    await createMatrixApi(transport).getRoomHistory('!room:bank', 't-99', { signal })
 
     const [path, init] = request.mock.calls[0]!
     expect(path).toBe('/_matrix/client/v3/rooms/!room%3Abank/messages')

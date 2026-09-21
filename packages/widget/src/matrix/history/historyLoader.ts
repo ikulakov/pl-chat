@@ -122,7 +122,7 @@ export class MatrixHistoryLoader {
     let prevBatch = fromBatch
 
     for (let page = 0; page < MAX_HISTORY_PAGES_PER_CALL; page++) {
-      const { chunk, end } = await this.api.getRoomHistory(roomId, prevBatch, signal)
+      const { chunk, end } = await this.api.getRoomHistory(roomId, prevBatch, { signal })
       if (isStale() || signal.aborted) return
 
       // dir=b отдаёт chunk newest-first — разворачиваем в хронологический порядок ленты.
