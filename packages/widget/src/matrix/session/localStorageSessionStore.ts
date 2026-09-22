@@ -19,23 +19,28 @@ interface PersistedSession {
 }
 
 export class LocalStorageSessionStore implements MatrixSessionStore {
+  private session: PersistedSession | null = null
+  // После неудачной записи/очистки storage может содержать прежнюю сессию.
+  // До следующего успешного сохранения доверяем памяти, иначе воскресим старые токены.
+  private hasUnpersistedChange = false
+
   getAccessToken(): string | null {
-    return readSession()?.accessToken ?? null
+    return this.readSession()?.accessToken ?? null
   }
 
   getRefreshToken(): string | null {
-    return readSession()?.refreshToken ?? null
+    return this.readSession()?.refreshToken ?? null
   }
 
   getUserId(): UserId | null {
-    return readSession()?.userId ?? null
+    return this.readSession()?.userId ?? null
   }
 
   setSession(session: SessionInit): void {
     // Фиксированный TTL ставится один раз — при установлении сессии.
     // silent refresh его НЕ продлевает (см. setTokens),
     // иначе клиент считал бы сессию живой после того, как сервер перестал принимать refresh-токен.
-    writeSession({
+    this.writeSession({
       version: SCHEMA_VERSION,
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
@@ -45,12 +50,12 @@ export class LocalStorageSessionStore implements MatrixSessionStore {
   }
 
   setTokens(accessToken: string, refreshToken?: string): void {
-    const currentSession = readSession()
+    const currentSession = this.readSession()
     // Для silent refresh: обновляет токены существующей сессии, сохраняя userId
     // Если сессии нет — обновлять нечего.
     if (!currentSession) return
 
-    writeSession({
+    this.writeSession({
       ...currentSession,
       accessToken,
       refreshToken: refreshToken ?? currentSession.refreshToken,
@@ -58,44 +63,60 @@ export class LocalStorageSessionStore implements MatrixSessionStore {
   }
 
   clearSession(): void {
-    removeSession()
-  }
-}
-
-function readSession(): PersistedSession | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_KEY)
-    if (!raw) return null
-    const parsed: unknown = JSON.parse(raw)
-
-    if (!isPersistedSession(parsed)) {
-      removeSession()
-      return null
+    this.session = null
+    try {
+      localStorage.removeItem(LOCAL_KEY)
+      this.hasUnpersistedChange = false
+    } catch {
+      this.hasUnpersistedChange = true
     }
-    if (parsed.expiresAt <= Date.now()) {
-      // TTL сессии истёк — считаем, что сессии нет, и чистим.
-      removeSession()
-      return null
+  }
+
+  private readSession(): PersistedSession | null {
+    if (!this.hasUnpersistedChange) this.readPersistedSession()
+
+    // TTL действует и без storage; silent refresh не продлевает жизнь сессии в памяти.
+    if (this.session && this.session.expiresAt <= Date.now()) {
+      this.clearSession()
     }
-    return parsed
-  } catch {
-    return null
+    return this.session
   }
-}
 
-function writeSession(session: PersistedSession): void {
-  try {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(session))
-  } catch {
-    // localStorage best-effort: при сбое будет новая гостевая регистрация.
+  private readPersistedSession(): void {
+    let raw: string | null
+    try {
+      // При работающем storage сохраняем read-through: refresh/logout другой вкладки видны.
+      raw = localStorage.getItem(LOCAL_KEY)
+    } catch {
+      // Отказ чтения не равен logout: уже известная сессия продолжает работать из памяти.
+      return
+    }
+
+    if (raw === null) {
+      this.session = null
+      return
+    }
+
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (isPersistedSession(parsed)) {
+        this.session = parsed
+        return
+      }
+    } catch {
+      // Повреждённая запись, в отличие от недоступного storage, больше не задаёт сессию.
+    }
+    this.clearSession()
   }
-}
 
-function removeSession(): void {
-  try {
-    localStorage.removeItem(LOCAL_KEY)
-  } catch {
-    // localStorage best-effort: при сбое будет новая гостевая регистрация.
+  private writeSession(session: PersistedSession): void {
+    this.session = session
+    try {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(session))
+      this.hasUnpersistedChange = false
+    } catch {
+      this.hasUnpersistedChange = true
+    }
   }
 }
 

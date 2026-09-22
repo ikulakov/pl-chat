@@ -1,4 +1,6 @@
-import { sleep } from '@/shared/utils/sleep'
+import { consoleDev } from '@/shared/utils/consoleDev'
+import { Generation } from '@/shared/utils/generation'
+import { retryWithBackoff } from '@/shared/utils/retryWithBackoff'
 import type { MatrixApi } from '../api/matrixApi'
 import { isRateLimitedError } from '../api/matrixError'
 import type * as Matrix from '../wire'
@@ -13,11 +15,9 @@ export interface SyncTick {
 interface SyncLoopOptions {
   cursor: string
   onTick: (tick: SyncTick) => void
+  /** Сбой самого запроса /sync — перед паузой backoff. Ошибки `onTick` сюда не попадают. */
   onError?: (error: unknown, meta: { since: string; backoff: number }) => void
 }
-
-const INITIAL_BACKOFF_MS = 1_000
-const MAX_BACKOFF_MS = 30_000
 
 function jittered(ms: number): number {
   return ms * (0.5 + Math.random() / 2)
@@ -31,15 +31,16 @@ function retryDelay(err: unknown, backoff: number): number {
   return Math.max(delay, serverHint)
 }
 
+const SYNC_BACKOFF = { baseMs: 1_000, maxMs: 30_000, delay: retryDelay }
+
 type SyncApi = Pick<MatrixApi, 'longPollSync'>
 
 export class MatrixSyncLoop {
   private readonly api: SyncApi
   private isRunning = false
-  // Счётчик поколений: каждый start() начинает новый run;
-  // предыдущий stale run() не должен уметь остановить более новый
-  private runId = 0
-  private abort: AbortController | null = null
+  // Каждый start() начинает новое поколение: stale run() не должен уметь остановить более новый,
+  // а stop() заодно рвёт висящий long-poll и паузу backoff.
+  private readonly generation = new Generation()
   private cursor: string | null = null
   private onTick: ((tick: SyncTick) => void) | null = null
   private onError: ((error: unknown, meta: { since: string; backoff: number }) => void) | null =
@@ -56,56 +57,42 @@ export class MatrixSyncLoop {
     this.onTick = options.onTick
     this.onError = options.onError ?? null
     this.isRunning = true
-    const runId = ++this.runId
-    void this.run(runId)
+    void this.run(this.generation.begin())
   }
 
   stop(): void {
     this.isRunning = false
-    this.runId += 1
-    this.abort?.abort()
-    this.abort = null
+    this.generation.end()
   }
 
-  private isCurrentRun(runId: number): boolean {
-    return this.runId === runId
-  }
-
-  private async run(runId: number): Promise<void> {
-    const abort = new AbortController()
-    this.abort = abort
-    let backoff = INITIAL_BACKOFF_MS
-
-    while (this.isCurrentRun(runId)) {
+  private async run(signal: AbortSignal): Promise<void> {
+    while (!signal.aborted) {
       const cursor = this.cursor
       if (!cursor) break
 
+      const response = await retryWithBackoff(
+        () => this.api.longPollSync(cursor, { signal, setPresence: currentPresence() }),
+        {
+          ...SYNC_BACKOFF,
+          signal,
+          onError: (err, backoff) => {
+            this.onError?.(err, { since: cursor, backoff })
+            return false
+          },
+        },
+      )
+      if (!response || signal.aborted) break
+
+      // Курсор двигаем ДО применения, как matrix-js-sdk: батч, на котором падает обработка,
+      // пропускаем, а не запрашиваем по кругу — иначе битое событие заморозило бы чат.
+      this.cursor = response.next_batch
       try {
-        // Присутствие уезжает вместе с очередным запросом, отдельного PUT нет, и читается
-        // заново перед каждым: смена видимости вкладки доходит до сервера не позже конца
-        // текущего окна long-poll'а. Рвать запрос ради этого незачем — серверный idle-таймер
-        // вчетверо длиннее окна.
-        const response = await this.api.longPollSync(cursor, {
-          signal: abort.signal,
-          setPresence: currentPresence(),
-        })
-        if (!this.isCurrentRun(runId)) break
-
-        backoff = INITIAL_BACKOFF_MS
-        this.cursor = response.next_batch
-
         this.onTick?.({ since: cursor, next: response.next_batch, response })
       } catch (err) {
-        if (!this.isCurrentRun(runId) || abort.signal.aborted) break
-
-        this.onError?.(err, { since: cursor, backoff })
-        if (!this.isCurrentRun(runId)) break
-
-        await sleep(retryDelay(err, backoff), abort.signal)
-        backoff = Math.min(backoff * 2, MAX_BACKOFF_MS)
+        consoleDev.error('sync tick failed, batch skipped', err)
       }
     }
 
-    if (this.isCurrentRun(runId)) this.isRunning = false
+    if (!signal.aborted) this.isRunning = false
   }
 }

@@ -1,6 +1,6 @@
 import type { RoomId } from '@/shared/types/ids'
 import { consoleDev } from '@/shared/utils/consoleDev'
-import { sleep } from '@/shared/utils/sleep'
+import { retryWithBackoff } from '@/shared/utils/retryWithBackoff'
 import type { RuntimeAction } from '@/store/state'
 import type { MatrixApi } from '../api/matrixApi'
 import { collectCardAnswers } from '../mappers/adaptiveCard'
@@ -11,12 +11,8 @@ import { timelineEventsToItems } from '../mappers/timeline'
 // Максимальное кол-во страниц для просмотра на случай если все события страницы будут не целевыми
 const MAX_HISTORY_PAGES_PER_CALL = 5
 
-// Базовая пауза перед ретраем догрузки истории; растёт вдвое каждую попытку (backoff).
-// Количество попыток не ограничено — ретраим, пока вызывающий разрешает (пользователь у верха).
-const HISTORY_RETRY_BASE_MS = 1_000
-
-// Потолок backoff-паузы: пользователь стоит у верха и ждёт — паузы длиннее бессмысленны.
-const HISTORY_RETRY_MAX_MS = 10_000
+// Базовая пауза перед ретраем догрузки истории и ее потолок; растёт вдвое каждую попытку (backoff).
+const HISTORY_BACKOFF = { baseMs: 1_000, maxMs: 10_000 }
 
 export interface HistoryContext {
   roomId: RoomId
@@ -24,10 +20,7 @@ export interface HistoryContext {
 }
 
 export interface HistoryLoadRequest {
-  getContext: () => HistoryContext | undefined
-  /** Сессионная ось отмены (поколение сессии владельца). Опрашивается на await-границах —
-   *  в отличие от `stop()`, запрос в полёте не рвёт. */
-  isStale: () => boolean
+  getCursor: () => HistoryContext | undefined
 }
 
 export interface HistoryLoaderDeps {
@@ -41,9 +34,10 @@ export interface HistoryLoaderDeps {
  * Догрузка истории вверх: backoff-ретрай транзиентных ошибок + постраничный обход,
  * пока страница не даст видимых событий.
  *
- * Две ортогональные оси отмены:
- * - `stop()` — намерение пользователя (ушёл от верха). Рвёт и запрос в полёте, и паузу backoff.
- * - `isStale()` — разрушение сессии у владельца. Проверяется после каждого await.
+ * Отмена одна — `stop()`: рвёт и запрос в полёте, и паузу backoff. Зовут её и по жесту
+ * (пользователь ушёл от верха), и при конце сессии у владельца: про сессии лоадер не знает,
+ * поэтому поздняя страница прежней сессии не доедет в стор новой, только если владелец
+ * остановил лоадер до её смены.
  */
 export class MatrixHistoryLoader {
   private readonly api: Pick<MatrixApi, 'getRoomHistory'>
@@ -58,42 +52,29 @@ export class MatrixHistoryLoader {
     this.onAuthError = deps.onAuthError
   }
 
-  async load({ getContext, isStale }: HistoryLoadRequest): Promise<void> {
-    if (!getContext() || this.activeLoad) return
+  async load({ getCursor }: HistoryLoadRequest): Promise<void> {
+    if (!getCursor() || this.activeLoad) return
 
     const abort = new AbortController()
     this.activeLoad = abort
     this.dispatch({ type: 'history.loading' })
 
-    let backoff = HISTORY_RETRY_BASE_MS
-
     try {
-      while (!isStale() && !abort.signal.aborted) {
-        const current = getContext()
-        if (!current) return
-
-        try {
-          await this.loadVisiblePage(current.roomId, current.prevBatch, isStale, abort.signal)
-          return
-        } catch (err) {
-          if (isStale() || abort.signal.aborted) return
+      // Транзиентную ошибку (сеть/5xx) ретраим с backoff без лимита попыток, пока не остановили.
+      await retryWithBackoff(() => this.loadVisiblePage(getCursor, abort.signal), {
+        ...HISTORY_BACKOFF,
+        signal: abort.signal,
+        onError: (err) => {
+          // Терминальная ошибка — retry бессмыслен
+          if (this.onAuthError(err)) return true
 
           consoleDev.error('load history failed', err)
-
-          // Терминальная ошибка — retry бессмыслен, владелец уводит в recovery.
-          if (this.onAuthError(err)) return
-
-          // sleep прерывается сигналом — проверяем сразу после него.
-          await sleep(backoff, abort.signal)
-          if (isStale() || abort.signal.aborted) return
-
-          // Транзиентную ошибку (сеть/5xx) ретраим с backoff без лимита попыток, пока сигнал жив.
-          backoff = Math.min(backoff * 2, HISTORY_RETRY_MAX_MS)
-        }
-      }
+          return false
+        },
+      })
     } finally {
-      // Снимаем флаг по идентичности загрузки, isStale: stop() мог уже занулить
-      // activeLoad и сам диспатчнуть settled — так избегаем двойного history.settled.
+      // Снимаем флаг по идентичности загрузки: stop() мог уже занулить activeLoad
+      // и сам диспатчнуть settled — так избегаем двойного history.settled.
       if (this.activeLoad === abort) {
         this.activeLoad = null
         this.dispatch({ type: 'history.settled' })
@@ -110,20 +91,21 @@ export class MatrixHistoryLoader {
     this.dispatch({ type: 'history.settled' })
   }
 
-  // Тянет страницы от курсора, пропуская те, что не дали видимых событий: сервер считает limit
+  // Одна попытка для retry в load(). Курсор перечитываем на каждой: пока ждали паузу, он мог
+  // сдвинуться. Страницы тянем, пропуская те, что не дали видимых событий: сервер считает limit
   // по сырым событиям, поэтому страница может состоять из m.reaction/m.room.member и т.п.
-  // При throw — retry в load().
   private async loadVisiblePage(
-    roomId: RoomId,
-    fromBatch: string,
-    isStale: () => boolean,
+    getCursor: HistoryLoadRequest['getCursor'],
     signal: AbortSignal,
   ): Promise<void> {
-    let prevBatch = fromBatch
+    const cursor = getCursor()
+    if (!cursor) return
+
+    let prevBatch = cursor.prevBatch
 
     for (let page = 0; page < MAX_HISTORY_PAGES_PER_CALL; page++) {
-      const { chunk, end } = await this.api.getRoomHistory(roomId, prevBatch, { signal })
-      if (isStale() || signal.aborted) return
+      const { chunk, end } = await this.api.getRoomHistory(cursor.roomId, prevBatch, { signal })
+      if (signal.aborted) return
 
       // dir=b отдаёт chunk newest-first — разворачиваем в хронологический порядок ленты.
       const reversed = [...chunk].reverse()

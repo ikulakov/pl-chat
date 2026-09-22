@@ -5,6 +5,7 @@ import { ChatController } from './chatController'
 import type { CatalogService } from './matrix/catalog/matrixCatalog'
 import type { MatrixClient } from './matrix/createMatrixClient'
 import type { MatrixService } from './matrix/matrixController'
+import type { MediaService } from './matrix/media/matrixMedia'
 import { chatStore } from './store/store'
 
 function makeBridge(): HostBridge {
@@ -25,14 +26,12 @@ function makeMatrix(): MatrixService {
     sendFile: vi.fn().mockResolvedValue(undefined),
     sendSticker: vi.fn().mockResolvedValue(undefined),
     sendCardAction: vi.fn().mockResolvedValue(undefined),
-    downloadFile: vi.fn().mockResolvedValue(new Blob()),
     cancelUpload: vi.fn(),
     resendMessage: vi.fn().mockResolvedValue(undefined),
     markRead: vi.fn().mockResolvedValue(undefined),
     toggleReaction: vi.fn().mockResolvedValue(undefined),
     loadMoreHistory: vi.fn().mockResolvedValue(undefined),
     stopLoadingHistory: vi.fn(),
-    loadPreview: vi.fn().mockResolvedValue(new Blob()),
   }
 }
 
@@ -47,7 +46,18 @@ function makeCatalog(): CatalogService {
   }
 }
 
-const client = (matrix: MatrixService): MatrixClient => ({ matrix, catalog: makeCatalog() })
+function makeMedia(): MediaService {
+  return {
+    loadPreview: vi.fn().mockResolvedValue(new Blob()),
+    downloadFile: vi.fn().mockResolvedValue(new Blob()),
+  }
+}
+
+const client = (matrix: MatrixService): MatrixClient => ({
+  matrix,
+  catalog: makeCatalog(),
+  media: makeMedia(),
+})
 
 beforeEach(() => {
   chatStore.getState().closePanel()

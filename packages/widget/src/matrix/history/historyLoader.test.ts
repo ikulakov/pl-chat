@@ -1,4 +1,3 @@
-import { describe, expect, it, vi } from 'vitest'
 import {
   deferred,
   makeMatrixApi,
@@ -6,9 +5,10 @@ import {
   OPERATOR_ID,
   roomMessageEvent,
 } from '@/shared/testUtils/matrixFixtures'
+import { INITIAL_RUNTIME_STATE } from '@/store/initialState'
 import { chatRuntimeReducer } from '@/store/reducer'
 import type { ChatRuntimeState, RuntimeAction } from '@/store/state'
-import { INITIAL_RUNTIME_STATE } from '@/store/initialState'
+import { describe, expect, it, vi } from 'vitest'
 import type { MatrixApi } from '../api/matrixApi'
 import { MatrixError } from '../api/matrixError'
 import type * as Matrix from '../wire'
@@ -30,12 +30,12 @@ const invisibleEvent: Matrix.ClientEvent = {
   content: {},
 }
 
-// Реальный редьюсер вместо статичного снимка: лоадер перечитывает курсор через getContext
+// Реальный редьюсер вместо статичного снимка: лоадер перечитывает курсор через getCursor
 // на каждой итерации, и продвижение prevBatch страницами должно быть настоящим.
 function loaderHarness(
   prevBatch: string | null,
   api: MatrixApi = makeMatrixApi(),
-  options: { isStale?: () => boolean; onAuthError?: (err: unknown) => boolean } = {},
+  options: { onAuthError?: (err: unknown) => boolean } = {},
 ) {
   let state: ChatRuntimeState = {
     ...INITIAL_RUNTIME_STATE,
@@ -57,11 +57,10 @@ function loaderHarness(
 
   const load = () =>
     loader.load({
-      getContext: () =>
+      getCursor: () =>
         state.room.prevBatch === null
           ? undefined
           : { roomId: ROOM_ID, prevBatch: state.room.prevBatch },
-      isStale: options.isStale ?? (() => false),
     })
 
   return { loader, load, dispatch, applied, getState: () => state }
@@ -239,20 +238,21 @@ describe('MatrixHistoryLoader', () => {
     expect(api.getRoomHistory).toHaveBeenCalledOnce()
   })
 
-  it('устаревший цикл (isStale) не пишет в стор', async () => {
-    // сессия пересоздалась под нами между попытками — страница не должна префиксить новую ленту
+  it('страница, обогнавшая stop(), не пишет в стор', async () => {
+    // владелец остановил лоадер при смене сессии, а ответ уже был в пути — мок отмену
+    // не слушает — страница не должна префиксить новую ленту
     const page = deferred<HistoryPage>()
-    let stale = false
     const api = makeMatrixApi({
       getRoomHistory: vi
         .fn<MatrixApi['getRoomHistory']>()
         .mockRejectedValueOnce(new MatrixError('M_UNKNOWN', 'boom'))
         .mockReturnValueOnce(page.promise),
     })
-    const { load, getState } = loaderHarness('p1', api, { isStale: () => stale })
+    const { loader, load, getState } = loaderHarness('p1', api)
 
     const inFlight = load()
-    stale = true
+    await vi.waitFor(() => expect(api.getRoomHistory).toHaveBeenCalledTimes(2))
+    loader.stop()
     page.resolve(messagesResponse([roomMessageEvent({ event_id: '$old' })], 'p2'))
     await inFlight
 

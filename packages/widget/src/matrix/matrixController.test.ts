@@ -16,6 +16,7 @@ import type { ChatRuntimeState, Identity, RoomState, RuntimeAction } from '@/sto
 import type { MatrixApi } from './api/matrixApi'
 import { MatrixError } from './api/matrixError'
 import { MatrixController } from './matrixController'
+import { MatrixMedia } from './media/matrixMedia'
 import { MatrixSessionManager } from './session/sessionManager'
 
 vi.mock(import('@/shared/utils/sleep'), () => ({ sleep: () => Promise.resolve() }))
@@ -34,14 +35,16 @@ function harness(initial: Partial<ChatRuntimeState> = {}, api: MatrixApi = makeM
     state = chatRuntimeReducer(state, action)
   })
   const sessionManager = new MatrixSessionManager(api, tokens)
+  const media = new MatrixMedia(api)
   const controller = new MatrixController({
     dispatch,
     getState: () => state,
     api,
+    media,
     sessionManager,
   })
 
-  return { controller, dispatch, applied, tokens, getState: () => state }
+  return { controller, media, dispatch, applied, tokens, getState: () => state }
 }
 
 // Общая форма "неудачно отправленного" сообщения для resendMessage-тестов ниже
@@ -422,7 +425,8 @@ describe('MatrixController (orchestrator)', () => {
     const { controller, applied } = harness({}, api)
 
     await controller.connect()
-    await vi.waitFor(() => expect(api.longPollSync).toHaveBeenCalledTimes(2))
+    // Третий, висящий sync — знак, что обе auth-ошибки уже разобраны.
+    await vi.waitFor(() => expect(api.longPollSync).toHaveBeenCalledTimes(3))
     controller.disconnect()
 
     // Сервер ответил — связь есть, мертва сессия. Это лечит recovery, а не баннер про сеть.
@@ -485,6 +489,112 @@ describe('MatrixController (orchestrator)', () => {
 
     expect(applied.filter((action) => action.type === 'session.started')).toHaveLength(2)
     expect(applied.some((action) => action.type === 'session.failed')).toBe(false)
+  })
+
+  it('запоздалая auth-ошибка запроса прежней сессии не запускает второй recovery', async () => {
+    // Отправка ушла под старым токеном, sync первым поймал его смерть и пересоздал сессию.
+    // Ответ отправки приходит уже в новой сессии — ему нечего лечить: иначе ещё одна регистрация
+    // гостя, и живая комната меняется на новую без причины.
+    const send = deferred<Awaited<ReturnType<MatrixApi['sendMessage']>>>()
+    const firstSync = deferred<Awaited<ReturnType<MatrixApi['longPollSync']>>>()
+    const api = makeMatrixApi({
+      sendMessage: vi.fn<MatrixApi['sendMessage']>().mockReturnValue(send.promise),
+    })
+    let syncCalls = 0
+    vi.mocked(api.longPollSync).mockImplementation(() =>
+      ++syncCalls === 1 ? firstSync.promise : new Promise<never>(() => {}),
+    )
+    const { controller, applied } = harness({}, api)
+    const recoveries = () => applied.filter((action) => action.type === 'session.recovering')
+
+    await controller.connect()
+    void controller.sendMessage('hi')
+    await vi.waitFor(() => expect(api.sendMessage).toHaveBeenCalledOnce())
+
+    firstSync.reject(new MatrixError('M_UNKNOWN_TOKEN', 'expired'))
+    await vi.waitFor(() =>
+      expect(applied.filter((action) => action.type === 'session.started')).toHaveLength(2),
+    )
+
+    send.reject(new MatrixError('M_UNKNOWN_TOKEN', 'expired'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    controller.disconnect()
+
+    expect(recoveries()).toHaveLength(1)
+    expect(api.registerGuest).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['M_UNKNOWN_TOKEN', 'M_USER_DEACTIVATED', 'success'])(
+    'ignores a late %s send result after auth recovery completed',
+    async (result) => {
+      const first = deferred<Awaited<ReturnType<MatrixApi['sendMessage']>>>()
+      const late = deferred<Awaited<ReturnType<MatrixApi['sendMessage']>>>()
+      const api = makeMatrixApi({
+        sendMessage: vi
+          .fn<MatrixApi['sendMessage']>()
+          .mockReturnValueOnce(first.promise)
+          .mockReturnValueOnce(late.promise),
+      })
+      const { controller, applied, getState, tokens } = harness(
+        { phase: 'ready', identity: IDENTITY },
+        api,
+      )
+
+      try {
+        const sending = controller.sendMessage('first')
+        const lateSending = controller.sendMessage('second')
+        first.reject(new MatrixError('M_UNKNOWN_TOKEN', 'expired'))
+        await sending
+        await vi.waitFor(() => expect(getState().phase).toBe('ready'))
+        const recoveredState = getState()
+        const actionCount = applied.length
+        const token = tokens.getAccessToken()
+
+        if (result === 'success') late.resolve({ event_id: '$old-room-event' })
+        else late.reject(new MatrixError(result, 'late response from old session'))
+        await lateSending
+
+        expect(api.registerGuest).toHaveBeenCalledOnce()
+        expect(getState()).toBe(recoveredState)
+        expect(applied).toHaveLength(actionCount)
+        expect(tokens.getAccessToken()).toBe(token)
+      } finally {
+        controller.disconnect()
+      }
+    },
+  )
+
+  it('clears cached previews and local originals when auth recovery replaces the session', async () => {
+    const file = makeFile('photo.png', 1, 'image/png')
+    const api = makeMatrixApi({
+      downloadMedia: vi
+        .fn<MatrixApi['downloadMedia']>()
+        .mockRejectedValue(new MatrixError('M_NOT_YET_UPLOADED', 'quarantine', undefined, 504)),
+    })
+    const { controller, media, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
+    const originalUrl = 'mxc://bank.ru/abc'
+    const previewUrl = 'mxc://bank.ru/preview'
+    const size = { width: 320, height: 240 }
+
+    try {
+      await controller.sendFile(file)
+      await expect(media.downloadFile(originalUrl)).resolves.toBe(file)
+      await media.loadPreview(previewUrl, size)
+      vi.mocked(api.sendMessage).mockRejectedValueOnce(
+        new MatrixError('M_UNKNOWN_TOKEN', 'expired'),
+      )
+
+      await controller.sendMessage('trigger recovery')
+      await vi.waitFor(() => expect(getState().phase).toBe('ready'))
+
+      await media.loadPreview(previewUrl, size)
+      expect(api.getThumbnail).toHaveBeenCalledTimes(2)
+      await expect(media.downloadFile(originalUrl)).rejects.toMatchObject({
+        reason: 'pending',
+      })
+    } finally {
+      controller.disconnect()
+    }
   })
 
   it('fails connection when initial sync does not contain a support room', async () => {
@@ -688,219 +798,16 @@ describe('MatrixController (orchestrator)', () => {
     )
   })
 
-  it('превью одной картинки качается один раз на все ряды, оригинал — каждый раз заново', async () => {
-    const thumb = deferred<Blob>()
-    const api = makeMatrixApi({
-      getThumbnail: vi.fn<MatrixApi['getThumbnail']>().mockReturnValue(thumb.promise),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-    const mxcUrl = 'mxc://bank.ru/abc'
-    const size = { width: 320, height: 240 }
-
-    // два ряда просят одно превью, пока первый запрос ещё в полёте
-    const inFlight = Promise.all([
-      controller.loadPreview(mxcUrl, size),
-      controller.loadPreview(mxcUrl, size),
-    ])
-    thumb.resolve(new Blob(['thumb']))
-    const [first, second] = await inFlight
-    const afterCache = await controller.loadPreview(mxcUrl, size)
-
-    expect(api.getThumbnail).toHaveBeenCalledOnce()
-    expect(second).toBe(first)
-    expect(afterCache).toBe(first)
-
-    // оригинал в кэш не кладём: многомегабайтному blob'у незачем висеть до конца сессии
-    await controller.downloadFile('mxc://bank.ru/abc')
-    await controller.downloadFile('mxc://bank.ru/abc')
-    expect(api.downloadMedia).toHaveBeenCalledTimes(2)
-  })
-
-  it('упавший запрос превью не залипает в кэше — повтор идёт в сеть заново', async () => {
-    const blob = new Blob(['thumb'])
-    const api = makeMatrixApi({
-      getThumbnail: vi
-        .fn<MatrixApi['getThumbnail']>()
-        .mockRejectedValueOnce(new MatrixError('M_UNKNOWN', 'timeout', undefined, 500))
-        .mockResolvedValue(blob),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-    const mxcUrl = 'mxc://bank.ru/abc'
-    const size = { width: 320, height: 240 }
-
-    await expect(controller.loadPreview(mxcUrl, size)).rejects.toMatchObject({ reason: 'failed' })
-
-    // без выброса записи повтор вернул бы тот же отклонённый (а при зависании — вечный) промис
-    await expect(controller.loadPreview(mxcUrl, size)).resolves.toBe(blob)
-    expect(api.getThumbnail).toHaveBeenCalledTimes(2)
-  })
-
-  // Локальная копия своего файла — не приоритет, а подмена на время карантина CDR: сервер
-  // чистит файл (пересжатие, вычистка PDF), поэтому его версия важнее нашей везде, кроме 504.
-  it('пока свой файл в карантине (504) показываем локальную копию', async () => {
-    const api = makeMatrixApi({
-      getThumbnail: vi
-        .fn<MatrixApi['getThumbnail']>()
-        .mockRejectedValue(new MatrixError('M_NOT_YET_UPLOADED', 'quarantine', undefined, 504)),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-    const file = makeFile('photo.png', 1, 'image/png')
-    const mxcUrl = 'mxc://bank.ru/abc'
-    const size = { width: 320, height: 240 }
-
-    await controller.sendFile(file)
-
-    // сначала спрашиваем сервер и только на «ещё не готово» подставляем свои байты
-    await expect(controller.loadPreview(mxcUrl, size)).resolves.toBe(file)
-    expect(api.getThumbnail).toHaveBeenCalledOnce()
-
-    // подмена живёт снаружи кэша: осядь локальный blob под ключом превью — за очищенной
-    // сервером версией мы не сходили бы уже никогда
-    await expect(controller.loadPreview(mxcUrl, size)).resolves.toBe(file)
-    expect(api.getThumbnail).toHaveBeenCalledTimes(2)
-  })
-
-  // Право на файл появляется вместе с записью привязки к комнате, и свой же файл может
-  // получить 403 сразу после отправки. Отложенный повтор внутри — не гарантия: показать
-  // отправителю ошибку по файлу, который лежит у нас в памяти, хуже, чем показать сам файл.
-  it('403, переживший повтор, тоже подменяется локальной копией', async () => {
-    const api = makeMatrixApi({
-      downloadMedia: vi
-        .fn<MatrixApi['downloadMedia']>()
-        .mockRejectedValue(new MatrixError('M_FORBIDDEN', 'no access', undefined, 403)),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-    const file = makeFile('doc.pdf', 1, 'application/pdf')
-
-    await controller.sendFile(file)
-
-    await expect(controller.downloadFile('mxc://bank.ru/abc')).resolves.toBe(file)
-  })
-
-  // Своя копия живёт до первого ответа сервера, а у файла сервер спрашивают только по клику
-  // «скачать» — без потолка всё отправленное за сеанс осталось бы в памяти до конца сессии.
-  it('держит только последние свои файлы, давние копии вытесняет', async () => {
-    let uploaded = 0
-    const api = makeMatrixApi({
-      downloadMedia: vi
-        .fn<MatrixApi['downloadMedia']>()
-        .mockRejectedValue(new MatrixError('M_NOT_YET_UPLOADED', 'quarantine', undefined, 504)),
-      uploadMedia: vi.fn<MatrixApi['uploadMedia']>().mockImplementation(() => {
-        uploaded += 1
-        return Promise.resolve({ content_uri: `mxc://bank.ru/file${uploaded}` })
-      }),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-
-    // потолок — 5 файлов, шестая отправка выбрасывает самую давнюю копию
-    let last = makeFile('f0.pdf', 1, 'application/pdf')
-    for (let i = 1; i <= 6; i += 1) {
-      last = makeFile(`f${i}.pdf`, 1, 'application/pdf')
-      await controller.sendFile(last)
-    }
-
-    // последний отправленный на месте, самый давний вытеснен — ошибка карантина дошла до UI
-    await expect(controller.downloadFile('mxc://bank.ru/file6')).resolves.toBe(last)
-    await expect(controller.downloadFile('mxc://bank.ru/file1')).rejects.toMatchObject({
-      reason: 'pending',
-    })
-  })
-
-  // Оригинал на порядки тяжелее миниатюры: одна такая запись обесценила бы лимит,
-  // посчитанный в записях, поэтому подмена превью оригиналом мимо кэша.
-  it('оригинал, отданный вместо несгенерированного превью, в кэш не попадает', async () => {
-    const api = makeMatrixApi({
-      getThumbnail: vi
-        .fn<MatrixApi['getThumbnail']>()
-        .mockRejectedValue(new MatrixError('M_NOT_FOUND', 'no thumbnail', undefined, 404)),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-    const size = { width: 320, height: 240 }
-
-    await controller.loadPreview('mxc://bank.ru/abc', size)
-    await controller.loadPreview('mxc://bank.ru/abc', size)
-
-    expect(api.downloadMedia).toHaveBeenCalledTimes(2)
-  })
-
-  it('отбракованный CDR свой файл не подменяем локальной копией — иначе отправитель не узнает об отказе', async () => {
-    const api = makeMatrixApi({
-      getThumbnail: vi
-        .fn<MatrixApi['getThumbnail']>()
-        .mockRejectedValue(new MatrixError('M_NOT_FOUND', 'rejected', undefined, 404)),
-      downloadMedia: vi
-        .fn<MatrixApi['downloadMedia']>()
-        .mockRejectedValue(new MatrixError('M_NOT_FOUND', 'rejected', undefined, 404)),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-
-    await controller.sendFile(makeFile('photo.png', 1, 'image/png'))
-
-    await expect(
-      controller.loadPreview('mxc://bank.ru/abc', { width: 320, height: 240 }),
-    ).rejects.toMatchObject({ reason: 'rejected' })
-  })
-
-  it('после успешной отдачи с сервера локальная копия освобождается', async () => {
-    const served = new Blob(['clean'])
-    const api = makeMatrixApi({
-      getThumbnail: vi.fn<MatrixApi['getThumbnail']>().mockResolvedValue(served),
-      downloadMedia: vi
-        .fn<MatrixApi['downloadMedia']>()
-        .mockRejectedValue(new MatrixError('M_NOT_YET_UPLOADED', 'quarantine', undefined, 504)),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-    const mxcUrl = 'mxc://bank.ru/abc'
-
-    await controller.sendFile(makeFile('photo.png', 1, 'image/png'))
-
-    // вернулась очищенная сервером версия, а не наш оригинал
-    await expect(controller.loadPreview(mxcUrl, { width: 320, height: 240 })).resolves.toBe(served)
-
-    // копии больше нет: даже на 504 подставлять нечего, ошибка доходит до UI
-    await expect(controller.downloadFile(mxcUrl)).rejects.toMatchObject({ reason: 'pending' })
-  })
-
   it('смена сессии сбрасывает кэш медиа: чужие байты в новой сессии недоступны', async () => {
     const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
+    const { controller, media } = harness({ phase: 'ready', identity: IDENTITY }, api)
     const mxcUrl = 'mxc://bank.ru/abc'
     const size = { width: 320, height: 240 }
 
-    await controller.loadPreview(mxcUrl, size)
+    await media.loadPreview(mxcUrl, size)
     controller.disconnect()
-    await controller.loadPreview(mxcUrl, size)
+    await media.loadPreview(mxcUrl, size)
 
-    expect(api.getThumbnail).toHaveBeenCalledTimes(2)
-  })
-
-  // Кэш превью хранит промис, и упавший запрос сам себя из него удаляет. Ключ при этом один
-  // на файл и размер, поэтому поздний отказ запроса прежней сессии обязан проверить, его ли
-  // запись лежит под ключом: иначе он выбрасывает уже начатый запрос новой сессии, и картинка
-  // качается заново на каждый ремаунт ряда.
-  it('поздний отказ прежней сессии не выбрасывает кэш новой', async () => {
-    const stale = deferred<Blob>()
-    const fresh = new Blob(['fresh'])
-    const api = makeMatrixApi({
-      getThumbnail: vi
-        .fn<MatrixApi['getThumbnail']>()
-        .mockReturnValueOnce(stale.promise)
-        .mockResolvedValue(fresh),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-    const mxcUrl = 'mxc://bank.ru/abc'
-    const size = { width: 320, height: 240 }
-
-    const staleRequest = expect(controller.loadPreview(mxcUrl, size)).rejects.toMatchObject({
-      reason: 'failed',
-    })
-    controller.disconnect()
-    expect(await controller.loadPreview(mxcUrl, size)).toBe(fresh)
-
-    stale.reject(new MatrixError('M_UNKNOWN', 'timeout', undefined, 500))
-    await staleRequest
-
-    expect(await controller.loadPreview(mxcUrl, size)).toBe(fresh)
     expect(api.getThumbnail).toHaveBeenCalledTimes(2)
   })
 
@@ -932,8 +839,8 @@ describe('MatrixController (orchestrator)', () => {
   })
 
   // Обе ветки handleAuthError обязаны снять загрузку, и ни одна не может положиться на смену
-  // lifecycle: recovery его вовсе не бампает (см. тест про догрузку истории ниже), а при
-  // деактивации бампает — но XHR без явного abort всё равно докачает файл в мёртвую сессию.
+  // поколения: оно отсекает поздний результат, но XHR без явного abort всё равно
+  // докачает файл в мёртвую сессию.
   // Ошибка при этом прилетает из отправки текста, а не из самой загрузки.
   it.each([
     ['M_UNKNOWN_TOKEN', 'expired'],
@@ -1551,10 +1458,10 @@ describe('MatrixController — подгрузка истории вверх', ()
   })
 
   it('recovery по auth-ошибке из другого вызова обрывает догрузку истории', async () => {
-    // Ошибка прилетела из отправки, а не из истории. Recovery НЕ бампает lifecycle,
-    // поэтому isStale остаётся false — единственное, что снимает догрузку, это
-    // stopLoadingHistory в recoverFromAuthError. Без него страница старой комнаты
-    // догрузится уже после пересоздания сессии.
+    // Ошибка прилетела из отправки, а не из истории. Про смену сессии лоадер знает только
+    // через stop(), поэтому единственное, что снимает догрузку, — stopLoadingHistory в
+    // recoverFromAuthError. Без него страница старой комнаты догрузится уже после
+    // пересоздания сессии.
     const page = deferred<Awaited<ReturnType<MatrixApi['getRoomHistory']>>>()
     const api = makeMatrixApi({
       getRoomHistory: vi.fn<MatrixApi['getRoomHistory']>().mockReturnValue(page.promise),
@@ -1596,53 +1503,5 @@ describe('MatrixController — подгрузка истории вверх', ()
 
     // устаревший цикл не тронул стор
     expect(getState().room.timeline).toEqual([])
-  })
-})
-
-describe('MatrixController.loadMedia', () => {
-  const MXC = 'mxc://bank.ru/abc'
-  const SIZE = { width: 320, height: 240 }
-
-  function mediaError(status: number): MatrixError {
-    return new MatrixError('M_UNKNOWN', 'media', undefined, status)
-  }
-
-  it('404 у превью означает «это не изображение» — идём за оригиналом', async () => {
-    const api = makeMatrixApi({
-      getThumbnail: vi.fn<MatrixApi['getThumbnail']>().mockRejectedValue(mediaError(404)),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-
-    await controller.loadPreview(MXC, SIZE)
-
-    expect(api.downloadMedia).toHaveBeenCalledOnce()
-  })
-
-  it('504 (файл ещё в карантине CDR) не подменяется скачиванием оригинала', async () => {
-    const api = makeMatrixApi({
-      getThumbnail: vi.fn<MatrixApi['getThumbnail']>().mockRejectedValue(mediaError(504)),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-
-    // наружу уходит доменная причина: коды провода за границу matrix/ не проходят
-    await expect(controller.loadPreview(MXC, SIZE)).rejects.toMatchObject({
-      name: 'MediaUnavailableError',
-      reason: 'pending',
-    })
-    expect(api.downloadMedia).not.toHaveBeenCalled()
-  })
-
-  it('403 повторяется ровно один раз — writer мог не успеть записать привязку файла', async () => {
-    const api = makeMatrixApi({
-      downloadMedia: vi
-        .fn<MatrixApi['downloadMedia']>()
-        .mockRejectedValueOnce(mediaError(403))
-        .mockResolvedValue(new Blob(['bytes'])),
-    })
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-
-    await controller.downloadFile(MXC)
-
-    expect(api.downloadMedia).toHaveBeenCalledTimes(2)
   })
 })

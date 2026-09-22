@@ -20,6 +20,7 @@ describe('LocalStorageSessionStore', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.useRealTimers()
     localStorage.clear()
   })
@@ -191,5 +192,150 @@ describe('LocalStorageSessionStore', () => {
     expect(store.getAccessToken()).toBeNull()
     expect(store.getRefreshToken()).toBeNull()
     expect(store.getUserId()).toBeNull()
+  })
+
+  it('keeps a new session in memory when persistence fails over an older record', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rawSession()))
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError')
+    })
+    const store = new LocalStorageSessionStore()
+
+    store.setSession({ accessToken: 'new', refreshToken: 'new-refresh', userId: '@new:bank' })
+    write.mockRestore()
+
+    // Чтение снова работает, но в storage всё ещё лежит прежняя сессия.
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).accessToken).toBe('access')
+    expect(store.getAccessToken()).toBe('new')
+    expect(store.getRefreshToken()).toBe('new-refresh')
+    expect(store.getUserId()).toBe('@new:bank')
+  })
+
+  it('keeps refreshed tokens when their persistence fails', () => {
+    const store = new LocalStorageSessionStore()
+    store.setSession({ accessToken: 'old', refreshToken: 'refresh', userId: '@u:bank' })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError')
+    })
+
+    store.setTokens('new')
+
+    expect(store.getAccessToken()).toBe('new')
+    expect(store.getRefreshToken()).toBe('refresh')
+    expect(store.getUserId()).toBe('@u:bank')
+  })
+
+  it('retains a hydrated session during a read failure and sees external logout after recovery', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rawSession()))
+    const store = new LocalStorageSessionStore()
+    expect(store.getAccessToken()).toBe('access')
+    const read = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Access denied', 'SecurityError')
+    })
+
+    expect(store.getAccessToken()).toBe('access')
+    expect(store.getRefreshToken()).toBe('refresh')
+    expect(store.getUserId()).toBe('@u:bank')
+
+    localStorage.removeItem(STORAGE_KEY)
+    read.mockRestore()
+    expect(store.getAccessToken()).toBeNull()
+    expect(store.getRefreshToken()).toBeNull()
+    expect(store.getUserId()).toBeNull()
+  })
+
+  it('does not resurrect a cleared session or refresh it when removal fails', () => {
+    const store = new LocalStorageSessionStore()
+    store.setSession({ accessToken: 'old', refreshToken: 'refresh', userId: '@u:bank' })
+    const remove = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new DOMException('Access denied', 'SecurityError')
+    })
+
+    store.clearSession()
+    remove.mockRestore()
+    store.setTokens('late-access', 'late-refresh')
+
+    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull()
+    expect(store.getAccessToken()).toBeNull()
+    expect(store.getRefreshToken()).toBeNull()
+    expect(store.getUserId()).toBeNull()
+  })
+
+  it('resumes read-through after a later successful write', () => {
+    const store = new LocalStorageSessionStore()
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError')
+    })
+    store.setSession({ accessToken: 'memory', refreshToken: 'refresh', userId: '@u:bank' })
+    write.mockRestore()
+
+    store.setTokens('persisted')
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).accessToken).toBe('persisted')
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rawSession({ accessToken: 'other-tab' })))
+    expect(store.getAccessToken()).toBe('other-tab')
+  })
+
+  it('resumes read-through after a later successful clear', () => {
+    const store = new LocalStorageSessionStore()
+    store.setSession({ accessToken: 'old', refreshToken: 'refresh', userId: '@u:bank' })
+    const remove = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new DOMException('Access denied', 'SecurityError')
+    })
+    store.clearSession()
+    remove.mockRestore()
+
+    store.clearSession()
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rawSession({ userId: '@other:bank' })))
+    expect(store.getUserId()).toBe('@other:bank')
+  })
+
+  it('expires a memory-only session at its original deadline despite a refresh', () => {
+    vi.useFakeTimers()
+    const start = new Date('2026-01-01T00:00:00.000Z').getTime()
+    vi.setSystemTime(start)
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('Access denied', 'SecurityError')
+    })
+    const store = new LocalStorageSessionStore()
+    expect(store.getAccessToken()).toBeNull()
+    store.setSession({ accessToken: 'first', refreshToken: 'refresh', userId: '@u:bank' })
+
+    vi.setSystemTime(start + 6 * 60 * 60 * 1000)
+    store.setTokens('refreshed', 'next-refresh')
+    expect(store.getAccessToken()).toBe('refreshed')
+    expect(store.getRefreshToken()).toBe('next-refresh')
+
+    vi.setSystemTime(start + 24 * 60 * 60 * 1000)
+    expect(store.getAccessToken()).toBeNull()
+    expect(store.getRefreshToken()).toBeNull()
+    expect(store.getUserId()).toBeNull()
+    store.setTokens('late')
+    expect(store.getAccessToken()).toBeNull()
+  })
+
+  it('expires the cached session even while reads fail', () => {
+    vi.useFakeTimers()
+    const start = Date.now()
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rawSession({ expiresAt: start + 1000 })))
+    const store = new LocalStorageSessionStore()
+    expect(store.getAccessToken()).toBe('access')
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Access denied', 'SecurityError')
+    })
+
+    vi.setSystemTime(start + 1000)
+    expect(store.getAccessToken()).toBeNull()
+    expect(store.getUserId()).toBeNull()
+  })
+
+  it('clears cached credentials when the readable record becomes malformed', () => {
+    const store = new LocalStorageSessionStore()
+    store.setSession({ accessToken: 'old', refreshToken: 'refresh', userId: '@u:bank' })
+    localStorage.setItem(STORAGE_KEY, '{broken')
+
+    expect(store.getAccessToken()).toBeNull()
+    expect(store.getRefreshToken()).toBeNull()
+    expect(store.getUserId()).toBeNull()
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
   })
 })

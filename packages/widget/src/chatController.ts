@@ -4,6 +4,7 @@ import type { ReplyTarget } from './domain/reply'
 import type { CatalogService } from './matrix/catalog/matrixCatalog'
 import { createMatrixClient, type MatrixClient } from './matrix/createMatrixClient'
 import type { MatrixService } from './matrix/matrixController'
+import type { MediaService } from './matrix/media/matrixMedia'
 import { chatStore } from './store/store'
 interface PanelActions {
   replyTo: (target: ReplyTarget) => void
@@ -15,6 +16,7 @@ interface PanelActions {
 
 export type ChatActions = Omit<MatrixService, 'connect' | 'disconnect'> &
   CatalogService &
+  MediaService &
   PanelActions
 
 export class ChatController {
@@ -28,7 +30,7 @@ export class ChatController {
     this.bridge = bridge
     this.bridge.setCommandHandler(this.handleHostCommand)
 
-    const { matrix, catalog } =
+    const { matrix, catalog, media } =
       client ??
       createMatrixClient({
         dispatch: (action) => chatStore.getState().dispatch(action),
@@ -42,8 +44,8 @@ export class ChatController {
       sendFile: (...args) => matrix.sendFile(...args),
       sendSticker: (...args) => matrix.sendSticker(...args),
       sendCardAction: (...args) => matrix.sendCardAction(...args),
-      loadPreview: (...args) => matrix.loadPreview(...args),
-      downloadFile: (...args) => matrix.downloadFile(...args),
+      loadPreview: (...args) => media.loadPreview(...args),
+      downloadFile: (...args) => media.downloadFile(...args),
       cancelUpload: (...args) => matrix.cancelUpload(...args),
       resendMessage: (...args) => matrix.resendMessage(...args),
       markRead: (...args) => matrix.markRead(...args),

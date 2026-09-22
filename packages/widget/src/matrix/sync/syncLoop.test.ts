@@ -17,6 +17,80 @@ function setVisibility(state: DocumentVisibilityState): void {
 describe('MatrixSyncLoop', () => {
   afterEach(() => setVisibility('visible'))
 
+  // Как в matrix-js-sdk: курсор уже сдвинут, битый батч пропускается, петля живёт дальше.
+  // Сбой обработки — не сбой связи: в onError (счётчик офлайна) не идёт, только в лог.
+  it('skips a batch whose handler throws and keeps polling from the next cursor', async () => {
+    const pending = deferred<Matrix.SyncResponse>()
+    const longPollSync = vi
+      .fn<LongPoll>()
+      .mockResolvedValueOnce(syncResponse('c1'))
+      .mockResolvedValueOnce(syncResponse('c2'))
+      .mockImplementation(() => pending.promise)
+    const loop = new MatrixSyncLoop({ longPollSync })
+    const onTick = vi.fn().mockImplementationOnce(() => {
+      throw new Error('apply failed')
+    })
+    const onError = vi.fn()
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    loop.start({ cursor: 'c0', onTick, onError })
+    await vi.waitFor(() => expect(longPollSync).toHaveBeenCalledTimes(3))
+    loop.stop()
+
+    expect(longPollSync.mock.calls.map(([since]) => since)).toEqual(['c0', 'c1', 'c2'])
+    expect(onTick).toHaveBeenCalledTimes(2)
+    expect(onError).not.toHaveBeenCalled()
+    expect(logged).toHaveBeenCalledOnce()
+    logged.mockRestore()
+  })
+
+  it('does not overwrite a new run cursor when onTick restarts the loop', async () => {
+    const pending = deferred<Matrix.SyncResponse>()
+    const longPollSync = vi
+      .fn<LongPoll>()
+      .mockResolvedValueOnce(syncResponse('old-next'))
+      .mockImplementation(() => pending.promise)
+    const loop = new MatrixSyncLoop({ longPollSync })
+    loop.start({
+      cursor: 'old',
+      onTick: () => {
+        loop.stop()
+        loop.start({ cursor: 'new', onTick: () => {} })
+      },
+    })
+    await vi.waitFor(() => expect(longPollSync).toHaveBeenCalledTimes(2))
+    expect(Reflect.get(loop, 'cursor')).toBe('new')
+    loop.stop()
+  })
+
+  it('does not deliver an old response to a new run between async continuations', async () => {
+    const oldPoll = deferred<Matrix.SyncResponse>()
+    const longPollSync = vi
+      .fn<LongPoll>()
+      .mockReturnValueOnce(oldPoll.promise)
+      .mockImplementation(() => new Promise<Matrix.SyncResponse>(() => {}))
+    const loop = new MatrixSyncLoop({ longPollSync })
+    const newTick = vi.fn()
+
+    try {
+      loop.start({ cursor: 'old', onTick: () => {} })
+      oldPoll.resolve(syncResponse('old-next'))
+      // Другой Promise может перезапустить sync между завершением попытки
+      // внутри retryWithBackoff и продолжением внешнего await в run().
+      queueMicrotask(() => {
+        loop.stop()
+        loop.start({ cursor: 'new', onTick: newTick })
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(newTick).not.toHaveBeenCalled()
+      expect(Reflect.get(loop, 'cursor')).toBe('new')
+      expect(longPollSync.mock.calls.map(([since]) => since)).toEqual(['old', 'new'])
+    } finally {
+      loop.stop()
+    }
+  })
+
   it('calls onTick with advancing cursor and the raw sync response', async () => {
     const ticks: SyncTick[] = []
     const longPollSync = vi.fn<LongPoll>()

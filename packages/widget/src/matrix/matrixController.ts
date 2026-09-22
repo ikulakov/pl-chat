@@ -1,8 +1,5 @@
 import type { CardAction } from '@/domain/adaptiveCards'
 import type { StickerItem } from '@/domain/emoji'
-import type { EventId, LocalId, RoomId, TxnId, UserId } from '@/shared/types/ids'
-import type { ThumbnailSize } from '@/domain/media'
-import { MediaUnavailableError } from '@/domain/mediaFailure'
 import {
   createOptimisticMediaMessage,
   createOptimisticStickerMessage,
@@ -12,24 +9,15 @@ import {
 import { findOwnReaction, type ReactionEntry } from '@/domain/reactions'
 import { canMoveMarker } from '@/domain/receipts'
 import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '@/domain/timeline'
-import { isAbortError, isDeadlineError } from '@/shared/utils/abort'
+import type { EventId, LocalId, RoomId, TxnId, UserId } from '@/shared/types/ids'
+import { isDeadlineError } from '@/shared/utils/abort'
 import { consoleDev } from '@/shared/utils/consoleDev'
-import { evictOldest } from '@/shared/utils/evictOldest'
+import { Generation } from '@/shared/utils/generation'
 import type { ImageDimensions } from '@/shared/utils/imageDimensions'
-import { parseMxcUrl, type ParsedMxcUrl } from '@/shared/utils/mxc'
-import { sleep } from '@/shared/utils/sleep'
 import type { ChatRuntimeState, RuntimeAction } from '@/store/state'
 import { type MatrixApi } from './api/matrixApi'
-import {
-  isForbiddenError,
-  isMatrixAuthError,
-  isMediaPendingError,
-  isNotFoundError,
-  isUserDeactivatedError,
-  type AuthErrorContext,
-} from './api/matrixError'
+import { isMatrixAuthError, isUserDeactivatedError, type AuthErrorContext } from './api/matrixError'
 import { MatrixHistoryLoader } from './history/historyLoader'
-import { classifyMediaError } from './mappers/mediaError'
 import {
   outgoingEventType,
   toAdaptiveActionContent,
@@ -38,6 +26,7 @@ import {
 } from './mappers/outgoing'
 import { toRoomSyncPatch } from './mappers/roomSync'
 import { classifyUploadError } from './mappers/uploadError'
+import type { MatrixMedia } from './media/matrixMedia'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
 import { MatrixEventType } from './wire/consts'
@@ -48,23 +37,9 @@ export interface SendFileOptions {
   dims?: ImageDimensions | undefined
 }
 
-// Право на скачивание появляется, когда writer запишет привязку файла к комнате, а событие
-// в /sync может обогнать её на доли секунды — отсюда единственный отложенный повтор на 403.
-const FORBIDDEN_RETRY_DELAY_MS = 400
-
 // Сколько подряд упавших sync'ов считаем потерей связи. Одиночный сбой ретраится через
 // секунду и обычно проходит — баннер из-за него мигал бы на ровном месте.
 const OFFLINE_AFTER_FAILURES = 2
-
-// Сколько миниатюр держим. Вытеснение безопасно в любой момент: object-URL сам держит свой
-// blob живым, пока компонент его не освободит.
-const MAX_CACHED_PREVIEWS = 40
-
-// Сколько своих файлов держим целиком (до 10 МБ каждый — размер режется ещё в композере).
-// Копия живёт до первого ответа сервера по этому mxc, а у чипа файла сервер спрашивают только
-// по клику «скачать»: без потолка всё отправленное за сеанс осталось бы в памяти до конца
-// сессии. Одновременно «в полёте» бывает один-два файла, поэтому запас минимальный.
-const MAX_LOCAL_ORIGINALS = 3
 
 export interface MatrixService {
   connect: () => Promise<void>
@@ -73,8 +48,6 @@ export interface MatrixService {
   sendFile: (file: File, options?: SendFileOptions) => Promise<void>
   sendSticker: (sticker: StickerItem) => Promise<void>
   sendCardAction: (cardEventId: EventId, action: CardAction) => Promise<void>
-  loadPreview: (mxcUrl: string, size: ThumbnailSize) => Promise<Blob>
-  downloadFile: (mxcUrl: string) => Promise<Blob>
   cancelUpload: (localId: LocalId) => void
   resendMessage: (localId: LocalId) => Promise<void>
   markRead: (eventId: EventId) => Promise<void>
@@ -85,6 +58,7 @@ export interface MatrixService {
 
 export interface MatrixControllerDeps {
   api: MatrixApi
+  media: MatrixMedia
   sessionManager: MatrixSessionManager
   dispatch: (action: RuntimeAction) => void
   getState: () => ChatRuntimeState
@@ -93,30 +67,20 @@ export interface MatrixControllerDeps {
 export class MatrixController implements MatrixService {
   private readonly api: MatrixApi
   private readonly syncLoop: MatrixSyncLoop
+  private readonly media: MatrixMedia
   private readonly historyLoader: MatrixHistoryLoader
   private readonly sessionManager: MatrixSessionManager
 
   private readonly dispatch: (action: RuntimeAction) => void
   private readonly getState: () => ChatRuntimeState
 
-  private lifecycleId = 0
-  private sessionRecovery: Promise<void> | null = null
+  // Поколение сессии: гаснет при смене сессии, и ответы прежней уже ничего не трогают.
+  private readonly generation = new Generation()
 
   // Подряд оставшиеся без ответа sync'и: порог, после которого объявляем потерю связи.
   // Счётчик внутренний — в сторе ему делать нечего, UI знает только итог (`online`).
   private syncFailures = 0
   private unwatchNetwork: (() => void) | null = null
-
-  private readonly uploads = new Map<LocalId, AbortController>()
-
-  // Кэш байтов превью, а не object-URL: URL создаёт и освобождает тот компонент, который
-  // рисует картинку — только он знает, когда revoke безопасен. Хранится промис, а не блоб:
-  // он же и дедуп — два ряда с одной картинкой (и двойной эффект StrictMode) делят один запрос.
-  private readonly previews = new Map<string, Promise<Blob>>()
-  // Оригиналы своих отправленных файлов, по mxc. Не кэш ради скорости, а подмена недоступного:
-  // до вердикта CDR сервер отвечает на них 504, и без локальной копии своя же картинка
-  // пропадала бы из ленты сразу после отправки. Отвечает и на превью, и на оригинал.
-  private readonly localOriginals = new Map<string, Blob>()
 
   // txnId незавершённых ответов на карточки, по `${cardEventId}#${actionId}`. Нужен, чтобы
   // повтор после сетевого сбоя ушёл с тем же ключом идемпотентности; чистится при смене
@@ -126,6 +90,7 @@ export class MatrixController implements MatrixService {
   constructor(deps: MatrixControllerDeps) {
     this.api = deps.api
     this.syncLoop = new MatrixSyncLoop(deps.api)
+    this.media = deps.media
     this.historyLoader = new MatrixHistoryLoader({
       api: deps.api,
       dispatch: deps.dispatch,
@@ -140,10 +105,9 @@ export class MatrixController implements MatrixService {
     const { phase } = this.getState()
     if (!(phase === 'idle' || phase === 'error')) return
 
-    const lifecycleId = this.nextLifecycle()
+    this.nextGeneration()
 
     await this.runConnectFlow(
-      lifecycleId,
       'connecting',
       () => this.sessionManager.establishSession(),
       (err) => {
@@ -158,7 +122,7 @@ export class MatrixController implements MatrixService {
 
   disconnect(): void {
     this.stopSessionActivity()
-    this.nextLifecycle()
+    this.nextGeneration()
     this.dispatch({ type: 'session.closed' })
   }
 
@@ -226,7 +190,7 @@ export class MatrixController implements MatrixService {
     if (existing?.status === 'sending' || existing?.status === 'sent') return
 
     this.dispatch({ type: 'card.answering', cardEventId, actionId: action.id })
-    const lifecycleId = this.lifecycleId
+    const signal = this.generation.signal
 
     // txnId переживает неудачную попытку: это ключ идемпотентности PUT /send. Если ответ
     // потерялся уже после записи события (обрыв, 502 от прокси), повтор с тем же ключом
@@ -243,12 +207,12 @@ export class MatrixController implements MatrixService {
         eventType: MatrixEventType.RoomMessage,
         content: toAdaptiveActionContent(cardEventId, action),
       })
-      if (!this.isCurrentLifecycle(lifecycleId)) return
+      if (signal.aborted) return
 
       this.cardActionTxnIds.delete(txnKey)
       this.dispatch({ type: 'card.answered', cardEventId })
     } catch (err) {
-      if (!this.isCurrentLifecycle(lifecycleId)) return
+      if (signal.aborted) return
 
       this.dispatch({ type: 'card.answerFailed', cardEventId })
       this.handleAuthError(err, 'sendCardAction')
@@ -262,127 +226,28 @@ export class MatrixController implements MatrixService {
   ): Promise<MediaTimelineItem | null> {
     const { localId, content } = draft
 
-    const lifecycleId = this.lifecycleId
+    const signal = this.generation.signal
 
-    this.uploads.get(localId)?.abort()
-    const controller = new AbortController()
-    this.uploads.set(localId, controller)
+    const outcome = await this.media.upload(localId, file, {
+      contentType: content.info.mimetype,
+      onProgress: (pct) => this.dispatch({ type: 'message.uploadProgress', localId, pct }),
+    })
+    if (outcome.status === 'aborted' || signal.aborted) return null
 
-    let contentUri: string
-    try {
-      const upload = await this.api.uploadMedia(file, {
-        signal: controller.signal,
-        contentType: content.info.mimetype,
-        onProgress: (pct) => this.dispatch({ type: 'message.uploadProgress', localId, pct }),
-      })
-      contentUri = upload.content_uri
-    } catch (err) {
-      if (isAbortError(err) || !this.isCurrentLifecycle(lifecycleId)) return null
-
-      this.dispatch({ type: 'message.failed', localId, upload: classifyUploadError(err) })
-      this.handleAuthError(err, context)
+    if (outcome.status === 'failed') {
+      this.dispatch({ type: 'message.failed', localId, upload: classifyUploadError(outcome.error) })
+      this.handleAuthError(outcome.error, context)
       return null
-    } finally {
-      if (this.uploads.get(localId) === controller) this.uploads.delete(localId)
     }
-    if (controller.signal.aborted || !this.isCurrentLifecycle(lifecycleId)) return null
 
-    // Перекладываем локальный файл в память контроллера,
-    // пока идет проверка со стороны сервера, для отображения превью
-    this.localOriginals.set(contentUri, file)
-    evictOldest(this.localOriginals, MAX_LOCAL_ORIGINALS)
+    this.dispatch({ type: 'message.uploaded', localId, url: outcome.url })
 
-    this.dispatch({ type: 'message.uploaded', localId, url: contentUri })
-
-    return { ...draft, content: { ...content, url: contentUri } }
-  }
-
-  loadPreview(mxcUrl: string, size: ThumbnailSize): Promise<Blob> {
-    return this.withLocalFallback(mxcUrl, (parsed) => this.previewBytes(parsed, size))
-  }
-
-  downloadFile(mxcUrl: string): Promise<Blob> {
-    return this.withLocalFallback(mxcUrl, (parsed) =>
-      this.fetchMediaBytes(() => this.api.downloadMedia(parsed)),
-    )
-  }
-
-  private async withLocalFallback(
-    mxcUrl: string,
-    fetch: (parsed: ParsedMxcUrl) => Promise<Blob>,
-  ): Promise<Blob> {
-    const parsed = parseMxcUrl(mxcUrl)
-    // Битую ссылку не вылечит ни повтор, ни ожидание вердикта — для UI это тот же «файла нет».
-    if (!parsed) throw new MediaUnavailableError('rejected')
-
-    try {
-      const blob = await fetch(parsed)
-      // Сервер отдал файл сам — локальная копия больше не нужна
-      this.localOriginals.delete(mxcUrl)
-
-      return blob
-    } catch (err) {
-      // 504 — файл ещё в карантине CDR; 403 переживший отложенный повтор — привязка файла
-      // к комнате всё ещё не записана. Ни то, ни другое не вердикт «нет», а свои байты у нас
-      // есть: показываем их, не выдумывая пользователю ошибку по только что отправленному файлу.
-      const local = this.localOriginals.get(mxcUrl)
-      if (local && (isMediaPendingError(err) || isForbiddenError(err))) return local
-
-      throw new MediaUnavailableError(classifyMediaError(err), { cause: err })
-    }
-  }
-
-  private async previewBytes(parsed: ParsedMxcUrl, size: ThumbnailSize): Promise<Blob> {
-    try {
-      return await this.cachedPreview(parsed, size)
-    } catch (err) {
-      // 404 у превью означает «превью не генерировалось» (нестандартный формат, сбой) — идём за
-      // оригиналом. 504 (карантин) и 403 сюда не попадают: их повторным запросом не вылечить.
-      if (!isNotFoundError(err)) throw err
-
-      // Оригинал в кэш превью не кладём: он на порядки тяжелее миниатюры и обесценил бы лимит,
-      // посчитанный в записях. Цена честнее, чем кажется: такая картинка качается целиком на
-      // каждый ремаунт ряда, и параллельные ряды с одним файлом не делят запрос (дедуп даёт
-      // только кэш). Размен принят ради простоты кэша — случай редкий, форматов без превью мало.
-      return this.fetchMediaBytes(() => this.api.downloadMedia(parsed))
-    }
-  }
-
-  private cachedPreview(parsed: ParsedMxcUrl, size: ThumbnailSize): Promise<Blob> {
-    const key = `${parsed.serverName}/${parsed.mediaId}#${size.width}x${size.height}`
-    const cached = this.previews.get(key)
-    if (cached) return cached
-
-    const request = this.fetchMediaBytes(() => this.api.getThumbnail(parsed, size)).catch(
-      (err: unknown) => {
-        // Упавший запрос в кэше не держим: следующий mount (или кнопка «повторить») пробует
-        // заново. Сверка по ссылке обязательна: ключ один на файл и размер, и поздний отказ
-        // запроса прежней сессии иначе выбросил бы уже начатый запрос новой.
-        if (this.previews.get(key) === request) this.previews.delete(key)
-        throw err
-      },
-    )
-
-    this.previews.set(key, request)
-    evictOldest(this.previews, MAX_CACHED_PREVIEWS)
-
-    return request
-  }
-
-  private async fetchMediaBytes(call: () => Promise<Blob>): Promise<Blob> {
-    try {
-      return await call()
-    } catch (err) {
-      if (!isForbiddenError(err)) throw err
-
-      await sleep(FORBIDDEN_RETRY_DELAY_MS)
-      return call()
-    }
+    return { ...draft, content: { ...content, url: outcome.url } }
   }
 
   cancelUpload(localId: LocalId): void {
-    this.uploads.get(localId)?.abort()
-    this.uploads.delete(localId)
+    // Черновик убираем и без живой заливки: так крестик снимает упавший rejected-файл.
+    this.media.cancel(localId)
     this.dispatch({ type: 'message.discarded', localId })
   }
 
@@ -392,12 +257,10 @@ export class MatrixController implements MatrixService {
     this.unwatchNetwork?.()
     this.unwatchNetwork = null
 
-    for (const [localId, controller] of this.uploads) {
-      controller.abort()
+    for (const localId of this.media.abortAll()) {
       // Заливку оборвали мы сами, сервер ничего не решал: причина заведомо повторяемая.
       this.dispatch({ type: 'message.failed', localId, upload: 'network' })
     }
-    this.uploads.clear()
 
     this.syncLoop.stop()
   }
@@ -444,12 +307,12 @@ export class MatrixController implements MatrixService {
     // Иначе, пока летит POST, стор хранит старый маркер, и каждый скан (скролл, новое сообщение)
     // снова проходил бы гард и слал тот же POST.
     this.dispatch({ type: 'receipt.markedRead', userId: identity.userId, eventId })
-    const lifecycleId = this.lifecycleId
+    const signal = this.generation.signal
 
     try {
       await this.api.sendReadReceipt(identity.roomId, eventId)
     } catch (err) {
-      if (!this.isCurrentLifecycle(lifecycleId)) return
+      if (signal.aborted) return
 
       if (this.handleAuthError(err, 'markRead')) {
         this.dispatch({
@@ -502,11 +365,11 @@ export class MatrixController implements MatrixService {
     const entry: ReactionEntry = { eventId: draftEventId, sender, key }
 
     this.dispatch({ type: 'reaction.added', targetEventId, entry })
-    const lifecycleId = this.lifecycleId
+    const signal = this.generation.signal
 
     try {
       const { event_id } = await this.api.sendReaction({ roomId, txnId, targetEventId, key })
-      if (!this.isCurrentLifecycle(lifecycleId)) return
+      if (signal.aborted) return
 
       this.dispatch({
         type: 'reaction.confirmed',
@@ -514,7 +377,7 @@ export class MatrixController implements MatrixService {
         reaction: { draft: draftEventId, confirmed: event_id },
       })
     } catch (err) {
-      if (!this.isCurrentLifecycle(lifecycleId)) return
+      if (signal.aborted) return
 
       this.dispatch({ type: 'reaction.removed', targetEventId, eventId: draftEventId })
       this.handleAuthError(err, 'toggleReaction')
@@ -527,25 +390,24 @@ export class MatrixController implements MatrixService {
     entry: ReactionEntry,
   ): Promise<void> {
     this.dispatch({ type: 'reaction.removed', targetEventId, eventId: entry.eventId })
-    const lifecycleId = this.lifecycleId
+    const signal = this.generation.signal
 
     try {
       await this.api.redactEvent({ roomId, txnId: crypto.randomUUID(), eventId: entry.eventId })
     } catch (err) {
-      if (!this.isCurrentLifecycle(lifecycleId)) return
+      if (signal.aborted) return
 
       this.dispatch({ type: 'reaction.added', targetEventId, entry })
       this.handleAuthError(err, 'toggleReaction')
     }
   }
 
-  // Механика догрузки живёт в MatrixHistoryLoader; контроллер даёт ей только сессионный
-  // контекст — откуда тянуть (getContext) и когда цикл устарел (isStale по поколению сессии).
+  // Механика догрузки живёт в MatrixHistoryLoader; контроллер даёт ей только, откуда тянуть.
+  // Про смену сессии лоадер узнаёт через stop() в stopSessionActivity — без него поздняя
+  // страница прежней сессии доехала бы в ленту новой.
   async loadMoreHistory(): Promise<void> {
-    const lifecycleId = this.lifecycleId
-
     await this.historyLoader.load({
-      getContext: () => {
+      getCursor: () => {
         const connection = this.requireConnection()
 
         if (!connection || connection.room.prevBatch === null) return
@@ -555,7 +417,6 @@ export class MatrixController implements MatrixService {
           prevBatch: connection.room.prevBatch,
         }
       },
-      isStale: () => !this.isCurrentLifecycle(lifecycleId),
     })
   }
 
@@ -569,7 +430,7 @@ export class MatrixController implements MatrixService {
     context: AuthErrorContext,
   ): Promise<void> {
     const localId = message.localId
-    const lifecycleId = this.lifecycleId
+    const signal = this.generation.signal
 
     try {
       const { event_id } = await this.api.sendMessage({
@@ -580,11 +441,11 @@ export class MatrixController implements MatrixService {
         eventType: outgoingEventType(message),
         content: toMessageContent(message),
       })
-      if (!this.isCurrentLifecycle(lifecycleId)) return
+      if (signal.aborted) return
 
       this.dispatch({ type: 'message.sent', localId, eventId: event_id })
     } catch (err) {
-      if (!this.isCurrentLifecycle(lifecycleId)) return
+      if (signal.aborted) return
 
       this.dispatch({ type: 'message.failed', localId })
 
@@ -595,16 +456,16 @@ export class MatrixController implements MatrixService {
   }
 
   private async runConnectFlow(
-    lifecycleId: number,
     phase: 'connecting' | 'recovering',
     establish: () => Promise<GuestSession>,
     onFailure: (err: unknown) => void,
   ): Promise<void> {
+    const signal = this.generation.signal
     this.dispatch({ type: phase === 'recovering' ? 'session.recovering' : 'session.starting' })
 
     try {
       const session = await establish()
-      if (!this.isCurrentLifecycle(lifecycleId)) return
+      if (signal.aborted) return
 
       this.dispatch({
         type: 'session.started',
@@ -620,7 +481,7 @@ export class MatrixController implements MatrixService {
       })
       this.watchNetwork()
     } catch (err) {
-      if (!this.isCurrentLifecycle(lifecycleId)) return
+      if (signal.aborted) return
 
       onFailure(err)
       this.dispatch({ type: 'session.failed' })
@@ -711,7 +572,7 @@ export class MatrixController implements MatrixService {
 
   // Успешный тик — доказательство связи, и оно сильнее мнения браузера: `navigator.onLine`
   // врёт в обе стороны (MDN прямо называет его подсказкой), а ответ сервера — факт. Ответы
-  // поколения, работавшего до `offline`, сюда не попадут: их отсекает runId внутри syncLoop.
+  // поколения, работавшего до `offline`, сюда не попадут: их отсекает поколение внутри syncLoop.
   //
   // Зовётся на каждый успешный тик, поэтому дешёвая проверка стора вместо dispatch'а:
   // редьюсер и так вернул бы то же состояние, но devtools собирали бы пустой экшен раз в 25 секунд.
@@ -737,49 +598,32 @@ export class MatrixController implements MatrixService {
     return false
   }
 
+  // Новый гость — новое поколение: поздние ответы умершей сессии отсекаются.
   private recoverFromAuthError(err: unknown, context: AuthErrorContext): void {
     consoleDev.error(`${context} auth error`, err)
     this.stopSessionActivity()
-    this.startSessionRecovery(this.lifecycleId)
-  }
+    this.nextGeneration()
 
-  private startSessionRecovery(lifecycleId: number): void {
-    if (this.sessionRecovery) return
-
-    const recovery = this.runConnectFlow(
-      lifecycleId,
+    void this.runConnectFlow(
       'recovering',
       () => this.sessionManager.resetGuestSession(),
       (err) => consoleDev.error('session recovery failed', err),
     )
-    this.sessionRecovery = recovery
-    recovery.finally(() => {
-      if (this.sessionRecovery === recovery) {
-        this.sessionRecovery = null
-      }
-    })
   }
 
   private failSession(): void {
     this.stopSessionActivity()
-    this.nextLifecycle()
+    this.nextGeneration()
     this.sessionManager.clearSession()
     this.dispatch({ type: 'session.failed' })
   }
 
-  private nextLifecycle(): number {
-    this.lifecycleId += 1
-    this.sessionRecovery = null
+  private nextGeneration(): void {
+    this.generation.begin()
     // Смена сессии — смена прав на медиа: чужие байты в кэше держать нельзя.
-    this.previews.clear()
-    this.localOriginals.clear()
+    this.media.reset()
     // Ключи идемпотентности привязаны к событиям прежней комнаты и в новой сессии бессмысленны.
     this.cardActionTxnIds.clear()
-    return this.lifecycleId
-  }
-
-  private isCurrentLifecycle(lifecycleId: number): boolean {
-    return this.lifecycleId === lifecycleId
   }
 
   private requireConnection(): {
