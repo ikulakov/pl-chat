@@ -1,33 +1,30 @@
+import { INITIAL_RUNTIME_STATE } from '@/store/initialState'
 import { t } from '@/i18n'
-import { FEATURES } from '@/shared/constants/features'
 import { fileItem, textItem } from '@/shared/testUtils/matrixFixtures'
 import { CopyFilledIcon } from '@/shared/ui/icons'
 import { chatStore } from '@/store/store'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MessageActions } from './MessageActions'
+import { ReactionPicker } from './reactions/ReactionPicker'
 
 const resendMessage = vi.fn()
 const replyTo = vi.fn()
-const toggleReaction = vi.fn()
 const showToast = vi.hoisted(() => vi.fn())
 
 vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
-  useChatActions: () => ({ resendMessage, replyTo, toggleReaction }),
+  useChatActions: () => ({ resendMessage, replyTo }),
 }))
 
 vi.mock(import('@/shared/ui/Toast'), () => ({ showToast }))
 
 describe('MessageActions', () => {
   beforeEach(() => {
-    // Реакции включаем явно: тесты не должны зависеть от того, в каком положении флаг
-    // лежит в features.ts на момент сборки. Выключенное состояние проверяет свой тест ниже.
-    vi.spyOn(FEATURES, 'reactions', 'get').mockReturnValue(true)
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
     chatStore.getState().setViewport('docked')
     resendMessage.mockClear()
     replyTo.mockClear()
-    toggleReaction.mockClear()
+    chatStore.setState(INITIAL_RUNTIME_STATE)
     showToast.mockClear()
   })
 
@@ -38,12 +35,43 @@ describe('MessageActions', () => {
   // Открытие меню/закрытие по внешнему клику — механика Dropdown, покрыта в Dropdown.test.tsx.
   // Здесь тестируем только то, что MessageActions строит поверх Dropdown: пункты и их действия.
 
+  it('выбирает текущее сообщение для ответа', () => {
+    render(
+      <MessageActions
+        message={textItem()}
+        isOwn={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+    fireEvent.click(screen.getByText(t('chat.action.reply')))
+
+    expect(replyTo).toHaveBeenCalledExactlyOnceWith({
+      eventId: 'm1',
+      sender: '@operator:bank',
+      quote: { kind: 'text', text: 'hello' },
+    })
+  })
+
+  it('скрывает пункт ответа у оптимистичного сообщения', () => {
+    render(
+      <MessageActions
+        message={textItem({ eventId: 'optimistic:m1' })}
+        isOwn={false}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(screen.queryByText(t('chat.action.reply'))).not.toBeInTheDocument()
+  })
+
   it('copies the message body to the clipboard when "Копировать" is clicked', async () => {
     render(
       <MessageActions
         message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello world' })}
         isOwn={false}
-        reactions={[]}
       />,
     )
 
@@ -60,7 +88,6 @@ describe('MessageActions', () => {
       <MessageActions
         message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello world' })}
         isOwn={false}
-        reactions={[]}
       />,
     )
 
@@ -79,7 +106,6 @@ describe('MessageActions', () => {
       <MessageActions
         message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello world' })}
         isOwn={false}
-        reactions={[]}
       />,
     )
 
@@ -105,7 +131,6 @@ describe('MessageActions', () => {
           sendStatus: 'failed',
         })}
         isOwn={true}
-        reactions={[]}
       />,
     )
 
@@ -115,59 +140,11 @@ describe('MessageActions', () => {
     expect(resendMessage).toHaveBeenCalledExactlyOnceWith('m1')
   })
 
-  it('прячет «Ответить» у сообщения с оптимистичным eventId — иначе на бэкенд уедет висячий указатель', () => {
-    render(
-      <MessageActions
-        message={textItem({ eventId: 'optimistic:m1', sender: '@user:bank', body: 'hello' })}
-        isOwn={false}
-        reactions={[]}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
-
-    expect(screen.queryByText(t('chat.action.reply'))).not.toBeInTheDocument()
-  })
-
-  it('прячет «Ответить» у сообщения с пустым body — очищенное/недоступное, цитата на него бессмысленна', () => {
-    render(
-      <MessageActions
-        message={textItem({ eventId: '$m1', sender: '@operator:bank', body: '   ' })}
-        isOwn={false}
-        reactions={[]}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
-
-    expect(screen.queryByText(t('chat.action.reply'))).not.toBeInTheDocument()
-  })
-
-  it('«Ответить» у отправленного сообщения передаёт цель ответа целиком (eventId, автор, текст)', () => {
-    render(
-      <MessageActions
-        message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello' })}
-        isOwn={false}
-        reactions={[]}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
-    fireEvent.click(screen.getByText(t('chat.action.reply')))
-
-    expect(replyTo).toHaveBeenCalledExactlyOnceWith({
-      eventId: '$m1',
-      sender: '@operator:bank',
-      quote: { kind: 'text', text: 'hello' },
-    })
-  })
-
   it('прячет «Копировать» у файла без подписи — копировать нечего, body пуст', () => {
     render(
       <MessageActions
         message={fileItem()}
         isOwn={false}
-        reactions={[]}
       />,
     )
 
@@ -176,64 +153,11 @@ describe('MessageActions', () => {
     expect(screen.queryByText(t('chat.action.copy'))).not.toBeInTheDocument()
   })
 
-  it('показывает «Ответить» у файла даже без подписи — сам файл уже контент для цитаты', () => {
-    render(
-      <MessageActions
-        message={fileItem()}
-        isOwn={false}
-        reactions={[]}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
-
-    expect(screen.getByText(t('chat.action.reply'))).toBeInTheDocument()
-  })
-
-  it('«Ответить» у файла без подписи кладёт в превью цитаты имя файла, а не пустую строку', () => {
-    render(
-      <MessageActions
-        message={fileItem()}
-        isOwn={false}
-        reactions={[]}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
-    fireEvent.click(screen.getByText(t('chat.action.reply')))
-
-    expect(replyTo).toHaveBeenCalledExactlyOnceWith({
-      eventId: '$m1',
-      sender: '@operator:bank',
-      quote: { kind: 'text', text: 'doc.pdf' },
-    })
-  })
-
-  it('«Ответить» у файла с подписью кладёт в превью саму подпись, не имя файла', () => {
-    render(
-      <MessageActions
-        message={fileItem({ body: 'договор на подпись' })}
-        isOwn={false}
-        reactions={[]}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
-    fireEvent.click(screen.getByText(t('chat.action.reply')))
-
-    expect(replyTo).toHaveBeenCalledExactlyOnceWith({
-      eventId: '$m1',
-      sender: '@operator:bank',
-      quote: { kind: 'text', text: 'договор на подпись' },
-    })
-  })
-
   it('показывает «Копировать» у файла с реальной подписью (body отличается от filename)', async () => {
     render(
       <MessageActions
         message={fileItem({ body: 'договор на подпись' })}
         isOwn={false}
-        reactions={[]}
       />,
     )
 
@@ -256,7 +180,6 @@ describe('MessageActions', () => {
           upload: { file: new File([], 'doc.pdf'), pct: null, error: 'network' },
         })}
         isOwn={true}
-        reactions={[]}
       />,
     )
 
@@ -268,82 +191,48 @@ describe('MessageActions', () => {
       <MessageActions
         message={fileItem({ localId: 'm1', sendStatus: 'failed' })}
         isOwn={true}
-        reactions={[]}
       />,
     )
 
     expect(screen.getByText(t('chat.action.retry'))).toBeInTheDocument()
   })
 
-  it('показывает панель быстрых реакций вместе с меню и отдаёт выбранный ключ', () => {
-    render(
-      <MessageActions
-        message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello' })}
-        isOwn={false}
-        reactions={[]}
-      />,
-    )
+  it.each(['hello', ''])(
+    'показывает переданный пикер и обрабатывает выбор при body="%s"',
+    (body) => {
+      const onToggleReaction = vi.fn()
+      render(
+        <MessageActions
+          reactionPicker={
+            <ReactionPicker
+              summaries={[]}
+              onToggle={onToggleReaction}
+            />
+          }
+          message={textItem({ body })}
+          isOwn={false}
+        />,
+      )
+      fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
+      expect(screen.getByRole('toolbar')).toBeInTheDocument()
+      if (body) {
+        expect(screen.getByText(t('chat.action.reply'))).toBeInTheDocument()
+        expect(screen.getByText(t('chat.action.copy'))).toBeInTheDocument()
+      } else {
+        expect(screen.queryByRole('menuitem')).not.toBeInTheDocument()
+      }
+      fireEvent.click(screen.getByRole('button', { name: t('chat.reaction.add', { emoji: '👍' }) }))
+      expect(onToggleReaction).toHaveBeenCalledExactlyOnceWith('👍')
+    },
+  )
 
-    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
-    fireEvent.click(screen.getByRole('button', { name: t('chat.reaction.add', { emoji: '👍' }) }))
-
-    expect(toggleReaction).toHaveBeenCalledExactlyOnceWith('$m1', '👍')
-  })
-
-  it('помечает уже поставленную реакцию — тот же слот её и снимает', () => {
-    render(
-      <MessageActions
-        message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello' })}
-        isOwn={false}
-        reactions={[{ key: '👍', count: 1, ownEventId: '$r1' }]}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
-
-    expect(
-      screen.getByRole('button', { name: t('chat.reaction.remove', { emoji: '👍' }) }),
-    ).toHaveAttribute('aria-pressed', 'true')
-  })
-
-  it('прячет панель реакций у сообщения с оптимистичным eventId — аннотировать нечего', () => {
-    render(
-      <MessageActions
-        message={textItem({ eventId: 'optimistic:m1', sender: '@user:bank', body: 'hello' })}
-        isOwn={true}
-        reactions={[]}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
-
-    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
-  })
-
-  it('при выключённой фиче реакций прячет панель, но оставляет ответ и копирование', () => {
-    vi.spyOn(FEATURES, 'reactions', 'get').mockReturnValue(false)
-
-    render(
-      <MessageActions
-        message={textItem({ eventId: '$m1', sender: '@operator:bank', body: 'hello' })}
-        isOwn={false}
-        reactions={[]}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: t('chat.action.menu') }))
-
-    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
-    expect(screen.getByText(t('chat.action.reply'))).toBeInTheDocument()
-    expect(screen.getByText(t('chat.action.copy'))).toBeInTheDocument()
-  })
+  it.todo('закрывает меню и возвращает фокус на «…» после выбора реакции')
 
   it('does not render "Повторить отправку" for a non-own or non-failed message', () => {
     render(
       <MessageActions
         message={textItem({ eventId: '$m1', sender: '@operator:bank' })}
         isOwn={false}
-        reactions={[]}
       />,
     )
 

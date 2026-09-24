@@ -1,17 +1,15 @@
-import { useChatActions } from '@/hooks/useChatActions'
 import { isPreviewableImage, validateFile } from '@/shared/utils/fileValidation'
 import { readImageDimensions, type ImageDimensions } from '@/shared/utils/imageDimensions'
 import { useCallback, useEffect, useState } from 'react'
-import type { FileAttachment, PendingAttachment, SendOptions } from '../types'
+import type { FileAttachment, PendingAttachment, SendOptions, SendAttachment } from '../types'
 
 interface PendingState extends PendingAttachment {
   /** декодирование картинки, начатое при выборе; у обычных файлов размеров нет. Нужно только send */
   dimsPromise?: Promise<ImageDimensions | null>
 }
 
-export function useAttachmentState(): FileAttachment {
+export function useAttachmentState(sendFile: SendAttachment): FileAttachment {
   const [pending, setPending] = useState<PendingState | null>(null)
-  const { sendFile } = useChatActions()
 
   // Освобождаем object-URL превью при смене вложения и при размонтировании.
   useEffect(() => {

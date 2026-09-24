@@ -1,4 +1,5 @@
 /* eslint-disable i18next/no-literal-string -- якорь заглушки пикера, не UI-текст */
+import { ChatController } from '../../chatController'
 import { t } from '@/i18n'
 import { FEATURES } from '@/shared/constants/features'
 import { makeFile } from '@/shared/testUtils/matrixFixtures'
@@ -6,14 +7,15 @@ import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '@/store/initialState'
 import { chatStore } from '@/store/store'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AttachmentProvider } from '../Attachment/ui/AttachmentProvider'
+import { AttachmentProvider } from '../Attachment'
 import { Composer, MAX_MESSAGE_LENGTH } from './Composer'
+
+const controller = new ChatController({ setCommandHandler: vi.fn(), send: vi.fn() })
 
 const sendMessage = vi.fn()
 const sendFile = vi.fn()
-const cancelReply = vi.fn()
 vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
-  useChatActions: () => ({ sendMessage, sendFile, cancelReply }),
+  useChatActions: () => ({ ...controller.actions, sendMessage, sendFile }),
 }))
 
 // Пикер подменён кнопкой-заглушкой: здесь проверяется только то, что делает композер с
@@ -45,7 +47,6 @@ describe('Composer — семантика отправки', () => {
   afterEach(() => {
     sendMessage.mockReset()
     sendFile.mockReset()
-    cancelReply.mockReset()
   })
 
   function typeThenEnter(value: string, opts: { shiftKey?: boolean } = {}) {
@@ -128,14 +129,6 @@ describe('Composer — семантика отправки', () => {
     expect(sendMessage).not.toHaveBeenCalled()
   })
 
-  it('слишком большой файл показывает ошибку', () => {
-    const { container } = render(<Composer />, { wrapper: AttachmentProvider })
-
-    pickFile(container, makeFile('big.pdf', 11 * 1024 * 1024))
-
-    expect(screen.getByText('Файл слишком большой')).toBeInTheDocument()
-  })
-
   it('файл + текст уходят одним вызовом sendFile с подписью, поле очищается', async () => {
     const { container } = render(<Composer />, { wrapper: AttachmentProvider })
 
@@ -179,17 +172,6 @@ describe('Composer — семантика отправки', () => {
       expect.any(File),
       expect.objectContaining({ caption: '' }),
     )
-  })
-
-  it('валидный файл показывает вложение, крестик его убирает', () => {
-    const { container } = render(<Composer />, { wrapper: AttachmentProvider })
-
-    pickFile(container, makeFile('doc.pdf', 100))
-    expect(screen.getByText('doc.pdf')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByLabelText('Убрать вложение'))
-
-    expect(screen.queryByText('doc.pdf')).not.toBeInTheDocument()
   })
 
   describe('ответ на сообщение', () => {
@@ -255,7 +237,8 @@ describe('Composer — семантика отправки', () => {
 
       fireEvent.click(screen.getByLabelText('Отменить ответ'))
 
-      expect(cancelReply).toHaveBeenCalledOnce()
+      expect(chatStore.getState().room.replyTarget).toBeNull()
+      expect(screen.queryByText('исходное сообщение')).not.toBeInTheDocument()
     })
 
     it('Escape в поле ввода вызывает cancelReply', () => {
@@ -263,7 +246,8 @@ describe('Composer — семантика отправки', () => {
 
       fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' })
 
-      expect(cancelReply).toHaveBeenCalledOnce()
+      expect(chatStore.getState().room.replyTarget).toBeNull()
+      expect(screen.queryByText('исходное сообщение')).not.toBeInTheDocument()
     })
   })
 

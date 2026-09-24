@@ -3,7 +3,7 @@ import { toMediaFailure } from '@/domain/mediaFailure'
 import { useChatActions } from '@/hooks/useChatActions'
 import { useChatStore } from '@/hooks/useChatStore'
 import { parseMxcUrl } from '@/shared/utils/mxc'
-import { selectMediaVerdicts } from '@/store/selectors'
+import { selectMediaVerdictStatusFor } from '@/store/selectors'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
@@ -39,11 +39,10 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
 
   const { loadPreview } = useChatActions()
 
-  const verdicts = useChatStore(selectMediaVerdicts)
   const mediaId = mxcUrl ? parseMxcUrl(mxcUrl)?.mediaId : undefined
-  const verdict = mediaId ? verdicts[mediaId] : undefined
+  const verdictStatus = useChatStore(selectMediaVerdictStatusFor(mediaId))
 
-  const isRejected = verdict?.status === 'rejected'
+  const isRejected = verdictStatus === 'rejected'
 
   const [attempt, setAttempt] = useState(0)
   const retry = useCallback(() => setAttempt((value) => value + 1), [])
@@ -92,7 +91,7 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
       URL.revokeObjectURL(objectUrl)
       setResult(null)
     }
-    // В зависимостях isRejected, а не verdict?.status: перезапуск нужен только на переходе
+    // В зависимостях isRejected, а не verdictStatus: перезапуск нужен только на переходе
     // в rejected — он гасит сеть и снимает картинку. На переходе undefined → ready эффект
     // перезапускаться не должен: его cleanup отозвал бы object-URL уже показанной картинки,
     // и пользователь увидел бы спиннер поверх того, на что он смотрит. Состояние ready и так
@@ -105,7 +104,7 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
   // приход вердикта — иначе повторный 504 крутил бы бесконечный цикл.
   const readyRetriedRef = useRef(false)
   useEffect(() => {
-    if (verdict?.status !== 'ready') {
+    if (verdictStatus !== 'ready') {
       readyRetriedRef.current = false
       return
     }
@@ -117,7 +116,7 @@ export function useMediaSource({ mxcUrl, size }: Options): MediaSource {
     readyRetriedRef.current = true
     // eslint-disable-next-line react-hooks/set-state-in-effect -- см. комментарий выше
     retry()
-  }, [verdict?.status, result, key, retry])
+  }, [verdictStatus, result, key, retry])
 
   if (!key) return IDLE
   // Вердикт приоритетнее любого сетевого результата — актуален и тогда, когда он пришёл

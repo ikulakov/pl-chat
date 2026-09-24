@@ -11,30 +11,29 @@ import { cn } from '@/shared/utils/cn'
 import { getFileExtension } from '@/shared/utils/fileExtension'
 import { formatSize } from '@/shared/utils/formatSize'
 import { parseMxcUrl } from '@/shared/utils/mxc'
-import { selectMediaVerdicts } from '@/store/selectors'
-import { BubbleMeta, type BubbleMetaData } from '../bubble/BubbleMeta'
-import styles from './FileChip.module.css'
-import { MediaCaption } from '../media/MediaCaption'
+import { selectMediaVerdictStatusFor } from '@/store/selectors'
+import type { ReactNode } from 'react'
+import styles from './FileContent.module.css'
+import { MediaCaption } from './MediaCaption'
 import { getMediaUploadView } from '../../utils/mediaUploadView'
 
 interface Props {
   item: FileTimelineItem
-  meta: BubbleMetaData
+  /** Время в конце подписи или строки под именем; нет — оно стоит в футере с реакциями. */
+  inlineMeta?: ReactNode
 }
 
-export function FileChip({ item, meta }: Props) {
+export function FileContent({ item, inlineMeta }: Props) {
   const { cancelUpload, resendMessage } = useChatActions()
   const { download, isLoading } = useMediaDownload(item)
-  const { uploadPct, failure, uploadFailed, isStatusHidden } = getMediaUploadView(item)
+  const { uploadPct, failure, uploadFailed } = getMediaUploadView(item)
   const isUploading = uploadPct !== null
 
   const { body, filename, info, url } = item.content
 
-  const verdicts = useChatStore(selectMediaVerdicts)
   const mediaId = url ? parseMxcUrl(url)?.mediaId : undefined
-  const verdict = mediaId ? verdicts[mediaId] : undefined
   // Отказ проверки терминален: файл уже не скачается, ретраить нечего — чип не кликабелен.
-  const isRejected = verdict?.status === 'rejected'
+  const isRejected = useChatStore(selectMediaVerdictStatusFor(mediaId)) === 'rejected'
 
   const hasCaption = body.length > 0
 
@@ -67,12 +66,7 @@ export function FileChip({ item, meta }: Props) {
         >
           {subline}
         </span>
-        {!hasCaption && (
-          <BubbleMeta
-            {...meta}
-            isStatusHidden={isStatusHidden}
-          />
-        )}
+        {!hasCaption && inlineMeta}
       </span>
     </span>
   )
@@ -149,8 +143,7 @@ export function FileChip({ item, meta }: Props) {
       {hasCaption && (
         <MediaCaption
           body={body}
-          meta={meta}
-          isStatusHidden={isStatusHidden}
+          inlineMeta={inlineMeta}
         />
       )}
     </div>

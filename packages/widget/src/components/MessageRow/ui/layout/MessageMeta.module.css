@@ -1,0 +1,38 @@
+.meta {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  align-self: end;
+  height: 18px;
+  color: var(--meta-color, var(--c-text-message-meta));
+}
+
+/* Подложка поверх контента без пузыря: светлый текст на тёмном, у своего сообщения тоже.
+   Высота — 18px строки плюс отступы (box-sizing: border-box). */
+.overlay {
+  height: 22px;
+  padding: 2px 6px;
+  border-radius: var(--radius-md);
+  background: var(--c-surface-meta-overlay);
+  color: var(--c-text-invert);
+}
+
+.time {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: normal;
+  text-align: right;
+  min-width: 28px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Спиннер занимает место галочки, чтобы время не сдвигалось при смене статуса. */
+.spinnerWrap {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  justify-content: center;
+  align-items: center;
+}

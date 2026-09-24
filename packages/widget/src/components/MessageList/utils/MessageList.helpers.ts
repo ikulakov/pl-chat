@@ -1,9 +1,6 @@
-import type { EventId, LocalId, UserId } from '@/shared/types/ids'
-import { replyEventIdOf, replyQuoteOf, type ReplyStickerPreview } from '@/domain/reply'
+import type { EventId } from '@/shared/types/ids'
 import { isSystem, type MessageTimelineItem, type TimelineItem } from '@/domain/timeline'
-import { t } from '@/i18n'
 import { formatDateLabel, startOfDay } from '@/shared/utils/formatDate'
-import { replyAuthorLabel, replyQuoteView } from '../../ReplyPreview'
 import type { MessageGroupPosition } from '../../MessageRow'
 
 interface DayGroup {
@@ -57,41 +54,4 @@ export function indexMessagesByEventId(
   }
 
   return index
-}
-
-export interface ReplyPreviewData {
-  author?: string
-  text: string
-  targetId?: LocalId
-  sticker?: ReplyStickerPreview
-}
-
-interface GetReplyPreviewParams {
-  index: Map<EventId, MessageTimelineItem>
-  message: MessageTimelineItem
-  userId: UserId
-}
-
-export function getReplyPreview({
-  index,
-  message,
-  userId,
-}: GetReplyPreviewParams): ReplyPreviewData | undefined {
-  const parentId = replyEventIdOf(message)
-  if (!parentId) return
-
-  // цитата резолвится только из загруженной ленты
-  const parent = index.get(parentId)
-  const quote = parent ? replyQuoteOf(parent) : undefined
-
-  // нечего показать (отредактированное/вычищенное сообщение) — то же, что не загруженное
-  if (!parent || !quote) {
-    return { text: t('chat.reply.unavailable') }
-  }
-
-  return {
-    author: replyAuthorLabel(parent.sender, userId),
-    targetId: parent.localId,
-    ...replyQuoteView(quote),
-  }
 }

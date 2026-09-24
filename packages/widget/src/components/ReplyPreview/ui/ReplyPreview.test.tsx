@@ -10,43 +10,47 @@ vi.mock<unknown>(import('../../Emoji/lottie/lottiePlayer'), () => ({
 }))
 
 describe('ReplyPreview', () => {
-  it('без onClick — статичный блок, не кнопка (оригинал недоступен)', () => {
+  it.each([{}, { onNavigate: vi.fn() }, { targetId: 'parent-local' }])(
+    'без цели или обработчика перехода — статичный блок: %o',
+    ({ onNavigate, ...replyFields }) => {
+      render(
+        <ReplyPreview
+          reply={{ author: 'Оля', text: 'вопрос', ...replyFields }}
+          onNavigate={onNavigate}
+        />,
+      )
+
+      expect(screen.queryByRole('button')).toBeNull()
+      expect(screen.getByText('вопрос')).toBeInTheDocument()
+    },
+  )
+
+  it('клик делегирует переход к оригиналу с его localId', () => {
+    const onNavigate = vi.fn()
     render(
       <ReplyPreview
-        author="Оля"
-        text="вопрос"
-      />,
-    )
-
-    expect(screen.queryByRole('button')).toBeNull()
-    expect(screen.getByText('вопрос')).toBeInTheDocument()
-  })
-
-  it('с onClick — кнопка, клик делегирует переход к оригиналу', () => {
-    const onClick = vi.fn()
-    render(
-      <ReplyPreview
-        author="Оля"
-        text="вопрос"
-        onClick={onClick}
+        reply={{ author: 'Оля', text: 'вопрос', targetId: 'parent-local' }}
+        onNavigate={onNavigate}
       />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: t('chat.reply.goToOriginal') }))
 
-    expect(onClick).toHaveBeenCalledTimes(1)
+    expect(onNavigate).toHaveBeenCalledExactlyOnceWith('parent-local')
   })
 
   it('цитата стикера показывает сам стикер, а не его подпись шрифтом', () => {
     const { container } = render(
       <ReplyPreview
-        author="Вы"
-        text={t('chat.reply.sticker')}
-        sticker={{
-          mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
-          bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
-          body: '🐥',
-          format: 'image',
+        reply={{
+          author: 'Вы',
+          text: t('chat.reply.sticker'),
+          sticker: {
+            mediaId: 'AbCdEfGhIjKlMnOpQrStUvWx',
+            bytesUrl: '/_matrix/sticker/AbCdEfGhIjKlMnOpQrStUvWx',
+            body: '🐥',
+            format: 'image',
+          },
         }}
       />,
     )

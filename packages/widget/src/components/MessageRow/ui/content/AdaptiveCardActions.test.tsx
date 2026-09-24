@@ -1,7 +1,8 @@
 import type { CardAction } from '@/domain/adaptiveCards'
 import { adaptiveCardItem } from '@/shared/testUtils/matrixFixtures'
 import { chatStore } from '@/store/store'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
+import { Profiler } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdaptiveCardActions } from './AdaptiveCardActions'
@@ -47,6 +48,37 @@ describe('AdaptiveCardActions', () => {
     render(<AdaptiveCardActions item={adaptiveCardItem()} />)
 
     expect(screen.getByRole('button', { name: 'Подтвердить' })).toBeEnabled()
+  })
+
+  it('игнорирует ответы чужой карточки и переключает подписку при смене сообщения', () => {
+    const onRender = vi.fn()
+    const view = (eventId: '$card' | '$other') => (
+      <Profiler
+        id="card"
+        onRender={onRender}
+      >
+        <AdaptiveCardActions item={adaptiveCardItem({ eventId })} />
+      </Profiler>
+    )
+    const { rerender } = render(view('$card'))
+    onRender.mockClear()
+
+    act(() =>
+      chatStore
+        .getState()
+        .dispatch({ type: 'card.answering', cardEventId: '$other', actionId: 'confirm' }),
+    )
+    expect(onRender).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Подтвердить' })).toBeEnabled()
+
+    rerender(view('$other'))
+    expect(screen.getByRole('button', { name: 'Подтвердить' })).toBeDisabled()
+    onRender.mockClear()
+
+    act(() => chatStore.getState().dispatch({ type: 'card.answerFailed', cardEventId: '$other' }))
+    expect(onRender).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Подтвердить' })).toBeEnabled()
+    expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 
   it('двойной клик по кнопке шлёт действие один раз — после первого клика кнопка выключена', async () => {

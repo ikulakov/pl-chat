@@ -2,7 +2,7 @@ import { toSubmitActions, type CardAction } from '@/domain/adaptiveCards'
 import type { AdaptiveCardTimelineItem } from '@/domain/timeline'
 import { useChatActions } from '@/hooks/useChatActions'
 import { useChatStore } from '@/hooks/useChatStore'
-import { selectCardAnswers } from '@/store/selectors'
+import { selectCardAnswerFor } from '@/store/selectors'
 import { useMemo } from 'react'
 import { CardActions } from './CardActions'
 
@@ -12,8 +12,7 @@ interface Props {
 
 export function AdaptiveCardActions({ item }: Props) {
   const { sendCardAction } = useChatActions()
-  const cardAnswers = useChatStore(selectCardAnswers)
-  const answer = cardAnswers[item.eventId]
+  const answer = useChatStore(selectCardAnswerFor(item.eventId))
 
   // Единственное место, где карточка сужается до поддерживаемого подмножества (только кнопки).
   const actions = useMemo(() => toSubmitActions(item.content.card), [item.content.card])

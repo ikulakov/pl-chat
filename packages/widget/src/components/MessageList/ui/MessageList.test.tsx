@@ -2,7 +2,7 @@ import type { TextTimelineItem } from '@/domain/timeline'
 import { systemItem, textItem } from '@/shared/testUtils/matrixFixtures'
 import { INITIAL_ROOM_STATE, INITIAL_RUNTIME_STATE } from '@/store/initialState'
 import { chatStore } from '@/store/store'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MessageList } from './MessageList'
 
@@ -129,7 +129,7 @@ describe('MessageList', () => {
 
     // оба сообщения (включая ранний $a) — с двойной галочкой: порог покрывает всё ≤ ts($b)
     expect(
-      container.querySelectorAll('[data-role="message-bubble"] [data-read="true"]'),
+      container.querySelectorAll('[data-testid="message-bubble"] [data-read="true"]'),
     ).toHaveLength(2)
     expect(container.querySelectorAll('[data-read="false"]')).toHaveLength(0)
   })
@@ -217,7 +217,7 @@ describe('MessageList', () => {
     expect(container.querySelector('[data-role="spinner"]')).toBeInTheDocument()
   })
 
-  it('a reply to a not-loaded original renders an unavailable reply preview that is not clickable', () => {
+  it('updates the reply preview when its original is loaded, changed or cleared', () => {
     // родитель вне загруженной ленты → заглушка без цели скролла, кнопки-цитаты нет
     const ts = new Date('2026-07-01T10:00:00').getTime()
     const reply: TextTimelineItem = {
@@ -229,6 +229,38 @@ describe('MessageList', () => {
 
     render(<MessageList userId={ME} />)
 
+    expect(screen.getByText('Сообщение недоступно')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Перейти к исходному сообщению' }),
+    ).not.toBeInTheDocument()
+
+    const parent = message({ localId: 'p1', eventId: '$missing', ts, body: 'исходный текст' })
+    act(() => {
+      chatStore.setState({ room: { ...INITIAL_ROOM_STATE, timeline: [parent, reply] } })
+    })
+
+    const preview = screen.getByRole('button', { name: 'Перейти к исходному сообщению' })
+    expect(within(preview).getByText('исходный текст')).toBeInTheDocument()
+    expect(screen.queryByText('Сообщение недоступно')).not.toBeInTheDocument()
+
+    act(() => {
+      chatStore.setState({
+        room: {
+          ...INITIAL_ROOM_STATE,
+          timeline: [{ ...parent, content: { body: 'изменённый текст' } }, reply],
+        },
+      })
+    })
+    expect(within(preview).getByText('изменённый текст')).toBeInTheDocument()
+
+    act(() => {
+      chatStore.setState({
+        room: {
+          ...INITIAL_ROOM_STATE,
+          timeline: [{ ...parent, content: { body: '' } }, reply],
+        },
+      })
+    })
     expect(screen.getByText('Сообщение недоступно')).toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Перейти к исходному сообщению' }),
@@ -252,6 +284,6 @@ describe('MessageList', () => {
     expect(screen.getByText('Оператор завершил чат')).toBeInTheDocument()
     expect(container.querySelector('[data-role="system-message"]')).toBeInTheDocument()
     expect(container.querySelector('[data-role="message-actions-trigger"]')).not.toBeInTheDocument()
-    expect(container.querySelector('[data-role="message-bubble"]')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-testid="message-bubble"]')).not.toBeInTheDocument()
   })
 })

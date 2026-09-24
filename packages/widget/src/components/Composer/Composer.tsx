@@ -3,17 +3,15 @@ import { useChatStore } from '@/hooks/useChatStore'
 import { t } from '@/i18n'
 import { FEATURES } from '@/shared/constants/features'
 import { IconButton } from '@/shared/ui/IconButton'
-import { CloseIcon, FailedIcon, SendIcon } from '@/shared/ui/icons'
+import { FailedIcon, SendIcon } from '@/shared/ui/icons'
 import { cn } from '@/shared/utils/cn'
 import { selectReplyTarget, selectUserId } from '@/store/selectors'
 import { useEffect, useRef, useState } from 'react'
-import { useAttachment } from '../Attachment'
+import { AttachmentPreview, FilePickerButton, useAttachment } from '../Attachment'
 import { EmojiPickerButton } from '../Emoji'
-import { ReplyPreview, replyAuthorLabel, replyQuoteView } from '../ReplyPreview'
-import { AttachmentPreview } from './AttachmentPreview'
 import styles from './Composer.module.css'
-import { FilePickerButton } from './FilePickerButton'
 import { MessageTextarea } from './MessageTextarea'
+import { ReplyBanner } from './ReplyBanner'
 
 export const MAX_MESSAGE_LENGTH = 2048
 
@@ -36,8 +34,6 @@ export function Composer() {
   const charsOverLimit = trimmed.length - MAX_MESSAGE_LENGTH
   const isTooLong = charsOverLimit > 0
   const hasContent = trimmed.length > 0 || attachment.pending !== null
-  // файл прикреплён и прошёл валидацию — второй пока нельзя выбрать
-  const hasValidAttachment = attachment.pending !== null && !attachment.pending.error
 
   const canSend = hasContent && !isTooLong && !attachment.pending?.error
 
@@ -75,30 +71,16 @@ export function Composer() {
       )}
 
       {replyTarget && (
-        <div className={styles.replyRow}>
-          <div className={styles.replyPreview}>
-            <ReplyPreview
-              author={replyAuthorLabel(replyTarget.sender, userId)}
-              {...replyQuoteView(replyTarget.quote)}
-            />
-          </div>
-          <IconButton
-            variant="ghost"
-            size="sm"
-            aria-label={t('chat.reply.cancel')}
-            onClick={cancelReply}
-          >
-            <CloseIcon size={16} />
-          </IconButton>
-        </div>
+        <ReplyBanner
+          target={replyTarget}
+          userId={userId}
+          onCancel={cancelReply}
+        />
       )}
 
       <div className={cn(styles.field, isTooLong && styles.error)}>
         <div className={styles.slot}>
-          <FilePickerButton
-            disabled={hasValidAttachment}
-            onFileSelect={attachment.pickFile}
-          />
+          <FilePickerButton />
         </div>
         <div
           className={styles.inputArea}

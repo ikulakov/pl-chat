@@ -2,9 +2,9 @@ import { t } from '@/i18n'
 import { fileItem } from '@/shared/testUtils/matrixFixtures'
 import { chatStore } from '@/store/store'
 import { act, render, screen } from '@testing-library/react'
+import { Profiler } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { BubbleMetaData } from '../bubble/BubbleMeta'
-import { FileChip } from './FileChip'
+import { FileContent } from './FileContent'
 
 const cancelUpload = vi.fn()
 const resendMessage = vi.fn()
@@ -14,9 +14,49 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
   useChatActions: () => ({ cancelUpload, resendMessage, downloadFile }),
 }))
 
-const meta: BubbleMetaData = { ts: 0, own: true, sendStatus: 'sent', isRead: false }
+describe('FileContent', () => {
+  it('не обновляется из-за чужого вердикта, но применяет отказ своего файла после рендера', () => {
+    const onRender = vi.fn()
+    render(
+      <Profiler
+        id="file"
+        onRender={onRender}
+      >
+        <FileContent item={fileItem()} />
+      </Profiler>,
+    )
+    onRender.mockClear()
 
-describe('FileChip', () => {
+    const reject = (mediaId: 'other' | 'abc') =>
+      act(() => {
+        chatStore.getState().dispatch({
+          type: 'sync.received',
+          cursor: mediaId,
+          room: {
+            timeline: [],
+            readMarkers: [],
+            reactions: [],
+            cardAnswers: [],
+            prevBatch: null,
+            mediaVerdicts: [{ mediaId, verdict: { status: 'rejected' } }],
+          },
+        })
+      })
+
+    reject('other')
+    expect(onRender).not.toHaveBeenCalled()
+    expect(
+      screen.getByRole('button', { name: t('chat.media.download', { name: 'doc.pdf' }) }),
+    ).toBeEnabled()
+
+    reject('abc')
+    expect(onRender).toHaveBeenCalledOnce()
+    expect(screen.getByText(t('chat.media.rejected'))).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: t('chat.media.download', { name: 'doc.pdf' }) }),
+    ).not.toBeInTheDocument()
+  })
+
   afterEach(() => {
     cancelUpload.mockClear()
     resendMessage.mockClear()
@@ -28,23 +68,17 @@ describe('FileChip', () => {
     // причина заполняется только при сорванной отдаче байт — падение /send диспатчит
     // message.failed без поля upload; по этому признаку компонент различает две причины failed
     const { rerender } = render(
-      <FileChip
+      <FileContent
         item={fileItem({
           sendStatus: 'failed',
           upload: { file: new File([], 'doc.pdf'), pct: null, error: 'network' },
         })}
-        meta={meta}
       />,
     )
 
     expect(screen.getByText(t('chat.upload.error'))).toBeInTheDocument()
 
-    rerender(
-      <FileChip
-        item={fileItem({ sendStatus: 'failed' })}
-        meta={meta}
-      />,
-    )
+    rerender(<FileContent item={fileItem({ sendStatus: 'failed' })} />)
 
     expect(screen.queryByText(t('chat.upload.error'))).not.toBeInTheDocument()
     expect(screen.getByText('PDF')).toBeInTheDocument()
@@ -52,7 +86,7 @@ describe('FileChip', () => {
 
   it('во время загрузки показывает процент вместо размера и даёт отменить, после — размер без кнопки отмены', () => {
     const { rerender } = render(
-      <FileChip
+      <FileContent
         item={fileItem({
           sendStatus: 'sending',
           content: {
@@ -63,7 +97,6 @@ describe('FileChip', () => {
           },
           upload: { file: new File([], 'без-расширения'), pct: 40 },
         })}
-        meta={meta}
       />,
     )
 
@@ -73,7 +106,7 @@ describe('FileChip', () => {
     expect(cancelUpload).toHaveBeenCalledExactlyOnceWith('m1')
 
     rerender(
-      <FileChip
+      <FileContent
         item={fileItem({
           sendStatus: 'sent',
           content: {
@@ -83,7 +116,6 @@ describe('FileChip', () => {
             info: { mimetype: '', size: 2048 },
           },
         })}
-        meta={meta}
       />,
     )
 
@@ -93,39 +125,10 @@ describe('FileChip', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('на время отдачи байт прячет спиннер отправки — прогресс уже показан кольцом', () => {
-    const upload = { file: new File([], 'doc.pdf'), pct: 40 }
-    const sending: BubbleMetaData = { ...meta, sendStatus: 'sending' }
-
-    const { container, rerender } = render(
-      <FileChip
-        item={fileItem({ sendStatus: 'sending', upload })}
-        meta={sending}
-      />,
-    )
-
-    expect(container.querySelector('[data-role="spinner"]')).not.toBeInTheDocument()
-
-    // upload снят редьюсером — байты доехали, пошёл PUT /send: теперь спиннер уместен
-    rerender(
-      <FileChip
-        item={fileItem({ sendStatus: 'sending' })}
-        meta={sending}
-      />,
-    )
-
-    expect(container.querySelector('[data-role="spinner"]')).toBeInTheDocument()
-  })
-
   it('клик по чипу скачивает оригинал файла, а не превью', async () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 
-    render(
-      <FileChip
-        item={fileItem({ sendStatus: 'sent' })}
-        meta={meta}
-      />,
-    )
+    render(<FileContent item={fileItem({ sendStatus: 'sent' })} />)
 
     await act(async () => {
       screen.getByRole('button', { name: t('chat.media.download', { name: 'doc.pdf' }) }).click()
@@ -141,12 +144,11 @@ describe('FileChip', () => {
   it('предлагает повтор при временном сбое и удаление — при отказе сервера', () => {
     const upload = { file: new File([], 'doc.pdf'), pct: null }
     const { rerender } = render(
-      <FileChip
+      <FileContent
         item={fileItem({
           sendStatus: 'failed',
           upload: { ...upload, error: 'network' },
         })}
-        meta={meta}
       />,
     )
 
@@ -154,13 +156,12 @@ describe('FileChip', () => {
     expect(resendMessage).toHaveBeenCalledExactlyOnceWith('m1')
 
     rerender(
-      <FileChip
+      <FileContent
         item={fileItem({
           sendStatus: 'failed',
           // fileguard отклонил файл — повтор даст тот же ответ, остаётся убрать черновик
           upload: { ...upload, error: 'rejected' },
         })}
-        meta={meta}
       />,
     )
 
@@ -185,12 +186,7 @@ describe('FileChip', () => {
       },
     })
 
-    render(
-      <FileChip
-        item={fileItem({ sendStatus: 'sent' })}
-        meta={meta}
-      />,
-    )
+    render(<FileContent item={fileItem({ sendStatus: 'sent' })} />)
 
     expect(screen.getByText(t('chat.media.rejected'))).toBeInTheDocument()
     expect(screen.queryByText('PDF')).not.toBeInTheDocument()

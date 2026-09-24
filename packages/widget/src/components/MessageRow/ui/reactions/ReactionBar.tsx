@@ -10,7 +10,10 @@ interface Props {
 
 export function ReactionBar({ summaries, onToggle }: Props) {
   return (
-    <div className={styles.bar}>
+    <div
+      className={styles.bar}
+      data-testid="reaction-bar"
+    >
       {summaries.map(({ key, count, ownEventId }) => (
         <button
           key={key}

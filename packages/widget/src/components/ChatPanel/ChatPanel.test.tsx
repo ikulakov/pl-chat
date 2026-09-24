@@ -33,6 +33,7 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
     loadMoreHistory: vi.fn(),
     stopLoadingHistory: vi.fn(),
     sendMessage: vi.fn(),
+    sendFile: vi.fn(),
     close: vi.fn(),
   }),
 }))

@@ -8,11 +8,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 30px;
-  padding: 0 9px;
+  height: 24px;
+  padding: 4px 8px;
   border: none;
-  /* пилюля: радиус равен половине высоты */
-  border-radius: 15px;
+  border-radius: var(--radius-md);
   background: var(--c-surface-secondary);
   cursor: pointer;
   transition: background var(--dur-fast);

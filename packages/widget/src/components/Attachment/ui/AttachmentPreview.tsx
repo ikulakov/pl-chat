@@ -6,13 +6,8 @@ import { cn } from '@/shared/utils/cn'
 import { getFileExtension } from '@/shared/utils/fileExtension'
 import type { FileRejection } from '@/shared/utils/fileValidation'
 import { formatSize } from '@/shared/utils/formatSize'
-import type { PendingAttachment } from '../Attachment'
+import type { PendingAttachment } from '../types'
 import styles from './AttachmentPreview.module.css'
-
-interface Props {
-  pending: PendingAttachment
-  onCancel: () => void
-}
 
 const REJECTION_TEXT: Record<FileRejection, MessageKey> = {
   badType: 'composer.upload.badType',
@@ -23,6 +18,11 @@ const REJECTION_TEXT: Record<FileRejection, MessageKey> = {
  * Вложение до отправки. Отбракованный файл показывается здесь же с причиной — отправку
  * блокирует композер. Загрузка начинается позже, её статус живёт на сообщении в ленте.
  */
+interface Props {
+  pending: PendingAttachment
+  onCancel: () => void
+}
+
 export function AttachmentPreview({ pending, onCancel }: Props) {
   const { error } = pending
 

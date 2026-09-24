@@ -36,7 +36,7 @@
   height: 32px;
   border-radius: var(--radius-sm);
   flex-shrink: 0;
-  background: var(--c-icon-tint);
+  background: var(--c-surface-attachment);
 }
 
 /* Обе иконки в одной ячейке грида — подмена не двигает раскладку чипа. */
@@ -73,11 +73,11 @@
   border-radius: var(--radius-sm);
   flex-shrink: 0;
   color: inherit;
-  background: var(--c-icon-tint);
+  background: var(--c-surface-attachment);
   transition: background-color var(--dur-fast);
 
   &:not(:disabled):hover {
-    background: var(--c-icon-tint-hover);
+    background: var(--c-surface-attachment-hover);
   }
 }
 
@@ -147,10 +147,10 @@
   border-radius: var(--radius-sm);
   flex-shrink: 0;
   color: inherit;
-  background: var(--c-icon-tint);
+  background: var(--c-surface-attachment);
   transition: background-color var(--dur-fast);
 
   &:hover {
-    background: var(--c-icon-tint-hover);
+    background: var(--c-surface-attachment-hover);
   }
 }

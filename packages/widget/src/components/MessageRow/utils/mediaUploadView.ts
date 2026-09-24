@@ -15,7 +15,8 @@ export interface MediaUploadView {
   // причина сорвавшейся заливки; undefined — не падала
   failure: UploadFailure | undefined
   uploadFailed: boolean
-  isStatusHidden: boolean
+  // время и статус не показываем — о судьбе сообщения говорит само вложение
+  isMetaHidden: boolean
 }
 
 export function getMediaUploadView(item: MediaTimelineItem): MediaUploadView {
@@ -32,9 +33,9 @@ export function getMediaUploadView(item: MediaTimelineItem): MediaUploadView {
     uploadPct,
     failure,
     uploadFailed,
-    // Галочка/крестик статуса рядом со временем — про доставку сообщения. Сорвавшаяся заливка
-    // уже показана на самом вложении (рамка и действие у картинки, текст и действие у чипа),
-    // и крестик рядом со временем читался бы как вторая, другая ошибка.
-    isStatusHidden: uploadPct !== null || uploadFailed,
+    // Заливка и её сбой уже показаны на самом вложении (кольцо прогресса, рамка и действие у
+    // картинки; текст и действие у чипа). Время со статусом рядом читалось бы вторым сообщением
+    // о том же, а крестик статуса — как другая ошибка. По макету их нет вовсе.
+    isMetaHidden: uploadPct !== null || uploadFailed,
   }
 }

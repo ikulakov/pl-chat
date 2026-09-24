@@ -1,5 +1,6 @@
 import type { UserId } from '@/shared/types/ids'
 import { readOwnEventIds } from '@/domain/receipts'
+import { replyEventIdOf } from '@/domain/reply'
 import { isSystem } from '@/domain/timeline'
 import { useChatScroll } from '../hooks/useChatScroll'
 import { useChatStore } from '@/hooks/useChatStore'
@@ -9,16 +10,10 @@ import { registerTimelineScroll } from '@/shared/timeline/timelineScroll'
 import { Spinner } from '@/shared/ui/Spinner'
 import { ToastOutlet } from '@/shared/ui/Toast'
 import { cn } from '@/shared/utils/cn'
-import {
-  selectIsOpen,
-  selectReactions,
-  selectReadReceipts,
-  selectTimeline,
-} from '@/store/selectors'
+import { selectIsOpen, selectReadReceipts, selectTimeline } from '@/store/selectors'
 import { useEffect, useMemo, useRef } from 'react'
 import {
   getPosition,
-  getReplyPreview,
   groupTimelineByDate,
   indexMessagesByEventId,
 } from '../utils/MessageList.helpers'
@@ -35,7 +30,6 @@ interface Props {
 export function MessageList({ userId }: Props) {
   const isOpen = useChatStore(selectIsOpen)
   const readReceipts = useChatStore(selectReadReceipts)
-  const reactions = useChatStore(selectReactions)
 
   const timeline = useChatStore(selectTimeline)
   const timelineGroupedByDate = useMemo(() => groupTimelineByDate(timeline), [timeline])
@@ -100,11 +94,8 @@ export function MessageList({ userId }: Props) {
                 )
               }
               const position = getPosition(arr[index - 1], item, arr[index + 1])
-              const reply = getReplyPreview({
-                index: messagesByEventId,
-                message: item,
-                userId,
-              })
+              const replyEventId = replyEventIdOf(item)
+              const replyParent = replyEventId ? messagesByEventId.get(replyEventId) : undefined
               return (
                 <TimelineRow
                   key={item.localId}
@@ -117,12 +108,8 @@ export function MessageList({ userId }: Props) {
                     message={item}
                     position={position}
                     readByOperator={readByOperatorIds.has(item.eventId)}
-                    reactions={reactions[item.eventId]}
-                    replyAuthor={reply?.author}
-                    replyText={reply?.text}
-                    replySticker={reply?.sticker}
-                    replyTargetId={reply?.targetId}
-                    onReplyClick={scrollToItem}
+                    replyParent={replyParent}
+                    onReplyNavigate={scrollToItem}
                   />
                 </TimelineRow>
               )

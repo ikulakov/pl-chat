@@ -5,10 +5,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAttachmentState } from './useAttachmentState'
 
 const sendFile = vi.fn()
-vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
-  useChatActions: () => ({ sendFile }),
-}))
-
 // jsdom не грузит <img> → readImageDimensions зависла бы. Мокаем интринсик-размеры.
 vi.mock(import('@/shared/utils/imageDimensions'), () => ({
   readImageDimensions: vi.fn().mockResolvedValue({ w: 800, h: 600 }),
@@ -20,7 +16,7 @@ describe('useAttachmentState', () => {
   })
 
   it('отбракованный файл всё равно виден в композере — с причиной и без права на отправку', () => {
-    const { result } = renderHook(() => useAttachmentState())
+    const { result } = renderHook(() => useAttachmentState(sendFile))
 
     act(() => result.current.pickFile(makeFile('evil.exe', 100)))
 
@@ -38,7 +34,7 @@ describe('useAttachmentState', () => {
   })
 
   it('accepts a whitelisted file as the pending attachment without touching the network', () => {
-    const { result } = renderHook(() => useAttachmentState())
+    const { result } = renderHook(() => useAttachmentState(sendFile))
 
     act(() => result.current.pickFile(makeFile('doc.pdf', 100)))
 
@@ -55,7 +51,7 @@ describe('useAttachmentState', () => {
     const decoding = deferred<ImageDimensions | null>()
     vi.mocked(readImageDimensions).mockReturnValueOnce(decoding.promise)
     sendFile.mockResolvedValue(undefined)
-    const { result } = renderHook(() => useAttachmentState())
+    const { result } = renderHook(() => useAttachmentState(sendFile))
 
     act(() => result.current.pickFile(makeFile('p.png', 100, 'image/png')))
     act(() => result.current.send())
@@ -74,7 +70,7 @@ describe('useAttachmentState', () => {
   })
 
   it('cancel clears the pending attachment', () => {
-    const { result } = renderHook(() => useAttachmentState())
+    const { result } = renderHook(() => useAttachmentState(sendFile))
 
     act(() => result.current.pickFile(makeFile('doc.pdf', 100)))
     act(() => result.current.cancel())
@@ -84,7 +80,7 @@ describe('useAttachmentState', () => {
 
   it('send передаёт файл с подписью и сразу освобождает композер', () => {
     sendFile.mockResolvedValue(undefined)
-    const { result } = renderHook(() => useAttachmentState())
+    const { result } = renderHook(() => useAttachmentState(sendFile))
 
     act(() => result.current.pickFile(makeFile('doc.pdf', 100)))
     act(() => result.current.send({ caption: 'глядите договор' }))

@@ -1,0 +1,33 @@
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 4px 0;
+
+  &.own {
+    align-items: flex-end;
+  }
+}
+
+/* Цитата не шире контента: сама в ширину колонки не вкладывается (width: 0),
+   но растягивается до неё (min-width: 100%). Иначе длинная цитата раздула бы колонку. */
+.reply {
+  width: 0;
+  min-width: 100%;
+}
+
+.frame {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* Только положение времени в углу рамки; вид подложки — MessageMeta с overlay.
+   display не задаём: абсолютный inline-flex и так становится flex. */
+.meta {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+}

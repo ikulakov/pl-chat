@@ -1,0 +1,12 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 12px 2px;
+  color: var(--c-text-primary);
+}
+
+.preview {
+  flex: 1;
+  min-width: 0;
+}

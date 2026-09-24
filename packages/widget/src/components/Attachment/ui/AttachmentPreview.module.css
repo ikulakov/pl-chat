@@ -25,12 +25,12 @@
   border-radius: var(--radius-sm);
   flex-shrink: 0;
   color: var(--c-text-tertiary);
-  background: var(--c-icon-tint);
+  background: var(--c-surface-attachment);
 }
 
 .iconError {
   color: var(--c-error);
-  background: var(--c-error-tint);
+  background: var(--c-surface-attachment-error);
 }
 
 .info {

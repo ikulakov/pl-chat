@@ -6,7 +6,7 @@
   height: 172px;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: var(--c-icon-tint);
+  background: var(--c-surface-attachment);
 }
 
 /* Сбой заливки: текста и статуса на картинке нет, поэтому сам кадр и говорит об ошибке.
@@ -62,13 +62,13 @@
   height: 24px;
   border-radius: 50%;
   color: var(--c-text-invert);
-  background: rgb(0 0 0 / 45%);
+  background: var(--c-surface-image-overlay);
   transition:
     background-color var(--dur-fast),
     opacity var(--dur-fast);
 
   &:not(:disabled):hover {
-    background: rgb(0 0 0 / 65%);
+    background: var(--c-surface-image-overlay-hover);
   }
 }
 

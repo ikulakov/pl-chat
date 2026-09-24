@@ -1,3 +1,4 @@
+import type { ImageDimensions } from '@/shared/utils/imageDimensions'
 import type { EventId } from '@/shared/types/ids'
 import type { FileRejection } from '@/shared/utils/fileValidation'
 
@@ -21,3 +22,9 @@ export interface FileAttachment {
   cancel: () => void
   send: (options?: SendOptions) => void
 }
+
+/** Операция отправки, которую провайдер передаёт в хук состояния вложения. */
+export type SendAttachment = (
+  file: File,
+  options?: SendOptions & { dims?: ImageDimensions | undefined },
+) => Promise<void>

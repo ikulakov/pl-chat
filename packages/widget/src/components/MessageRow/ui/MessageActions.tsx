@@ -1,41 +1,33 @@
-import { isOptimistic } from '@/domain/optimistic'
-import type { ReactionSummary } from '@/domain/reactions'
 import { replyTargetOf } from '@/domain/reply'
 import { isMedia, type MessageTimelineItem } from '@/domain/timeline'
 import { useChatActions } from '@/hooks/useChatActions'
 import { useChatStore } from '@/hooks/useChatStore'
 import { t } from '@/i18n'
-import { FEATURES } from '@/shared/constants/features'
 import { Dropdown, type DropdownHandle, DropdownItem } from '@/shared/ui/Dropdown'
 import { IconButton } from '@/shared/ui/IconButton'
 import { showToast } from '@/shared/ui/Toast'
 import { CopyFilledIcon, CopyIcon, MoreIcon, ReplyIcon, RetryIcon } from '@/shared/ui/icons'
 import { copyText } from '@/shared/utils/clipboard'
 import { selectViewport } from '@/store/selectors'
-import type { Ref } from 'react'
-import { ReactionPicker } from './reactions/ReactionPicker'
+import type { ReactNode, Ref } from 'react'
 
 interface Props {
   ref?: Ref<DropdownHandle>
   message: MessageTimelineItem
   isOwn: boolean
-  reactions: ReactionSummary[]
+  reactionPicker?: ReactNode
 }
 
-export function MessageActions({ ref, message, isOwn, reactions }: Props) {
-  const { resendMessage, replyTo, toggleReaction } = useChatActions()
+export function MessageActions({ ref, message, isOwn, reactionPicker }: Props) {
+  const { resendMessage, replyTo } = useChatActions()
   const viewport = useChatStore(selectViewport)
 
   const replyTarget = replyTargetOf(message)
   const uploadFailed = isMedia(message) && message.upload?.error
 
   const canRetry = isOwn && message.sendStatus === 'failed' && !uploadFailed
-  const canReact = FEATURES.reactions && !isOptimistic(message.eventId)
   const canReply = replyTarget !== undefined
   const canCopy = message.content.body.trim() !== ''
-
-  const hasMenuItems = canRetry || canReply || canCopy
-  const disabled = !(hasMenuItems || canReact)
 
   const handleCopy = (): void => {
     void copyText(message.content.body).then((copied) => {
@@ -45,49 +37,43 @@ export function MessageActions({ ref, message, isOwn, reactions }: Props) {
     })
   }
 
-  const menuItems = hasMenuItems ? (
-    <>
-      {canRetry && (
-        <DropdownItem
-          icon={<RetryIcon />}
-          onSelect={() => resendMessage(message.localId)}
-        >
-          {t('chat.action.retry')}
-        </DropdownItem>
-      )}
+  const menuItems = [
+    canRetry && (
+      <DropdownItem
+        key="retry"
+        icon={<RetryIcon />}
+        onSelect={() => resendMessage(message.localId)}
+      >
+        {t('chat.action.retry')}
+      </DropdownItem>
+    ),
+    canReply && (
+      <DropdownItem
+        key="reply"
+        icon={<ReplyIcon />}
+        onSelect={() => replyTo(replyTarget)}
+      >
+        {t('chat.action.reply')}
+      </DropdownItem>
+    ),
+    canCopy && (
+      <DropdownItem
+        key="copy"
+        icon={<CopyIcon />}
+        onSelect={handleCopy}
+      >
+        {t('chat.action.copy')}
+      </DropdownItem>
+    ),
+  ].filter(Boolean)
 
-      {canReply && (
-        <DropdownItem
-          icon={<ReplyIcon />}
-          onSelect={() => replyTo(replyTarget)}
-        >
-          {t('chat.action.reply')}
-        </DropdownItem>
-      )}
-
-      {canCopy && (
-        <DropdownItem
-          icon={<CopyIcon />}
-          onSelect={handleCopy}
-        >
-          {t('chat.action.copy')}
-        </DropdownItem>
-      )}
-    </>
-  ) : undefined
+  const disabled = !menuItems.length && !reactionPicker
 
   return (
     <Dropdown
       ref={ref}
       disabled={disabled}
-      above={
-        canReact ? (
-          <ReactionPicker
-            summaries={reactions}
-            onToggle={(key) => void toggleReaction(message.eventId, key)}
-          />
-        ) : undefined
-      }
+      above={reactionPicker}
       trigger={(triggerProps) => (
         <IconButton
           {...triggerProps}

@@ -1,3 +1,4 @@
+import { useChatActions } from '@/hooks/useChatActions'
 import type { PropsWithChildren } from 'react'
 import { AttachmentContext } from '../AttachmentContext'
 import { DropZone } from './DropZone'
@@ -12,7 +13,8 @@ interface Props extends PropsWithChildren {
  * Composer, и DropZone берут состояние через useAttachment()
  */
 export function AttachmentProvider({ children, dropZoneEnabled = true }: Props) {
-  const attachment = useAttachmentState()
+  const { sendFile } = useChatActions()
+  const attachment = useAttachmentState(sendFile)
 
   return (
     <AttachmentContext value={attachment}>

@@ -1,0 +1,9 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* По ширине кадра (MEDIA_BOX, см. MediaImage.module.css): подпись переносится по границе
+     картинки, а не уезжает шире неё. */
+  width: 184px;
+  min-width: 0;
+}

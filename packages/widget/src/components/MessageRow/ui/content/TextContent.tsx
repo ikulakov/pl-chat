@@ -1,16 +1,18 @@
 import { splitLinks, type TextSegment } from '@/shared/utils/linkify'
+import type { ReactNode } from 'react'
 import { EmojiText } from '../../../Emoji'
-import { BubbleMeta, type BubbleMetaData } from '../bubble/BubbleMeta'
 import styles from './TextContent.module.css'
 
 interface Props {
   text: string
-  meta: BubbleMetaData
+  isOwn: boolean
+  /** Время в конце абзаца; нет — оно стоит в футере с реакциями. */
+  inlineMeta?: ReactNode
 }
 
-export function TextContent({ text, meta }: Props) {
+export function TextContent({ text, isOwn, inlineMeta }: Props) {
   // Ссылки разбираем только у оператора
-  const segments: TextSegment[] = meta.own ? [{ kind: 'text', text }] : splitLinks(text)
+  const segments: TextSegment[] = isOwn ? [{ kind: 'text', text }] : splitLinks(text)
 
   return (
     <p className={styles.text}>
@@ -33,7 +35,7 @@ export function TextContent({ text, meta }: Props) {
           />
         ),
       )}
-      <BubbleMeta {...meta} />
+      {inlineMeta}
     </p>
   )
 }

@@ -1,169 +1,198 @@
-import { aggregateReactions, type ReactionEntry } from '@/domain/reactions'
-import { replyTargetOf, type ReplyStickerPreview } from '@/domain/reply'
-import { type MessageTimelineItem } from '@/domain/timeline'
+import { replyTargetOf } from '@/domain/reply'
+import { isMedia, type MessageTimelineItem } from '@/domain/timeline'
 import { useChatActions } from '@/hooks/useChatActions'
-import { FEATURES } from '@/shared/constants/features'
 import type { LocalId, UserId } from '@/shared/types/ids'
 import type { DropdownHandle } from '@/shared/ui/Dropdown'
 import { ReplyIcon } from '@/shared/ui/icons'
 import { assertNever } from '@/shared/utils/assertNever'
 import { cn } from '@/shared/utils/cn'
-import { memo, useMemo, useRef, type ReactNode } from 'react'
+import { memo, useRef, type ReactNode } from 'react'
 import { useEmojiSegments } from '../../Emoji'
-import { ReplyPreview } from '../../ReplyPreview'
-import type { BubbleMetaData } from './bubble/BubbleMeta'
-import type { MessageGroupPosition } from '../types'
-import { MessageBubble } from './bubble/MessageBubble'
+import { getMessageReplyPreview, ReplyPreview } from '../../ReplyPreview'
+import { useMessageGestures } from '../hooks/useMessageGestures'
+import { useMessageReactions } from '../hooks/useMessageReactions'
+import type { LayoutProps, MessageGroupPosition } from '../types'
+import { getMediaUploadView } from '../utils/mediaUploadView'
 import { AdaptiveCardActions } from './content/AdaptiveCardActions'
-import { EmojiMessage } from './content/EmojiMessage'
-import { FileChip } from './content/FileChip'
-import { ImageMessage } from './content/ImageMessage'
-import { StickerMessage } from './content/StickerMessage'
+import { EmojiContent } from './content/EmojiContent'
+import { FileContent } from './content/FileContent'
+import { ImageContent } from './content/ImageContent'
+import { MediaCaption } from './content/MediaCaption'
+import { StickerContent } from './content/StickerContent'
 import { TextContent } from './content/TextContent'
+import { BubbleLayout } from './layout/BubbleLayout'
+import { UnboxedLayout } from './layout/UnboxedLayout'
 import { MessageActions } from './MessageActions'
 import styles from './MessageRow.module.css'
 import { ReactionBar } from './reactions/ReactionBar'
-import { useMessageGestures } from '../hooks/useMessageGestures'
+import { ReactionPicker } from './reactions/ReactionPicker'
 
 interface Props {
   message: MessageTimelineItem
   userId: UserId
   position: MessageGroupPosition
   readByOperator: boolean
-  reactions: ReactionEntry[] | undefined
-  replyAuthor: string | undefined
-  replyText: string | undefined
-  replySticker: ReplyStickerPreview | undefined
-  replyTargetId: LocalId | undefined
-  onReplyClick: (localId: LocalId) => void
+  replyParent: MessageTimelineItem | undefined
+  onReplyNavigate: (localId: LocalId) => void
 }
 
 export const MessageRow = memo(
-  ({
-    userId,
-    message,
-    position,
-    readByOperator,
-    reactions,
-    replyAuthor,
-    replyText,
-    replySticker,
-    replyTargetId,
-    onReplyClick,
-  }: Props) => {
+  ({ userId, message, position, readByOperator, replyParent, onReplyNavigate }: Props) => {
     const isOwn = message.sender === userId
     const isGroupStart = position === 'single' || position === 'first'
-    const replyTarget = replyTargetOf(message)
-    const { replyTo, toggleReaction } = useChatActions()
+    const swipeReplyTarget = replyTargetOf(message)
+    const { replyTo } = useChatActions()
 
     const rowRef = useRef<HTMLDivElement>(null)
     const dropdownRef = useRef<DropdownHandle>(null)
 
     const { isSwiping } = useMessageGestures(rowRef, {
-      onLongPress: () =>
-        rowRef.current && dropdownRef.current?.open({ anchor: rowRef.current, backdrop: true }),
-      onSwipe: replyTarget ? () => replyTo(replyTarget) : undefined,
+      onLongPress: () => {
+        if (rowRef.current) {
+          dropdownRef.current?.open({ anchor: rowRef.current, backdrop: true })
+        }
+      },
+      onSwipe: swipeReplyTarget ? () => replyTo(swipeReplyTarget) : undefined,
     })
 
     const { segments, layout, version } = useEmojiSegments(
       message.kind === 'text' ? message.content.body : '',
     )
 
-    // Свёртка — новая коллекция на выходе, поэтому живёт здесь, а не в селекторе.
-    // При выключённой фиче реакции продолжают копиться в сторе, но в ленту не попадают.
-    const summaries = useMemo(
-      () => (FEATURES.reactions ? aggregateReactions(reactions, userId) : []),
-      [reactions, userId],
-    )
+    const {
+      summaries,
+      canReact,
+      toggle: onToggleReaction,
+    } = useMessageReactions({
+      eventId: message.eventId,
+      userId,
+    })
 
-    const reply = replyText ? (
+    const replyPreviewData = getMessageReplyPreview({ parent: replyParent, message, userId })
+    const replyPreview = replyPreviewData ? (
       <ReplyPreview
-        author={replyAuthor}
-        text={replyText}
-        sticker={replySticker}
-        onClick={replyTargetId ? () => onReplyClick(replyTargetId) : undefined}
+        reply={replyPreviewData}
+        onNavigate={onReplyNavigate}
       />
     ) : undefined
 
-    // Один узел на все ветки: реакции одинаково нужны и пузырю, и картинке, и стикеру.
     const reactionBar =
       summaries.length > 0 ? (
         <ReactionBar
           summaries={summaries}
-          onToggle={(key) => void toggleReaction(message.eventId, key)}
+          onToggle={onToggleReaction}
         />
       ) : undefined
 
-    // Сообщение из одних эмодзи рисуется крупно и без плашки. С цитатой и с реакциями так
-    // нельзя: их не на чем показать, поэтому такое сообщение остаётся обычным баблом со
-    // строчными эмодзи.
-    const emojiOnlyLayout = layout !== 'inline' && !reply && !reactionBar ? layout : null
+    const reactionPicker = canReact ? (
+      <ReactionPicker
+        summaries={summaries}
+        onToggle={onToggleReaction}
+      />
+    ) : undefined
 
-    const bubbleProps = {
-      type: isOwn ? 'user' : 'operator',
-      position,
-      reply,
+    // Эмодзи с цитатой остаются строчными в пузыре: слот цитаты у UnboxedLayout по ширине
+    // контента, и над одиночным эмодзи её сплющит. Реакции крупным эмодзи не мешают.
+    // TODO: когда будет макет цитаты над крупным эмодзи и стикером — дать цитате без пузыря
+    // свою ширину (с потолком, а не min-width: 100%) и снять здесь !replyPreviewData.
+    const emojiOnlyLayout = layout !== 'inline' && !replyPreviewData ? layout : null
+
+    const layoutProps: LayoutProps = {
+      isOwn,
+      meta:
+        isMedia(message) && getMediaUploadView(message).isMetaHidden
+          ? null
+          : {
+              ts: message.ts,
+              delivery: isOwn ? { sendStatus: message.sendStatus, isRead: readByOperator } : null,
+            },
+      reply: replyPreview,
       reactions: reactionBar,
-    } as const
-
-    const meta: BubbleMetaData = {
-      ts: message.ts,
-      own: isOwn,
-      sendStatus: message.sendStatus,
-      isRead: readByOperator,
     }
 
-    const renderContent = (): ReactNode => {
+    const renderTextBubble = (text: string): ReactNode => (
+      <BubbleLayout
+        {...layoutProps}
+        position={position}
+      >
+        {(inlineMeta) => (
+          <TextContent
+            text={text}
+            isOwn={isOwn}
+            inlineMeta={inlineMeta}
+          />
+        )}
+      </BubbleLayout>
+    )
+
+    const renderMessage = (): ReactNode => {
       switch (message.kind) {
-        case 'sticker':
+        case 'text':
+          if (emojiOnlyLayout) {
+            return (
+              <UnboxedLayout {...layoutProps}>
+                <EmojiContent
+                  segments={segments}
+                  layout={emojiOnlyLayout}
+                  version={version}
+                />
+              </UnboxedLayout>
+            )
+          }
+          return renderTextBubble(message.content.body)
+        case 'adaptiveCard':
           return (
-            <StickerMessage
-              item={message}
-              meta={meta}
-              reactions={reactionBar}
-            />
-          )
-        case 'image':
-          return (
-            <ImageMessage
-              item={message}
-              meta={meta}
-              reply={reply}
-              reactions={reactionBar}
-            />
+            <div className={styles.adaptiveCardStack}>
+              {renderTextBubble(message.content.body)}
+              <AdaptiveCardActions item={message} />
+            </div>
           )
         case 'file':
           return (
-            <div className={styles.content}>
-              <MessageBubble {...bubbleProps}>
-                <FileChip
+            <BubbleLayout
+              {...layoutProps}
+              position={position}
+            >
+              {(inlineMeta) => (
+                <FileContent
                   item={message}
-                  meta={meta}
+                  inlineMeta={inlineMeta}
                 />
-              </MessageBubble>
-            </div>
+              )}
+            </BubbleLayout>
           )
-        case 'text':
-        case 'adaptiveCard':
-          return emojiOnlyLayout ? (
-            <EmojiMessage
-              segments={segments}
-              layout={emojiOnlyLayout}
-              version={version}
-              meta={meta}
-            />
-          ) : (
-            <div className={styles.content}>
-              <MessageBubble {...bubbleProps}>
-                <TextContent
-                  text={message.content.body}
-                  meta={meta}
-                />
-              </MessageBubble>
-              {message.kind === 'adaptiveCard' && <AdaptiveCardActions item={message} />}
-            </div>
+        case 'image':
+          // С подписью кадр — верх пузыря, а подпись и время под ним; без подписи кадр стоит
+          // сам по себе, и время — пилюлей на нём.
+          if (message.content.body.length > 0) {
+            return (
+              <BubbleLayout
+                {...layoutProps}
+                position={position}
+                media={<ImageContent item={message} />}
+              >
+                {(inlineMeta) => (
+                  <MediaCaption
+                    body={message.content.body}
+                    inlineMeta={inlineMeta}
+                  />
+                )}
+              </BubbleLayout>
+            )
+          }
+          return (
+            <UnboxedLayout {...layoutProps}>
+              <ImageContent item={message} />
+            </UnboxedLayout>
           )
-
+        case 'sticker':
+          // TODO: ответ стикером бэкенд пока не поддерживает — когда появится, сверить цитату
+          // над стикером с макетом (слот reply у UnboxedLayout уже передаётся).
+          return (
+            <UnboxedLayout {...layoutProps}>
+              <StickerContent item={message} />
+            </UnboxedLayout>
+          )
         default:
           return assertNever(message)
       }
@@ -172,31 +201,27 @@ export const MessageRow = memo(
     return (
       <div
         ref={rowRef}
-        className={cn(
-          styles.messageRow,
-          isOwn && styles.own,
-          isGroupStart && styles.groupStart,
-          isSwiping && styles.swiping,
-        )}
-        data-role="message-row"
+        className={cn(styles.messageRow, isOwn && styles.own, isGroupStart && styles.groupStart)}
+        data-testid="message-row"
       >
         <MessageActions
           ref={dropdownRef}
           message={message}
           isOwn={isOwn}
-          reactions={summaries}
+          reactionPicker={reactionPicker}
         />
 
         {isSwiping && (
           <span
             className={styles.swipeHint}
+            data-testid="message-swipe-hint"
             aria-hidden="true"
           >
             <ReplyIcon />
           </span>
         )}
 
-        {renderContent()}
+        {renderMessage()}
       </div>
     )
   },

@@ -5,19 +5,6 @@
   border-top: 1px solid var(--c-border);
 }
 
-.replyRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px 12px 2px;
-  color: var(--c-text-primary);
-}
-
-.replyPreview {
-  flex: 1;
-  min-width: 0;
-}
-
 .field {
   display: flex;
   align-items: flex-start;

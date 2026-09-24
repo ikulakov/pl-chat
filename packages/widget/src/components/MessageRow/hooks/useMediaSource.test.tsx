@@ -1,6 +1,6 @@
 import { MediaUnavailableError } from '@/domain/mediaFailure'
 import { chatStore } from '@/store/store'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useMediaSource } from './useMediaSource'
 
@@ -13,6 +13,68 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
 const SIZE = { width: 320, height: 240 }
 
 describe('useMediaSource', () => {
+  it('чужой вердикт не вызывает рендер, свой ready сохраняет загруженный object-URL', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview')
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const rendered = vi.fn()
+    const { result } = renderHook(() => {
+      rendered()
+      return useMediaSource({ mxcUrl: 'mxc://bank.ru/abc', size: SIZE })
+    })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    const source = result.current
+    rendered.mockClear()
+
+    const ready = (mediaId: 'other' | 'abc') =>
+      act(() => {
+        chatStore.getState().dispatch({
+          type: 'sync.received',
+          cursor: mediaId,
+          room: {
+            timeline: [],
+            readMarkers: [],
+            reactions: [],
+            cardAnswers: [],
+            prevBatch: null,
+            mediaVerdicts: [{ mediaId, verdict: { status: 'ready' } }],
+          },
+        })
+      })
+
+    ready('other')
+    expect(rendered).not.toHaveBeenCalled()
+    ready('abc')
+    expect(result.current).toBe(source)
+    expect(loadPreview).toHaveBeenCalledOnce()
+    expect(revoke).not.toHaveBeenCalled()
+  })
+
+  it('при смене URL читает вердикт нового файла и не сохраняет отказ предыдущего', async () => {
+    act(() =>
+      chatStore.getState().dispatch({
+        type: 'sync.received',
+        cursor: 's1',
+        room: {
+          timeline: [],
+          readMarkers: [],
+          reactions: [],
+          cardAnswers: [],
+          prevBatch: null,
+          mediaVerdicts: [{ mediaId: 'abc', verdict: { status: 'rejected' } }],
+        },
+      }),
+    )
+    const { result, rerender } = renderHook(
+      ({ url }) => useMediaSource({ mxcUrl: url, size: SIZE }),
+      { initialProps: { url: 'mxc://bank.ru/abc' } },
+    )
+    expect(result.current.status).toBe('rejected')
+    expect(loadPreview).not.toHaveBeenCalled()
+    rerender({ url: 'mxc://bank.ru/other' })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(loadPreview).toHaveBeenCalledExactlyOnceWith('mxc://bank.ru/other', SIZE)
+  })
+
   afterEach(() => {
     loadPreview.mockReset()
     loadPreview.mockResolvedValue(new Blob(['bytes']))
