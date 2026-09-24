@@ -238,12 +238,12 @@ export default tseslint.config(
   // она обязана совпадать с build.target в packages/widget/vite.config.ts.
   // Покрываем ВСЕ пакеты, а не только виджет: loader грузится на каждом просмотре
   // страницы хоста, а protocol вкомпилирован в оба, и его код исполняется на
-  // странице банка. Обоснование планки — docs/adr/browser-support.md.
+  // странице банка. Планка задана в .browserslistrc.
   //
   // Охват неполный по устройству плагина: он надёжно видит глобалы и статические
   // методы (AbortSignal.timeout, crypto.randomUUID), но не методы экземпляра —
   // тип получателя ему неизвестен, поэтому array.at() и array.findLast() он
-  // пропустит. Зелёный линтер не отменяет ревью, см. rules/frontend.md.
+  // пропустит. Зелёный линтер не отменяет ревью этих методов.
   {
     ...compat.configs['flat/recommended'],
     files: ['packages/*/src/**/*.{ts,tsx}'],

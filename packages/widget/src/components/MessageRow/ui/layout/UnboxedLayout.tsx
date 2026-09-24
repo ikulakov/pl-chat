@@ -9,7 +9,7 @@ interface Props extends LayoutProps {
 }
 
 /**
- * Оболочка сообщения без пузыря: картинка без подписи, стикер, крупные эмодзи. Время — пилюля поверх угла
+ * Оболочка сообщения без пузыря: картинка, стикер, крупные эмодзи. Время — пилюля поверх угла
  * контента, реакции — строкой под ним. Пара в пузыре — `BubbleLayout`.
  */
 export function UnboxedLayout({ isOwn, meta, reply, reactions, children }: Props) {

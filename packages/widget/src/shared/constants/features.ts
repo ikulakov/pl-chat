@@ -17,11 +17,8 @@ export interface WidgetFeatures {
    * рисуются системным шрифтом. Стикеры оператора не затрагиваются.
    */
   emoji: boolean
-  /** Реакции: чипы под сообщением и панель быстрых реакций в меню сообщения. */
-  reactions: boolean
 }
 
 export const FEATURES: WidgetFeatures = {
   emoji: false,
-  reactions: false,
 }

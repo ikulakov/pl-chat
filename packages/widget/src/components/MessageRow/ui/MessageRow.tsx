@@ -17,7 +17,6 @@ import { AdaptiveCardActions } from './content/AdaptiveCardActions'
 import { EmojiContent } from './content/EmojiContent'
 import { FileContent } from './content/FileContent'
 import { ImageContent } from './content/ImageContent'
-import { MediaCaption } from './content/MediaCaption'
 import { StickerContent } from './content/StickerContent'
 import { TextContent } from './content/TextContent'
 import { BubbleLayout } from './layout/BubbleLayout'
@@ -162,24 +161,6 @@ export const MessageRow = memo(
             </BubbleLayout>
           )
         case 'image':
-          // С подписью кадр — верх пузыря, а подпись и время под ним; без подписи кадр стоит
-          // сам по себе, и время — пилюлей на нём.
-          if (message.content.body.length > 0) {
-            return (
-              <BubbleLayout
-                {...layoutProps}
-                position={position}
-                media={<ImageContent item={message} />}
-              >
-                {(inlineMeta) => (
-                  <MediaCaption
-                    body={message.content.body}
-                    inlineMeta={inlineMeta}
-                  />
-                )}
-              </BubbleLayout>
-            )
-          }
           return (
             <UnboxedLayout {...layoutProps}>
               <ImageContent item={message} />
