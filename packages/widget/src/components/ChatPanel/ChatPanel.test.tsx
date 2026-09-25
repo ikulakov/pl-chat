@@ -10,6 +10,7 @@ import type * as MessageListModule from '../MessageList/ui/MessageList'
 // Панель тянет за собой ленту и композер, которым нужен живой ChatController —
 // в этом тесте нас интересует только подпись в шапке.
 const reconnect = vi.hoisted(() => vi.fn())
+const loadMoreHistory = vi.hoisted(() => vi.fn())
 // Переключатель падения ленты: в остальных тестах она рендерится как есть.
 const listCrash = vi.hoisted(() => ({ enabled: false }))
 
@@ -30,7 +31,7 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => ({
     loadEmojiIndex: vi.fn(),
     resendMessage: vi.fn(),
     markRead: vi.fn(),
-    loadMoreHistory: vi.fn(),
+    loadMoreHistory,
     stopLoadingHistory: vi.fn(),
     sendMessage: vi.fn(),
     sendFile: vi.fn(),
@@ -105,7 +106,59 @@ describe('ChatPanel — экран приветствия', () => {
   }
 
   beforeEach(() => {
+    loadMoreHistory.mockClear()
     chatStore.setState({ ...INITIAL_RUNTIME_STATE, room: INITIAL_ROOM_STATE })
+  })
+
+  it('догружает историю, если initial sync содержит реакции без сообщений', () => {
+    chatStore.setState({
+      ...readyState,
+      room: {
+        ...INITIAL_ROOM_STATE,
+        prevBatch: 'older',
+        reactions: { $message: [{ eventId: '$reaction', sender: '@me:bank', key: '👍' }] },
+      },
+    })
+
+    render(<ChatPanel />)
+
+    expect(screen.queryByText(t('status.welcome'))).not.toBeInTheDocument()
+    expect(screen.getByTestId('message-list')).toBeInTheDocument()
+    expect(loadMoreHistory).toHaveBeenCalled()
+
+    act(() =>
+      chatStore.getState().dispatch({
+        type: 'history.loaded',
+        items: [textItem({ eventId: '$message', body: 'Сообщение из истории' })],
+        reactions: [],
+        cardAnswers: [],
+        mediaVerdicts: [],
+        prevBatch: null,
+      }),
+    )
+
+    expect(screen.getByText('Сообщение из истории')).toBeInTheDocument()
+    expect(screen.queryByText(t('status.welcome'))).not.toBeInTheDocument()
+  })
+
+  it('показывает приветствие только после проверки действительно пустой истории', () => {
+    chatStore.setState({ ...readyState, room: { ...INITIAL_ROOM_STATE, prevBatch: 'older' } })
+    render(<ChatPanel />)
+    expect(screen.queryByText(t('status.welcome'))).not.toBeInTheDocument()
+
+    act(() =>
+      chatStore.getState().dispatch({
+        type: 'history.loaded',
+        items: [],
+        reactions: [],
+        cardAnswers: [],
+        mediaVerdicts: [],
+        prevBatch: null,
+      }),
+    )
+
+    expect(screen.getByText(t('status.welcome'))).toBeInTheDocument()
+    expect(screen.queryByTestId('message-list')).not.toBeInTheDocument()
   })
 
   it('показывает приветствие вместо ленты, пока сообщений в комнате нет', () => {

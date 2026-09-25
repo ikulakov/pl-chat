@@ -3,8 +3,6 @@ import {
   addReaction,
   aggregateReactions,
   applyReactionDelta,
-  confirmReaction,
-  findOwnReaction,
   removeReaction,
   type ReactionIndex,
 } from './reactions'
@@ -28,65 +26,23 @@ describe('addReaction', () => {
     ])
   })
 
-  it('схлопывает эхо из /sync с оптимистичной записью того же автора и ключа', () => {
-    // сервер дедуплицирует по (target, sender, key) — две такие записи всегда одно событие
-    const optimistic = addReaction({}, '$m1', {
-      eventId: 'optimistic:l1',
-      sender: ME,
-      key: '👍',
-    })
-
-    const echoed = addReaction(optimistic, '$m1', { eventId: '$r1', sender: ME, key: '👍' })
-
-    expect(echoed['$m1']).toEqual([{ eventId: '$r1', sender: ME, key: '👍' }])
-  })
-
-  it('не даёт оптимистичной записи затереть уже известный реальный eventId', () => {
-    // иначе снятие реакции упёрлось бы в placeholder и редакцию слать было бы некуда
-    const real = addReaction({}, '$m1', { eventId: '$r1', sender: ME, key: '👍' })
-
-    const next = addReaction(real, '$m1', { eventId: 'optimistic:l1', sender: ME, key: '👍' })
-
-    expect(next).toBe(real)
-  })
-
   it('повторное добавление того же события не создаёт новую ссылку', () => {
+    // так приходит эхо из /sync на реакцию, уже записанную по ответу сервера
     const index = addReaction({}, '$m1', { eventId: '$r1', sender: ME, key: '👍' })
 
     expect(addReaction(index, '$m1', { eventId: '$r1', sender: ME, key: '👍' })).toBe(index)
   })
 })
 
-describe('confirmReaction', () => {
-  it('меняет оптимистичный eventId на серверный', () => {
-    const optimistic = addReaction({}, '$m1', {
-      eventId: 'optimistic:l1',
-      sender: ME,
-      key: '👍',
-    })
-
-    const confirmed = confirmReaction(optimistic, '$m1', {
-      draft: 'optimistic:l1',
-      confirmed: '$r1',
-    })
-
-    expect(confirmed['$m1']).toEqual([{ eventId: '$r1', sender: ME, key: '👍' }])
-  })
-
-  it('ничего не делает, если эхо из /sync уже подменило запись', () => {
-    const echoed = addReaction({}, '$m1', { eventId: '$r1', sender: ME, key: '👍' })
-
-    expect(confirmReaction(echoed, '$m1', { draft: 'optimistic:l1', confirmed: '$r1' })).toBe(
-      echoed,
-    )
-  })
-})
-
 describe('removeReaction', () => {
-  it('убирает запись и выбрасывает опустевшее сообщение из индекса', () => {
-    const index = addReaction({}, '$m1', { eventId: '$r1', sender: ME, key: '👍' })
+  it('находит цель сама — редакция называет только событие реакции', () => {
+    const index: ReactionIndex = {
+      $m1: [{ eventId: '$r1', sender: ME, key: '👍' }],
+      $m2: [{ eventId: '$r2', sender: OPERATOR, key: '❤️' }],
+    }
 
-    expect(removeReaction(index, '$m1', '$r1')).toEqual({})
+    // опустевшее сообщение уходит из индекса целиком
+    expect(removeReaction(index, '$r2')).toEqual({ $m1: index['$m1'] })
   })
 
   it('не трогает реакции соседних сообщений и сохраняет их ссылки', () => {
@@ -95,7 +51,7 @@ describe('removeReaction', () => {
       $m2: [{ eventId: '$r2', sender: OPERATOR, key: '❤️' }],
     }
 
-    const next = removeReaction(index, '$m1', '$r1')
+    const next = removeReaction(index, '$r1')
 
     // ссылочная стабильность нетронутого сообщения — от неё зависит memo на MessageRow
     expect(next['$m2']).toBe(index['$m2'])
@@ -104,7 +60,7 @@ describe('removeReaction', () => {
   it('возвращает тот же индекс, когда снимать нечего', () => {
     const index = addReaction({}, '$m1', { eventId: '$r1', sender: ME, key: '👍' })
 
-    expect(removeReaction(index, '$m1', '$unknown')).toBe(index)
+    expect(removeReaction(index, '$unknown')).toBe(index)
   })
 })
 
@@ -121,16 +77,6 @@ describe('applyReactionDelta', () => {
     expect(index['$m1']).toHaveLength(1)
   })
 
-  it('находит цель редакции сама — в самом событии редакции её нет', () => {
-    const index = applyReactionDelta({}, [
-      { op: 'add', targetEventId: '$m1', entry: { eventId: '$r1', sender: ME, key: '👍' } },
-      { op: 'add', targetEventId: '$m2', entry: { eventId: '$r2', sender: ME, key: '❤️' } },
-      { op: 'remove', eventId: '$r2' },
-    ])
-
-    expect(Object.keys(index)).toEqual(['$m1'])
-  })
-
   it('хранит реакцию на ещё не подгруженное сообщение', () => {
     // страница истории dir=b отдаёт реакцию раньше её цели
     const index = applyReactionDelta({}, [
@@ -142,22 +88,20 @@ describe('applyReactionDelta', () => {
 })
 
 describe('aggregateReactions', () => {
-  it('считает реакции по ключу и помечает свою её eventId', () => {
+  it('считает реакции по ключу и помечает свою', () => {
     const summaries = aggregateReactions(
       [
         { eventId: '$r1', sender: OPERATOR, key: '👍' },
         { eventId: '$r2', sender: ME, key: '👍' },
+        { eventId: '$r3', sender: OPERATOR, key: '❤️' },
       ],
       ME,
     )
 
-    expect(summaries).toEqual([{ key: '👍', count: 2, ownEventId: '$r2' }])
-  })
-
-  it('оставляет ownEventId пустым, когда своей реакции нет', () => {
-    const summaries = aggregateReactions([{ eventId: '$r1', sender: OPERATOR, key: '👍' }], ME)
-
-    expect(summaries).toEqual([{ key: '👍', count: 1, ownEventId: null }])
+    expect(summaries).toEqual([
+      { key: '👍', count: 2, isOwn: true },
+      { key: '❤️', count: 1, isOwn: false },
+    ])
   })
 
   it('держит порядок по первому появлению ключа, а не по автору', () => {
@@ -174,21 +118,36 @@ describe('aggregateReactions', () => {
     expect(summaries.map((s) => s.key)).toEqual(['❤️', '👍'])
   })
 
+  it('считает участников, а не события: дубль одного автора — один голос', () => {
+    // сервер дедуплицирует асинхронно — два быстрых запроса из двух вкладок оставляют два события
+    const summaries = aggregateReactions(
+      [
+        { eventId: '$r1', sender: ME, key: '👍' },
+        { eventId: '$r2', sender: ME, key: '👍' },
+      ],
+      ME,
+    )
+
+    expect(summaries).toEqual([{ key: '👍', count: 1, isOwn: true }])
+  })
+
+  it('недоведённый выбор заменяет свои реакции из индекса, чужие оставляя', () => {
+    const entries = [
+      { eventId: '$r1', sender: OPERATOR, key: '👍' },
+      { eventId: '$r2', sender: ME, key: '👍' },
+      { eventId: '$r3', sender: ME, key: '😂' },
+    ]
+
+    expect(aggregateReactions(entries, ME, '❤️')).toEqual([
+      { key: '👍', count: 1, isOwn: false },
+      { key: '❤️', count: 1, isOwn: true },
+    ])
+    // выбор «снять» прячет свои сразу, не дожидаясь редакции
+    expect(aggregateReactions(entries, ME, null)).toEqual([{ key: '👍', count: 1, isOwn: false }])
+  })
+
   it('на сообщении без реакций отдаёт пустой список', () => {
     expect(aggregateReactions(undefined, ME)).toEqual([])
-  })
-})
-
-describe('findOwnReaction', () => {
-  it('находит только свою реакцию с этим ключом', () => {
-    const index: ReactionIndex = {
-      $m1: [
-        { eventId: '$r1', sender: OPERATOR, key: '👍' },
-        { eventId: '$r2', sender: ME, key: '❤️' },
-      ],
-    }
-
-    expect(findOwnReaction(index, '$m1', ME, '👍')).toBeUndefined()
-    expect(findOwnReaction(index, '$m1', ME, '❤️')?.eventId).toBe('$r2')
+    expect(aggregateReactions(undefined, ME, null)).toEqual([])
   })
 })

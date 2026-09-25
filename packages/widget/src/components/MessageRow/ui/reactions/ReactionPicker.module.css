@@ -1,7 +1,8 @@
 .picker {
   display: flex;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 8px;
+  max-width: calc(100vw - 16px);
   border-radius: var(--radius-lg);
   background: var(--c-surface-primary);
   box-shadow: var(--shadow-floating);
@@ -13,21 +14,11 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-lg);
-  background: transparent;
-  font-size: 26px;
-  line-height: 1;
-  cursor: pointer;
+  border-radius: var(--radius-md);
+  font-size: 28px;
   transition: background var(--dur-fast);
 
-  &:hover,
-  &:focus-visible {
+  &[aria-pressed='true'] {
     background: var(--c-surface-secondary);
-  }
-
-  &.own {
-    background: var(--c-surface-accent-soft);
   }
 }

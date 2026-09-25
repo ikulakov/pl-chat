@@ -25,7 +25,11 @@ export interface DropdownCloseOptions {
   returnFocus?: boolean
 }
 
-/** Открытие не с триггера — например, долгим нажатием на сообщение. При `disabled` — no-op. */
+/**
+ * Управление меню снаружи — например, из обработчиков жестов и выбора реакции. `open` при
+ * `disabled` — no-op.
+ */
 export interface DropdownHandle {
   open: (options?: DropdownOpenOptions) => void
+  close: (options?: DropdownCloseOptions) => void
 }

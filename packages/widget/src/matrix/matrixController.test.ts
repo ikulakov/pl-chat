@@ -1138,7 +1138,9 @@ describe('MatrixController (orchestrator)', () => {
     expect(api.registerGuest).not.toHaveBeenCalled()
   })
 
-  it('toggleReaction ставит реакцию оптимистично и подтверждает её серверным eventId', async () => {
+  // Механика реакций проверяется в matrix/reactions/matrixReactions.test.ts; здесь — только
+  // проводка: вызов, эскалация auth-ошибки и сброс при смене сессии.
+  it('toggleReaction ставит реакцию: в сторе серверный id, выбор снят', async () => {
     const api = makeMatrixApi()
     const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
@@ -1153,68 +1155,25 @@ describe('MatrixController (orchestrator)', () => {
     expect(getState().room.reactions['$m1']).toEqual([
       { eventId: '$reaction', sender: IDENTITY.userId, key: '👍' },
     ])
+    expect(getState().room.pendingReactions).toEqual({})
   })
 
-  it('toggleReaction вторым вызовом снимает свою реакцию редакцией, а не шлёт вторую', async () => {
-    const api = makeMatrixApi()
-    const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
-
-    await controller.toggleReaction('$m1', '👍')
-    await controller.toggleReaction('$m1', '👍')
-
-    expect(api.sendReaction).toHaveBeenCalledOnce()
-    expect(api.redactEvent).toHaveBeenCalledExactlyOnceWith({
-      roomId: IDENTITY.roomId,
-      txnId: expect.any(String),
-      eventId: '$reaction',
-    })
-    expect(getState().room.reactions).toEqual({})
-  })
-
-  it('toggleReaction откатывает реакцию, если отправка не прошла', async () => {
+  it('toggleReaction отдаёт auth-ошибку в восстановление сессии', async () => {
     const api = makeMatrixApi({
-      sendReaction: vi.fn<MatrixApi['sendReaction']>().mockRejectedValue(new Error('net')),
+      sendReaction: vi
+        .fn<MatrixApi['sendReaction']>()
+        .mockRejectedValue(new MatrixError('M_UNKNOWN_TOKEN', 'expired')),
     })
-    const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
+    const { controller, applied, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
 
     await controller.toggleReaction('$m1', '👍')
 
-    expect(getState().room.reactions).toEqual({})
+    await vi.waitFor(() => expect(applied).toContainEqual({ type: 'session.recovering' }))
+    await vi.waitFor(() => expect(getState().phase).toBe('ready'))
+    controller.disconnect()
   })
 
-  it('toggleReaction возвращает реакцию на место, если редакция не прошла', async () => {
-    const api = makeMatrixApi({
-      redactEvent: vi.fn<MatrixApi['redactEvent']>().mockRejectedValue(new Error('net')),
-    })
-    const { controller, getState } = harness({ phase: 'ready', identity: IDENTITY }, api)
-
-    await controller.toggleReaction('$m1', '👍')
-    await controller.toggleReaction('$m1', '👍')
-
-    expect(getState().room.reactions['$m1']).toEqual([
-      { eventId: '$reaction', sender: IDENTITY.userId, key: '👍' },
-    ])
-  })
-
-  it('toggleReaction ничего не шлёт на черновик: аннотировать нечего, серверного id ещё нет', async () => {
-    const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'ready', identity: IDENTITY }, api)
-
-    await controller.toggleReaction('optimistic:l1', '👍')
-
-    expect(api.sendReaction).not.toHaveBeenCalled()
-  })
-
-  it('toggleReaction молчит вне подключения', async () => {
-    const api = makeMatrixApi()
-    const { controller } = harness({ phase: 'connecting', identity: IDENTITY }, api)
-
-    await controller.toggleReaction('$m1', '👍')
-
-    expect(api.sendReaction).not.toHaveBeenCalled()
-  })
-
-  it('toggleReaction не подтверждает реакцию из мёртвого поколения сессии', async () => {
+  it('disconnect гасит доводку реакций: поздний ответ прежней сессии стор не трогает', async () => {
     const send = deferred<{ event_id: string }>()
     const api = makeMatrixApi({
       sendReaction: vi.fn<MatrixApi['sendReaction']>().mockReturnValue(send.promise),
@@ -1226,7 +1185,7 @@ describe('MatrixController (orchestrator)', () => {
     send.resolve({ event_id: '$r1' })
     await promise
 
-    expect(applied.some((action) => action.type === 'reaction.confirmed')).toBe(false)
+    expect(applied.some((action) => action.type === 'reaction.added')).toBe(false)
   })
 
   it('markRead moves the store marker optimistically and posts the receipt', async () => {

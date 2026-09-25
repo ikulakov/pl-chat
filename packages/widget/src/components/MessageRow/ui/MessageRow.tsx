@@ -86,15 +86,12 @@ export const MessageRow = memo(
     const reactionPicker = canReact ? (
       <ReactionPicker
         summaries={summaries}
-        onToggle={onToggleReaction}
+        onToggle={(key) => {
+          onToggleReaction(key)
+          dropdownRef.current?.close()
+        }}
       />
     ) : undefined
-
-    // Эмодзи с цитатой остаются строчными в пузыре: слот цитаты у UnboxedLayout по ширине
-    // контента, и над одиночным эмодзи её сплющит. Реакции крупным эмодзи не мешают.
-    // TODO: когда будет макет цитаты над крупным эмодзи и стикером — дать цитате без пузыря
-    // свою ширину (с потолком, а не min-width: 100%) и снять здесь !replyPreviewData.
-    const emojiOnlyLayout = layout !== 'inline' && !replyPreviewData ? layout : null
 
     const layoutProps: LayoutProps = {
       isOwn,
@@ -127,12 +124,12 @@ export const MessageRow = memo(
     const renderMessage = (): ReactNode => {
       switch (message.kind) {
         case 'text':
-          if (emojiOnlyLayout) {
+          if (layout !== 'inline') {
             return (
               <UnboxedLayout {...layoutProps}>
                 <EmojiContent
                   segments={segments}
-                  layout={emojiOnlyLayout}
+                  layout={layout}
                   version={version}
                 />
               </UnboxedLayout>
@@ -155,6 +152,7 @@ export const MessageRow = memo(
               {(inlineMeta) => (
                 <FileContent
                   item={message}
+                  isOwn={isOwn}
                   inlineMeta={inlineMeta}
                 />
               )}
@@ -162,13 +160,21 @@ export const MessageRow = memo(
           )
         case 'image':
           return (
-            <UnboxedLayout {...layoutProps}>
+            <UnboxedLayout
+              {...layoutProps}
+              caption={
+                message.content.body.length > 0 ? (
+                  <TextContent
+                    text={message.content.body}
+                    isOwn={isOwn}
+                  />
+                ) : undefined
+              }
+            >
               <ImageContent item={message} />
             </UnboxedLayout>
           )
         case 'sticker':
-          // TODO: ответ стикером бэкенд пока не поддерживает — когда появится, сверить цитату
-          // над стикером с макетом (слот reply у UnboxedLayout уже передаётся).
           return (
             <UnboxedLayout {...layoutProps}>
               <StickerContent item={message} />

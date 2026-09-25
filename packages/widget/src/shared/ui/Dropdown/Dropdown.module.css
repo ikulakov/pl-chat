@@ -5,6 +5,13 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
+  /* Слой по ширине самого широкого из детей: поля рядом с узким ребёнком и зазор между ними
+     пропускают клик к ленте под слоем, а не глотают его. */
+  pointer-events: none;
+
+  & > * {
+    pointer-events: auto;
+  }
 }
 
 .dropdown {
@@ -31,4 +38,3 @@
     opacity: 0;
   }
 }
-

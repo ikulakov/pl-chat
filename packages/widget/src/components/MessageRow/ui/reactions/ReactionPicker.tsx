@@ -1,8 +1,6 @@
 import type { ReactionSummary } from '@/domain/reactions'
 import { t } from '@/i18n'
-import { cn } from '@/shared/utils/cn'
-import { useRef } from 'react'
-import { QUICK_REACTIONS } from '../../utils/quickReactions'
+import { useState, type KeyboardEvent } from 'react'
 import styles from './ReactionPicker.module.css'
 
 interface Props {
@@ -10,59 +8,59 @@ interface Props {
   onToggle: (key: string) => void
 }
 
+/**
+ * Полный пикер эмодзи (кнопка «⌄» в макете) приедет отдельной задачей — до тех пор седьмого
+ * слота нет: кнопка без обработчика хуже её отсутствия.
+ */
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏']
+
 export function ReactionPicker({ summaries, onToggle }: Props) {
-  const listRef = useRef<HTMLDivElement>(null)
+  const [focusedIndex, setFocusedIndex] = useState(0)
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const buttons = Array.from(listRef.current?.querySelectorAll<HTMLElement>('button') ?? [])
-    if (buttons.length === 0) return
+  // Своя реакция на сообщение одна: выбор другой заменяет её (MatrixReactions). Своих бывает и
+  // несколько — их оставляет вторая вкладка; нажатая любая из них снимает все, так и помечаем.
+  const ownKeys = new Set(summaries.filter((s) => s.isOwn).map((s) => s.key))
 
-    const current = buttons.indexOf(document.activeElement as HTMLElement)
-
-    switch (event.key) {
-      case 'ArrowRight':
-        event.preventDefault()
-        buttons[(current + 1) % buttons.length]?.focus()
-        break
-      case 'ArrowLeft':
-        event.preventDefault()
-        buttons[(current - 1 + buttons.length) % buttons.length]?.focus()
-        break
-      case 'Home':
-        event.preventDefault()
-        buttons[0]?.focus()
-        break
-      case 'End':
-        event.preventDefault()
-        buttons[buttons.length - 1]?.focus()
-        break
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const count = QUICK_REACTIONS.length
+    const nextIndexByKey: Partial<Record<string, number>> = {
+      ArrowRight: (focusedIndex + 1) % count,
+      ArrowLeft: (focusedIndex - 1 + count) % count,
+      Home: 0,
+      End: count - 1,
     }
+    const nextIndex = nextIndexByKey[event.key]
+    if (nextIndex === undefined) return
+
+    event.preventDefault()
+    event.currentTarget.querySelectorAll<HTMLButtonElement>('button')[nextIndex]?.focus()
   }
 
   return (
     <div
-      ref={listRef}
+      data-testid="reaction-picker"
       role="toolbar"
       aria-label={t('chat.reaction.pick')}
       className={styles.picker}
       onKeyDown={handleKeyDown}
     >
-      {QUICK_REACTIONS.map((key) => {
-        const isOwn = summaries.some((s) => s.key === key && s.ownEventId !== null)
-
-        return (
-          <button
-            key={key}
-            type="button"
-            className={cn(styles.item, isOwn && styles.own)}
-            aria-pressed={isOwn}
-            aria-label={t(isOwn ? 'chat.reaction.remove' : 'chat.reaction.add', { emoji: key })}
-            onClick={() => onToggle(key)}
-          >
-            {key}
-          </button>
-        )
-      })}
+      {QUICK_REACTIONS.map((key, index) => (
+        <button
+          key={key}
+          data-testid={`reaction-picker-${key}`}
+          type="button"
+          className={styles.item}
+          aria-pressed={ownKeys.has(key)}
+          aria-label={t(ownKeys.has(key) ? 'chat.reaction.remove' : 'chat.reaction.add', {
+            emoji: key,
+          })}
+          tabIndex={index === focusedIndex ? 0 : -1}
+          onFocus={() => setFocusedIndex(index)}
+          onClick={() => onToggle(key)}
+        >
+          {key}
+        </button>
+      ))}
     </div>
   )
 }

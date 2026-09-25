@@ -4,17 +4,19 @@
   align-items: flex-start;
   gap: 4px;
   padding: 4px 0;
+  min-width: 0;
+  max-width: 100%;
 
   &.own {
     align-items: flex-end;
   }
 }
 
-/* Цитата не шире контента: сама в ширину колонки не вкладывается (width: 0),
-   но растягивается до неё (min-width: 100%). Иначе длинная цитата раздула бы колонку. */
-.reply {
-  width: 0;
-  min-width: 100%;
+/* Ширина оценена по изображению макета; не зависит от размера эмодзи.
+   Ограничение переопределяет max-width общего стиля пузыря. */
+.message > .reply {
+  width: 214px;
+  max-width: 100%;
 }
 
 .frame {

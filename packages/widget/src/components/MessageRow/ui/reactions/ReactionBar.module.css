@@ -1,7 +1,8 @@
 .bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .chip {
@@ -10,10 +11,8 @@
   gap: 4px;
   height: 24px;
   padding: 4px 8px;
-  border: none;
   border-radius: var(--radius-md);
   background: var(--c-surface-secondary);
-  cursor: pointer;
   transition: background var(--dur-fast);
 
   &.own {
@@ -22,7 +21,13 @@
 }
 
 .emoji {
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  font-size: 13px;
   line-height: 16px;
 }
 

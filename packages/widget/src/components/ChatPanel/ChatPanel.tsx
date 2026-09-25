@@ -7,7 +7,7 @@ import { externalLinks } from '@/shared/constants/externalLinks'
 import { Spinner } from '@/shared/ui/Spinner'
 import { StatusScreen, StatusScreenAction, StatusScreenImage } from '@/shared/ui/StatusScreen'
 import {
-  selectHasMessages,
+  selectIsRoomEmpty,
   selectPanelView,
   selectPhase,
   selectUserId,
@@ -26,7 +26,7 @@ export function ChatPanel() {
   const phase = useChatStore(selectPhase)
   const userId = useChatStore(selectUserId)
   const viewport = useChatStore(selectViewport)
-  const hasMessages = useChatStore(selectHasMessages)
+  const isRoomEmpty = useChatStore(selectIsRoomEmpty)
 
   const { reconnect } = useChatActions()
 
@@ -64,7 +64,7 @@ export function ChatPanel() {
 
         {view === 'chat' && (
           <AttachmentProvider dropZoneEnabled={viewport !== 'fullscreen'}>
-            {hasMessages && userId ? (
+            {!isRoomEmpty && userId ? (
               <MessageList userId={userId} />
             ) : (
               <StatusScreen

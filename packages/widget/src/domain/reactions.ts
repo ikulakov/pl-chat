@@ -1,16 +1,25 @@
 import type { EventId, UserId } from '@/shared/types/ids'
-import { isOptimistic } from './optimistic'
 
 /** Одно событие `m.reaction`: кто и чем отреагировал. */
 export interface ReactionEntry {
-  // id события реакции; до ответа сервера — placeholder `optimistic:{uuid}`
   eventId: EventId
   sender: UserId
   key: string
 }
 
-/** Реакции по id целевого сообщения. */
+/**
+ * Реакции по id целевого сообщения — только то, что подтвердил сервер: события из `/sync` и
+ * истории плюс ответы на свои запросы. Свой ещё не подтверждённый выбор сюда не пишется, он
+ * лежит рядом (`PendingReactions`) и только накрывает индекс при показе. Поэтому откатывать
+ * индекс не приходится никогда: в нём ровно то, что прошло.
+ */
 export type ReactionIndex = Record<EventId, ReactionEntry[]>
+
+/**
+ * Своя реакция, выбранная, но ещё не доведённая до сервера: ключ или null — снять.
+ * Пока выбор есть, он заменяет свои реакции из индекса в том, что видит пользователь.
+ */
+export type PendingReactions = Record<EventId, string | null>
 
 /**
  * Изменения реакций одной порции событий, в хронологическом порядке.
@@ -26,93 +35,47 @@ export type ReactionOp =
   // редакция адресует событие реакции, а не сообщение, и цель из неё не восстановить
   | { op: 'remove'; eventId: EventId }
 
-/**
- * Подтверждение реакции: черновик получил настоящий id.
- *
- * Оба поля адресуют одно и то же событие реакции — до ответа сервера и после, — поэтому едут
- * парой, а не двумя соседними аргументами. Тип у них один (`EventId`), и в позиционном вызове
- * их было нечем развести: перестановка компилировалась молча, а ломалось тихо — реакция
- * оставалась с оптимистичным id и не снималась повторным тапом. Имена полей это закрывают.
- */
-export interface ReactionConfirmation {
-  draft: EventId
-  confirmed: EventId
-}
-
 /** Свёртка реакций сообщения для UI: по одному чипу на эмодзи. */
 export interface ReactionSummary {
   key: string
+  // сколько участников отреагировали этим эмодзи
   count: number
-  // id своей реакции с этим ключом — им же её и снимаем; null — своей нет
-  ownEventId: EventId | null
+  isOwn: boolean
 }
 
 const NO_SUMMARIES: ReactionSummary[] = []
 
-/**
- * Добавляет реакцию, схлопывая её с уже известной от того же автора с тем же ключом.
- *
- * Это и есть дедуп оптимистичной записи с эхом из `/sync`: сервер дедуплицирует по
- * `(target, sender, key)`, значит пара таких записей всегда описывает одно событие, каким бы
- * ни был порядок прихода. Реальный `eventId` вытесняет оптимистичный, но не наоборот.
- */
+/** Добавляет реакцию; уже известное событие (эхо ответа на свой запрос) не дублирует. */
 export function addReaction(
   index: ReactionIndex,
   targetEventId: EventId,
   entry: ReactionEntry,
 ): ReactionIndex {
   const entries = index[targetEventId] ?? []
-  const sameIndex = entries.findIndex((e) => e.sender === entry.sender && e.key === entry.key)
+  if (entries.some((e) => e.eventId === entry.eventId)) return index
 
-  if (sameIndex === -1) {
-    return { ...index, [targetEventId]: [...entries, entry] }
-  }
-
-  const existing = entries[sameIndex]!
-  if (existing.eventId === entry.eventId) return index
-  if (isOptimistic(entry.eventId) && !isOptimistic(existing.eventId)) return index
-
-  const next = [...entries]
-  next[sameIndex] = entry
-
-  return { ...index, [targetEventId]: next }
+  return { ...index, [targetEventId]: [...entries, entry] }
 }
 
-/** Проставляет оптимистичной записи реальный `eventId` из ответа на отправку. */
-export function confirmReaction(
-  index: ReactionIndex,
-  targetEventId: EventId,
-  { draft, confirmed }: ReactionConfirmation,
-): ReactionIndex {
-  const entries = index[targetEventId]
-  const draftIndex = entries?.findIndex((e) => e.eventId === draft) ?? -1
-  // эхо из /sync могло опередить ответ на PUT и уже подменить запись — подтверждать нечего
-  if (!entries || draftIndex === -1) return index
+/**
+ * Убирает реакцию по id её события. Редакция называет только его, поэтому цель ищем перебором;
+ * индекс мал — в нём живут лишь сообщения, на которые кто-то отреагировал. Опустевшая цель
+ * из индекса удаляется целиком.
+ */
+export function removeReaction(index: ReactionIndex, eventId: EventId): ReactionIndex {
+  for (const [targetEventId, entries] of Object.entries(index)) {
+    const next = entries.filter((e) => e.eventId !== eventId)
+    if (next.length === entries.length) continue
 
-  const next = [...entries]
-  next[draftIndex] = { ...entries[draftIndex]!, eventId: confirmed }
+    if (next.length === 0) {
+      const { [targetEventId]: _empty, ...rest } = index
+      return rest
+    }
 
-  return { ...index, [targetEventId]: next }
-}
-
-/** Убирает реакцию у известной цели. Пустая цель из индекса удаляется целиком. */
-export function removeReaction(
-  index: ReactionIndex,
-  targetEventId: EventId,
-  eventId: EventId,
-): ReactionIndex {
-  const entries = index[targetEventId]
-  if (!entries) return index
-
-  const next = entries.filter((e) => e.eventId !== eventId)
-  if (next.length === entries.length) return index
-
-  if (next.length === 0) {
-    const { [targetEventId]: _empty, ...rest } = index
-    return rest
+    return { ...index, [targetEventId]: next }
   }
 
-  return { ...index, [targetEventId]: next }
+  return index
 }
 
 export function applyReactionDelta(index: ReactionIndex, delta: ReactionDelta): ReactionIndex {
@@ -122,55 +85,47 @@ export function applyReactionDelta(index: ReactionIndex, delta: ReactionDelta): 
     result =
       op.op === 'add'
         ? addReaction(result, op.targetEventId, op.entry)
-        : removeAnywhere(result, op.eventId)
+        : removeReaction(result, op.eventId)
   }
 
   return result
 }
 
-// Редакция называет только id снимаемой реакции, поэтому цель ищем перебором. Индекс мал:
-// в нём живут лишь сообщения, на которые кто-то отреагировал.
-function removeAnywhere(index: ReactionIndex, eventId: EventId): ReactionIndex {
-  for (const targetEventId of Object.keys(index)) {
-    const next = removeReaction(index, targetEventId, eventId)
-    if (next !== index) return next
-  }
-
-  return index
-}
-
-export function findOwnReaction(
-  index: ReactionIndex,
-  targetEventId: EventId,
-  ownUserId: UserId,
-  key: string,
-): ReactionEntry | undefined {
-  return index[targetEventId]?.find((e) => e.sender === ownUserId && e.key === key)
-}
-
 /**
- * Схлопывает реакции сообщения в чипы. Порядок — по первому появлению ключа: чип не должен
- * прыгать от того, что вторым участником проставлена та же реакция.
+ * Схлопывает реакции сообщения в чипы — это и есть то, что видит пользователь; по этой же свёртке
+ * решается, ставить или снимать реакцию на нажатие.
+ *
+ * `pending` — свой выбор, ещё не доведённый до сервера (`PendingReactions`): пока он есть, свои
+ * реакции берутся из него, а не из индекса.
+ *
+ * Считаем участников, а не события: сервер дедуплицирует по `(target, sender, key)` асинхронно,
+ * и два быстрых запроса одного автора (например, из двух вкладок) могут оставить два события.
+ * Порядок — по первому появлению ключа: чип не должен прыгать от того, что вторым участником
+ * проставлена та же реакция.
  */
 export function aggregateReactions(
   entries: ReactionEntry[] | undefined,
   ownUserId: UserId,
+  pending?: string | null,
 ): ReactionSummary[] {
-  if (!entries || entries.length === 0) return NO_SUMMARIES
-
-  const byKey = new Map<string, ReactionSummary>()
-
-  for (const { key, sender, eventId } of entries) {
-    const summary = byKey.get(key)
-
-    if (!summary) {
-      byKey.set(key, { key, count: 1, ownEventId: sender === ownUserId ? eventId : null })
-      continue
-    }
-
-    summary.count += 1
-    if (sender === ownUserId) summary.ownEventId = eventId
+  const sendersByKey = new Map<string, Set<UserId>>()
+  const addSender = (key: string, sender: UserId) => {
+    const senders = sendersByKey.get(key) ?? new Set<UserId>()
+    senders.add(sender)
+    sendersByKey.set(key, senders)
   }
 
-  return [...byKey.values()]
+  for (const { key, sender } of entries ?? []) {
+    if (pending !== undefined && sender === ownUserId) continue
+    addSender(key, sender)
+  }
+  if (pending !== undefined && pending !== null) addSender(pending, ownUserId)
+
+  if (sendersByKey.size === 0) return NO_SUMMARIES
+
+  return [...sendersByKey].map(([key, senders]) => ({
+    key,
+    count: senders.size,
+    isOwn: senders.has(ownUserId),
+  }))
 }

@@ -226,8 +226,6 @@ describe('MessageActions', () => {
     },
   )
 
-  it.todo('закрывает меню и возвращает фокус на «…» после выбора реакции')
-
   it('does not render "Повторить отправку" for a non-own or non-failed message', () => {
     render(
       <MessageActions

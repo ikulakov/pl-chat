@@ -5,7 +5,7 @@ import { LONG_PRESS_MS } from '../hooks/useMessageGestures'
 import { t } from '@/i18n'
 import { formatTime } from '@/shared/utils/formatTime'
 import { ensureEmojiIndex, resetEmojiIndex } from '../../Emoji/cache/emojiIndexStore'
-import { fileItem, textItem } from '@/shared/testUtils/matrixFixtures'
+import { fileItem, imageItem, stickerItem, textItem } from '@/shared/testUtils/matrixFixtures'
 import { chatStore } from '@/store/store'
 import { INITIAL_RUNTIME_STATE } from '@/store/initialState'
 import { TestPointerEvent, touch } from '@/shared/testUtils/pointer'
@@ -33,6 +33,8 @@ vi.mock<unknown>(import('@/hooks/useChatActions'), () => {
     resendMessage: vi.fn(),
     toggleReaction,
     loadEmojiAnimation: () => Promise.resolve({}),
+    // превью картинки не приезжает: кадр остаётся скелетоном, в сеть тест не ходит
+    loadPreview: () => new Promise(() => {}),
   }
   return { useChatActions: () => ({ ...controller.actions, ...actions }) }
 })
@@ -115,11 +117,7 @@ describe('MessageRow: сообщение из одних эмодзи', () => {
       expect(toggleReaction).toHaveBeenLastCalledWith('m1', '👍')
 
       act(() => {
-        chatStore.getState().dispatch({
-          type: 'reaction.removed',
-          targetEventId: 'm1',
-          eventId: '$reaction',
-        })
+        chatStore.getState().dispatch({ type: 'reaction.removed', eventId: '$reaction' })
       })
 
       expect(reaction).not.toBeInTheDocument()
@@ -142,12 +140,70 @@ describe('MessageRow: сообщение из одних эмодзи', () => {
     expect(container.querySelector(BUBBLE)).not.toBeNull()
   })
 
-  it('сообщение с цитатой остаётся баблом: цитату не на чем показать', async () => {
-    const { container } = renderRow('😋', 'исходное сообщение')
+  it.each(['@me:bank', '@operator:bank'])(
+    'эмодзи с цитатой остаётся крупным и без пузыря (автор %s)',
+    async (sender) => {
+      const { container } = renderMessage(textItem({ body: '😋', sender }), 'исходное сообщение')
 
-    await screen.findByAltText('😋')
-    expect(container.querySelector(BUBBLE)).not.toBeNull()
+      const emoji = await screen.findByRole('img', { name: '😋' })
+      expect(emoji).toHaveStyle({ width: '102px', height: '102px' })
+      expect(container.querySelector(BUBBLE)).toBeNull()
+      expect(screen.getByTestId('reply-preview')).toHaveTextContent('исходное сообщение')
+      expect(screen.getByRole('button', { name: t('chat.reply.goToOriginal') })).toBeEnabled()
+    },
+  )
+
+  it('стикер с цитатой остаётся без пузыря и сохраняет свой размер', () => {
+    const { container } = renderMessage(stickerItem(), 'исходное сообщение')
+
+    expect(screen.getByRole('img', { name: '🩷' })).toHaveStyle({ width: '185px', height: '185px' })
+    expect(container.querySelector(BUBBLE)).toBeNull()
+    expect(screen.getByTestId('reply-preview')).toHaveTextContent('исходное сообщение')
   })
+})
+
+describe('MessageRow: подпись к вложению', () => {
+  it.each([
+    ['картинки', imageItem],
+    ['файла', fileItem],
+  ] as const)(
+    'ссылка в подписи %s кликабельна у оператора и остаётся текстом у своего',
+    (_, createItem) => {
+      const body = 'подробнее на https://bank.ru/help'
+      const { rerender } = renderMessage(createItem({ body }))
+      expect(screen.getByRole('link', { name: 'https://bank.ru/help' })).toHaveAttribute(
+        'href',
+        'https://bank.ru/help',
+      )
+
+      rerender(messageRow(createItem({ body, sender: '@me:bank' })))
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(screen.getByText(body)).toBeInTheDocument()
+    },
+  )
+
+  it.each<[string, string | undefined]>([
+    ['без цитаты', undefined],
+    ['с цитатой', 'исходное сообщение'],
+  ])(
+    'подпись картинки стоит в пузыре над кадром (%s), время — пилюлей на кадре',
+    (_, replyText) => {
+      const message = imageItem({ body: 'смотрите скриншот' })
+      renderMessage(message, replyText)
+
+      const caption = screen.getByText('смотрите скриншот')
+      // span времени → пилюля MessageMeta → рамка кадра
+      const frame = screen.getByText(formatTime(message.ts)).parentElement!.parentElement!
+
+      expect(frame).not.toContainElement(caption)
+      expect(caption.compareDocumentPosition(frame) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      if (replyText) {
+        expect(caption.closest('p')!.parentElement).toContainElement(
+          screen.getByTestId('reply-preview'),
+        )
+      }
+    },
+  )
 })
 
 describe('MessageRow: долгое нажатие', () => {
@@ -319,11 +375,7 @@ describe('MessageRow: реакции', () => {
       expect(toggleReaction).toHaveBeenCalledExactlyOnceWith(message.eventId, '👍')
 
       act(() => {
-        chatStore.getState().dispatch({
-          type: 'reaction.removed',
-          targetEventId: message.eventId,
-          eventId: '$own',
-        })
+        chatStore.getState().dispatch({ type: 'reaction.removed', eventId: '$own' })
       })
       expect(screen.queryByTestId('reaction-bar')).not.toBeInTheDocument()
       expect(screen.getAllByText(time)).toHaveLength(1)
@@ -341,7 +393,9 @@ describe('MessageRow: реакции', () => {
     fireEvent.click(screen.getByRole('button', { name: t('chat.reaction.add', { emoji: '👍' }) }))
     expect(toggleReaction).toHaveBeenCalledExactlyOnceWith('$target', '👍')
 
-    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: t('chat.action.menu') })).toHaveFocus()
     rerender(messageRow(textItem({ eventId: '$other', body: 'другой вопрос' })))
     openReactionPicker()
     fireEvent.click(screen.getByRole('button', { name: t('chat.reaction.add', { emoji: '👍' }) }))
@@ -363,6 +417,9 @@ describe('MessageRow: реакции', () => {
     expect(remove).toHaveAttribute('aria-pressed', 'true')
     expect(chip).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(remove)
+    expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: t('chat.action.menu') })).toHaveFocus()
     fireEvent.click(chip)
     expect(toggleReaction.mock.calls).toEqual([
       ['$message', '👍'],

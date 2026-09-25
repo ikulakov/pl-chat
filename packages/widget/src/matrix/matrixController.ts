@@ -4,12 +4,10 @@ import {
   createOptimisticMediaMessage,
   createOptimisticStickerMessage,
   createOptimisticTextMessage,
-  isOptimistic,
 } from '@/domain/optimistic'
-import { findOwnReaction, type ReactionEntry } from '@/domain/reactions'
 import { canMoveMarker } from '@/domain/receipts'
 import { isAdaptiveCard, isMedia, isSystem, type MediaTimelineItem } from '@/domain/timeline'
-import type { EventId, LocalId, RoomId, TxnId, UserId } from '@/shared/types/ids'
+import type { EventId, LocalId, RoomId, TxnId } from '@/shared/types/ids'
 import { isDeadlineError } from '@/shared/utils/abort'
 import { consoleDev } from '@/shared/utils/consoleDev'
 import { Generation } from '@/shared/utils/generation'
@@ -27,6 +25,7 @@ import {
 import { toRoomSyncPatch } from './mappers/roomSync'
 import { classifyUploadError } from './mappers/uploadError'
 import type { MatrixMedia } from './media/matrixMedia'
+import { MatrixReactions } from './reactions/matrixReactions'
 import type { GuestSession, MatrixSessionManager } from './session/sessionManager'
 import { MatrixSyncLoop, type SyncTick } from './sync/syncLoop'
 import { MatrixEventType } from './wire/consts'
@@ -69,6 +68,7 @@ export class MatrixController implements MatrixService {
   private readonly syncLoop: MatrixSyncLoop
   private readonly media: MatrixMedia
   private readonly historyLoader: MatrixHistoryLoader
+  private readonly reactions: MatrixReactions
   private readonly sessionManager: MatrixSessionManager
 
   private readonly dispatch: (action: RuntimeAction) => void
@@ -95,6 +95,12 @@ export class MatrixController implements MatrixService {
       api: deps.api,
       dispatch: deps.dispatch,
       onAuthError: (err) => this.handleAuthError(err, 'loadHistory'),
+    })
+    this.reactions = new MatrixReactions({
+      api: deps.api,
+      dispatch: deps.dispatch,
+      getConnection: () => this.requireConnection(),
+      onAuthError: (err) => this.handleAuthError(err, 'toggleReaction'),
     })
     this.sessionManager = deps.sessionManager
     this.dispatch = deps.dispatch
@@ -326,80 +332,10 @@ export class MatrixController implements MatrixService {
     }
   }
 
-  /**
-   * Ставит или снимает свою реакцию — одно действие на оба направления: что делать, знает стор,
-   * а не вызывающий компонент.
-   *
-   * Стор правим ДО запроса (и откатываем на ошибке) по той же причине, что и у read-маркера:
-   * ветку «поставить/снять» выбирает гард по стору, и без немедленного обновления второй тап
-   * ушёл бы вторым PUT'ом на постановку.
-   */
+  // Своя реакция на сообщение одна: повторный выбор снимает её, другой — заменяет. Механика —
+  // в MatrixReactions; про смену сессии она узнаёт через reset() в nextGeneration().
   async toggleReaction(targetEventId: EventId, key: string): Promise<void> {
-    const connection = this.requireConnection()
-    if (!connection) return
-
-    const { identity, room } = connection
-    // У черновика нет серверного id — реакции не на что вешать.
-    if (isOptimistic(targetEventId)) return
-
-    const own = findOwnReaction(room.reactions, targetEventId, identity.userId, key)
-
-    if (!own) {
-      await this.addReaction(identity.roomId, targetEventId, identity.userId, key)
-      return
-    }
-    // Постановка ещё в полёте: редактировать нечего, снимет следующий тап.
-    if (isOptimistic(own.eventId)) return
-
-    await this.removeReaction(identity.roomId, targetEventId, own)
-  }
-
-  private async addReaction(
-    roomId: RoomId,
-    targetEventId: EventId,
-    sender: UserId,
-    key: string,
-  ): Promise<void> {
-    const draftEventId: EventId = `optimistic:${crypto.randomUUID()}`
-    const txnId: TxnId = crypto.randomUUID()
-    const entry: ReactionEntry = { eventId: draftEventId, sender, key }
-
-    this.dispatch({ type: 'reaction.added', targetEventId, entry })
-    const signal = this.generation.signal
-
-    try {
-      const { event_id } = await this.api.sendReaction({ roomId, txnId, targetEventId, key })
-      if (signal.aborted) return
-
-      this.dispatch({
-        type: 'reaction.confirmed',
-        targetEventId,
-        reaction: { draft: draftEventId, confirmed: event_id },
-      })
-    } catch (err) {
-      if (signal.aborted) return
-
-      this.dispatch({ type: 'reaction.removed', targetEventId, eventId: draftEventId })
-      this.handleAuthError(err, 'toggleReaction')
-    }
-  }
-
-  private async removeReaction(
-    roomId: RoomId,
-    targetEventId: EventId,
-    entry: ReactionEntry,
-  ): Promise<void> {
-    this.dispatch({ type: 'reaction.removed', targetEventId, eventId: entry.eventId })
-    const signal = this.generation.signal
-
-    try {
-      await this.api.redactEvent({ roomId, txnId: crypto.randomUUID(), eventId: entry.eventId })
-    } catch (err) {
-      if (signal.aborted) return
-
-      this.dispatch({ type: 'reaction.added', targetEventId, entry })
-      this.handleAuthError(err, 'toggleReaction')
-    }
+    await this.reactions.toggle(targetEventId, key)
   }
 
   // Механика догрузки живёт в MatrixHistoryLoader; контроллер даёт ей только, откуда тянуть.
@@ -624,6 +560,7 @@ export class MatrixController implements MatrixService {
     this.media.reset()
     // Ключи идемпотентности привязаны к событиям прежней комнаты и в новой сессии бессмысленны.
     this.cardActionTxnIds.clear()
+    this.reactions.reset()
   }
 
   private requireConnection(): {

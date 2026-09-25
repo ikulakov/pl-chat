@@ -329,6 +329,11 @@ describe('Dropdown — края контракта', () => {
 
     expect(screen.getByRole('button', { name: 'react' })).toBeInTheDocument()
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'react' })).toHaveFocus()
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'react' }), { key: 'Escape' })
+    expect(screen.queryByRole('button', { name: 'react' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'menu' })).toHaveFocus()
   })
 
   // Событие из теневого дерева доходит до document с target, подменённым на хост: по нему

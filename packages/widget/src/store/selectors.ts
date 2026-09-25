@@ -76,8 +76,8 @@ export function selectTimeline(state: ChatStoreState): TimelineItem[] {
   return state.room.timeline
 }
 
-export function selectHasMessages(state: ChatStoreState): boolean {
-  return !state.room.timeline.every(isSystem)
+export function selectIsRoomEmpty(state: ChatStoreState): boolean {
+  return state.room.prevBatch === null && state.room.timeline.every(isSystem)
 }
 
 export function selectReadReceipts(state: ChatStoreState): Record<UserId, ReadReceipt> {
@@ -88,6 +88,13 @@ export function selectReactionsFor(
   eventId: EventId,
 ): (state: ChatStoreState) => ReactionEntry[] | undefined {
   return (state) => state.room.reactions[eventId]
+}
+
+/** Свой выбор реакции, ещё не доведённый до сервера; undefined — выбора нет. */
+export function selectPendingReactionFor(
+  eventId: EventId,
+): (state: ChatStoreState) => string | null | undefined {
+  return (state) => state.room.pendingReactions[eventId]
 }
 
 export function selectCardAnswerFor(

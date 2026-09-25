@@ -71,14 +71,18 @@ export function Dropdown({ ref, trigger, disabled = false, above, children }: Pr
     setIsOpen(false)
   }, [])
 
-  useImperativeHandle(ref, () => ({ open }), [open])
+  useImperativeHandle(ref, () => ({ open, close }), [open, close])
 
   const position = useDropdownPosition({ isOpen, anchorRef, triggerRef, layerRef })
 
-  // Фокус на первый пункт — когда слой измерен: скрытый через visibility элемент не фокусируется.
+  // Фокус на первый пункт, а без пунктов — на первую кнопку надстройки `above`. Ставим, когда
+  // слой измерен: скрытый через visibility элемент не фокусируется.
   useLayoutEffect(() => {
     if (!position) return
-    layerRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+    const layer = layerRef.current
+    const initial =
+      layer?.querySelector<HTMLElement>('[role="menuitem"]') ?? layer?.querySelector('button')
+    initial?.focus()
   }, [position])
 
   // Подложка в «своих»: её закрывает собственный click. Закройся слой уже на pointerdown,
