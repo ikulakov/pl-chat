@@ -204,6 +204,30 @@ describe('MessageRow: подпись к вложению', () => {
       }
     },
   )
+
+  // У файла время не пилюлей поверх, а в строке под именем: оболочка отдаёт его карточке, и
+  // второй раз (пилюлей или в подписи) оно появиться не должно — getByText упадёт на дубле.
+  it.each<[string, string | undefined]>([
+    ['без цитаты', undefined],
+    ['с цитатой', 'исходное сообщение'],
+  ])('подпись файла стоит в пузыре над карточкой (%s), время — в карточке', (_, replyText) => {
+    const message = fileItem({ body: 'договор на подпись' })
+    renderMessage(message, replyText)
+
+    const caption = screen.getByText('договор на подпись')
+    const card = screen.getByRole('button', {
+      name: t('chat.media.download', { name: 'doc.pdf' }),
+    }).parentElement!
+
+    expect(card).toContainElement(screen.getByText(formatTime(message.ts)))
+    expect(card).not.toContainElement(caption)
+    expect(caption.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    if (replyText) {
+      expect(caption.closest('p')!.parentElement).toContainElement(
+        screen.getByTestId('reply-preview'),
+      )
+    }
+  })
 })
 
 describe('MessageRow: долгое нажатие', () => {
@@ -346,15 +370,24 @@ describe('MessageRow: реакции', () => {
   afterEach(() => toggleReaction.mockClear())
 
   it.each(['', 'договор на подпись'])(
-    'размещает реакции файла и единственное время в общем футере (подпись: "%s")',
+    'реакции файла встают строкой под карточкой, время остаётся в ней (подпись: "%s")',
     (body) => {
       const message = fileItem({ body })
-      renderMessage(message)
+      const { container } = renderMessage(message)
       const time = formatTime(message.ts)
-      const download = screen.getByRole('button', {
+      // кнопка скачивания → карточка файла
+      const card = screen.getByRole('button', {
         name: t('chat.media.download', { name: 'doc.pdf' }),
-      })
-      const originalMetaParent = screen.getByText(time).parentElement!.parentElement!
+      }).parentElement!
+
+      expect(container.querySelector(BUBBLE)).toBeNull()
+      if (body) {
+        const caption = screen.getByText(body)
+        expect(card).not.toContainElement(caption)
+        expect(
+          caption.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy()
+      }
 
       act(() => {
         chatStore.getState().dispatch({
@@ -366,20 +399,12 @@ describe('MessageRow: реакции', () => {
 
       const bar = screen.getByTestId('reaction-bar')
       expect(screen.getAllByText(time)).toHaveLength(1)
-      expect(bar.parentElement).toContainElement(screen.getByText(time))
-      expect(originalMetaParent).not.toContainElement(screen.getByText(time))
-      expect(download).not.toContainElement(bar)
-      if (body) expect(screen.getByText(body)).toBeInTheDocument()
+      expect(card).toContainElement(screen.getByText(time))
+      expect(card).not.toContainElement(bar)
+      expect(card.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
       fireEvent.click(within(bar).getByRole('button'))
       expect(toggleReaction).toHaveBeenCalledExactlyOnceWith(message.eventId, '👍')
-
-      act(() => {
-        chatStore.getState().dispatch({ type: 'reaction.removed', eventId: '$own' })
-      })
-      expect(screen.queryByTestId('reaction-bar')).not.toBeInTheDocument()
-      expect(screen.getAllByText(time)).toHaveLength(1)
-      expect(originalMetaParent).toContainElement(screen.getByText(time))
     },
   )
 

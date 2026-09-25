@@ -151,4 +151,22 @@ describe('useMediaSource', () => {
 
     await waitFor(() => expect(result.current).toEqual({ status: 'ready', url: 'blob:preview' }))
   })
+
+  // Сеть и 5xx — не вердикт: картинку можно запросить снова, и повтор обязан уйти в сеть,
+  // а не вернуть закэшированную ошибку.
+  it('сетевой сбой отдаёт повтор, и повтор заново запрашивает превью', async () => {
+    loadPreview.mockRejectedValueOnce(new MediaUnavailableError('failed'))
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+
+    const { result } = renderHook(() => useMediaSource({ mxcUrl: 'mxc://bank.ru/abc', size: SIZE }))
+    await waitFor(() => expect(result.current.status).toBe('error'))
+
+    const source = result.current
+    if (source.status !== 'error') throw new Error('unreachable')
+    act(() => source.retry())
+
+    await waitFor(() => expect(result.current).toEqual({ status: 'ready', url: 'blob:preview' }))
+    expect(loadPreview).toHaveBeenCalledTimes(2)
+  })
 })

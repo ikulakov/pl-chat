@@ -1,42 +1,44 @@
-.wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
 .chip {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
+  width: 164px;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface-primary);
+  color: var(--c-text-primary);
 }
 
-/* Кликабельный чип: та же раскладка, что и .chip, но кнопка — клик скачивает файл. */
-.chipButton {
-  composes: chip;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  /* Во время скачивания кнопка отключена — курсор не должен обещать клик. */
-  &:disabled {
-    cursor: default;
-  }
+/* Сбой загрузки — рамка карточки в цвет ошибки, как у кадра картинки. */
+.chipFailed {
+  border-color: var(--c-error-border-soft);
 }
 
+/* Блок 24×24 по макету; сам документ в иконке 24-й сетки занимает 16×18. */
 .iconBox {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-sm);
   flex-shrink: 0;
-  background: var(--c-surface-attachment);
+}
+
+/* Без подложки (по макету): блок 24×24 весь занят иконкой, подложке негде проступить. Наведение
+   видно по подмене иконки на стрелку скачивания. */
+.downloadButton {
+  composes: iconBox;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+  }
 }
 
 /* Обе иконки в одной ячейке грида — подмена не двигает раскладку чипа. */
@@ -52,33 +54,32 @@
   opacity: 0;
 }
 
-.chipButton:hover .restIcon,
-.chipButton:focus-visible .restIcon {
+.downloadButton:hover .restIcon,
+.downloadButton:focus-visible .restIcon {
   opacity: 0;
 }
 
-.chipButton:hover .hoverIcon,
-.chipButton:focus-visible .hoverIcon {
+.downloadButton:hover .hoverIcon,
+.downloadButton:focus-visible .hoverIcon {
   opacity: 1;
 }
 
-/* Тот же квадрат 32×32, что у иконки типа файла и кнопок ошибок, — в чипе все слоты слева
-   одного размера. Кольцо прогресса внутри остаётся 24×24. */
-.cancelBox {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
+/* Кнопки у иконки файла (отмена, повтор, убрать) — в том же блоке 24×24 и тоже без подложки:
+   места под неё нет. Нажимаемость видна по приглушению на наведении. */
+.actionBox {
+  composes: iconBox;
   color: inherit;
-  background: var(--c-surface-attachment);
-  transition: background-color var(--dur-fast);
+  transition: opacity var(--dur-fast);
 
   &:not(:disabled):hover {
-    background: var(--c-surface-attachment-hover);
+    opacity: 0.7;
   }
+}
+
+/* Отмена загрузки: кольцо прогресса 24×24 во весь блок, крестик по центру. */
+.cancelBox {
+  composes: actionBox;
+  position: relative;
 }
 
 .failed {
@@ -110,7 +111,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 18px;
 }
 
 .filename {
@@ -126,32 +126,8 @@
 .size {
   font-size: 12px;
   line-height: 14px;
-  opacity: 0.7;
+  letter-spacing: 0.1px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Проценты меняются каждую долю секунды: без табличных цифр и запаса под «100%»
-   ширина строки гуляет и бабл дышит на каждом обновлении прогресса. */
-.progress {
-  min-width: 4ch;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Кнопки ошибок заливки (повтор/убрать) — размера иконки типа файла, не кольца прогресса. */
-.actionBox {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-  color: inherit;
-  background: var(--c-surface-attachment);
-  transition: background-color var(--dur-fast);
-
-  &:hover {
-    background: var(--c-surface-attachment-hover);
-  }
 }

@@ -1,6 +1,5 @@
 import type { ReactionSummary } from '@/domain/reactions'
 import { t } from '@/i18n'
-import { cn } from '@/shared/utils/cn'
 import styles from './ReactionBar.module.css'
 
 interface Props {
@@ -14,12 +13,12 @@ export function ReactionBar({ summaries, onToggle }: Props) {
       className={styles.bar}
       data-testid="reaction-bar"
     >
-      {summaries.map(({ key, count, ownEventId }) => (
+      {summaries.map(({ key, count, isOwn }) => (
         <button
           key={key}
           type="button"
-          className={cn(styles.chip, ownEventId !== null && styles.own)}
-          aria-pressed={ownEventId !== null}
+          className={styles.chip}
+          aria-pressed={isOwn}
           aria-label={t('chat.reaction.count', { emoji: key, count })}
           onClick={() => onToggle(key)}
         >

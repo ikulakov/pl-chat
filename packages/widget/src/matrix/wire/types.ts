@@ -113,7 +113,7 @@ export interface OperatorCurrentEvent extends BaseClientEvent {
 export interface OperatorJoinedEvent extends BaseClientEvent {
   type: typeof MatrixEventType.OperatorJoined
   content: {
-    operator_id: UserId
+    operator_id?: UserId
     displayname: string
     avatar_url?: string
     role: 'human' | 'bot'
@@ -123,7 +123,7 @@ export interface OperatorJoinedEvent extends BaseClientEvent {
 export interface OperatorLeftEvent extends BaseClientEvent {
   type: typeof MatrixEventType.OperatorLeft
   content: {
-    operator_id: UserId
+    operator_id?: UserId
     reason: 'completed' | 'transferred' | 'timeout'
   }
 }

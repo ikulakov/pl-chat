@@ -15,8 +15,12 @@ append('BankChat Demo Host')
 const appearance = loadStoredAppearance()
 if (appearance) append(`appearance из localStorage: ${JSON.stringify(appearance)}`)
 
+// Локально виджет — отдельный origin, как на проде. Через туннель (телефон) снаружи виден
+// только хост-демо: виджет проксируется им под тем же origin'ом (vite.config.ts).
+const isLocal = window.location.hostname === 'localhost'
+
 ChatSDK.init({
-  chatUrl: 'http://localhost:5174',
+  chatUrl: isLocal ? 'http://localhost:5174' : window.location.origin,
   ...(appearance && { appearance }),
 })
 

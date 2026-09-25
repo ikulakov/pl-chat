@@ -23,4 +23,9 @@ describe('isAllowedParentOrigin', () => {
   it('дев-хост разрешён только в дев-сборке', () => {
     expect(isAllowedParentOrigin('http://localhost:5173')).toBe(import.meta.env.DEV)
   })
+
+  // Хост-демо через туннель отдаёт виджет со своего origin'а (прокси /widget) — родитель тот же.
+  it('родитель со своим же origin разрешён только в дев-сборке', () => {
+    expect(isAllowedParentOrigin(window.location.origin)).toBe(import.meta.env.DEV)
+  })
 })

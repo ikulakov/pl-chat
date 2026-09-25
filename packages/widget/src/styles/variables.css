@@ -26,10 +26,15 @@
   --c-surface-error: #fff3f0;
   --c-surface-image-overlay: color-mix(in srgb, #000 30%, transparent);
   --c-surface-image-overlay-hover: color-mix(in srgb, #000 50%, transparent);
-  --c-surface-meta-overlay: color-mix(in srgb, #000 45%, transparent);
+  --c-surface-meta-overlay: color-mix(in srgb, #000 30%, transparent);
   --c-surface-attachment: color-mix(in srgb, #000 12%, transparent);
-  --c-surface-attachment-hover: color-mix(in srgb, #000 24%, transparent);
+  --c-surface-attachment-hover: color-mix(in srgb, #000 26%, transparent);
   --c-surface-attachment-error: color-mix(in srgb, #ea2c45 12%, transparent); /* --c-error */
+  /* reactions */
+  --c-surface-reaction: var(--c-surface-secondary);
+  --c-surface-reaction-hover: color-mix(in srgb, #f3f4f6 98.5%, #000); /* --c-surface-secondary */
+  --c-surface-reaction-on-fill: color-mix(in srgb, #000 20%, transparent);
+  --c-surface-reaction-on-fill-hover: color-mix(in srgb, #000 23%, transparent);
 
   /* Borders */
   --c-border: #f3f4f6;

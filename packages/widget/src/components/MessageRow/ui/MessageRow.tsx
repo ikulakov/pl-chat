@@ -1,5 +1,5 @@
 import { replyTargetOf } from '@/domain/reply'
-import { isMedia, type MessageTimelineItem } from '@/domain/timeline'
+import type { MessageTimelineItem } from '@/domain/timeline'
 import { useChatActions } from '@/hooks/useChatActions'
 import type { LocalId, UserId } from '@/shared/types/ids'
 import type { DropdownHandle } from '@/shared/ui/Dropdown'
@@ -12,7 +12,7 @@ import { getMessageReplyPreview, ReplyPreview } from '../../ReplyPreview'
 import { useMessageGestures } from '../hooks/useMessageGestures'
 import { useMessageReactions } from '../hooks/useMessageReactions'
 import type { LayoutProps, MessageGroupPosition } from '../types'
-import { getMediaUploadView } from '../utils/mediaUploadView'
+import { isMediaMetaHidden } from '../utils/mediaState'
 import { AdaptiveCardActions } from './content/AdaptiveCardActions'
 import { EmojiContent } from './content/EmojiContent'
 import { FileContent } from './content/FileContent'
@@ -95,13 +95,12 @@ export const MessageRow = memo(
 
     const layoutProps: LayoutProps = {
       isOwn,
-      meta:
-        isMedia(message) && getMediaUploadView(message).isMetaHidden
-          ? null
-          : {
-              ts: message.ts,
-              delivery: isOwn ? { sendStatus: message.sendStatus, isRead: readByOperator } : null,
-            },
+      meta: isMediaMetaHidden(message)
+        ? null
+        : {
+            ts: message.ts,
+            delivery: isOwn ? { sendStatus: message.sendStatus, isRead: readByOperator } : null,
+          },
       reply: replyPreview,
       reactions: reactionBar,
     }
@@ -121,12 +120,23 @@ export const MessageRow = memo(
       </BubbleLayout>
     )
 
+    const renderCaption = (body: string): ReactNode =>
+      body.length > 0 ? (
+        <TextContent
+          text={body}
+          isOwn={isOwn}
+        />
+      ) : undefined
+
     const renderMessage = (): ReactNode => {
       switch (message.kind) {
         case 'text':
           if (layout !== 'inline') {
             return (
-              <UnboxedLayout {...layoutProps}>
+              <UnboxedLayout
+                {...layoutProps}
+                narrowReply
+              >
                 <EmojiContent
                   segments={segments}
                   layout={layout}
@@ -145,38 +155,33 @@ export const MessageRow = memo(
           )
         case 'file':
           return (
-            <BubbleLayout
+            <UnboxedLayout
               {...layoutProps}
-              position={position}
+              caption={renderCaption(message.content.body)}
             >
               {(inlineMeta) => (
                 <FileContent
                   item={message}
-                  isOwn={isOwn}
                   inlineMeta={inlineMeta}
                 />
               )}
-            </BubbleLayout>
+            </UnboxedLayout>
           )
         case 'image':
           return (
             <UnboxedLayout
               {...layoutProps}
-              caption={
-                message.content.body.length > 0 ? (
-                  <TextContent
-                    text={message.content.body}
-                    isOwn={isOwn}
-                  />
-                ) : undefined
-              }
+              caption={renderCaption(message.content.body)}
             >
               <ImageContent item={message} />
             </UnboxedLayout>
           )
         case 'sticker':
           return (
-            <UnboxedLayout {...layoutProps}>
+            <UnboxedLayout
+              {...layoutProps}
+              narrowReply
+            >
               <StickerContent item={message} />
             </UnboxedLayout>
           )

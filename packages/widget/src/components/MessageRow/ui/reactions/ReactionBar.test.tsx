@@ -7,7 +7,7 @@ describe('ReactionBar', () => {
   it('не показывает счётчик единственной реакции — в макете его нет', () => {
     render(
       <ReactionBar
-        summaries={[{ key: '👍', count: 1, ownEventId: null }]}
+        summaries={[{ key: '👍', count: 1, isOwn: false }]}
         onToggle={vi.fn()}
       />,
     )
@@ -19,7 +19,7 @@ describe('ReactionBar', () => {
   it('показывает счётчик, когда реакцию поставил не один участник', () => {
     render(
       <ReactionBar
-        summaries={[{ key: '👍', count: 2, ownEventId: '$r1' }]}
+        summaries={[{ key: '👍', count: 2, isOwn: true }]}
         onToggle={vi.fn()}
       />,
     )
@@ -31,8 +31,8 @@ describe('ReactionBar', () => {
     render(
       <ReactionBar
         summaries={[
-          { key: '👍', count: 1, ownEventId: '$r1' },
-          { key: '❤️', count: 1, ownEventId: null },
+          { key: '👍', count: 1, isOwn: true },
+          { key: '❤️', count: 1, isOwn: false },
         ]}
         onToggle={vi.fn()}
       />,
@@ -48,7 +48,7 @@ describe('ReactionBar', () => {
     const onToggle = vi.fn()
     render(
       <ReactionBar
-        summaries={[{ key: '👍', count: 2, ownEventId: null }]}
+        summaries={[{ key: '👍', count: 2, isOwn: false }]}
         onToggle={onToggle}
       />,
     )

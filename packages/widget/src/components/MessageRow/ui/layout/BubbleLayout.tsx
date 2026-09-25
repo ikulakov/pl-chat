@@ -6,6 +6,10 @@ import { MessageMeta } from './MessageMeta'
 
 interface Props extends LayoutProps {
   position: MessageGroupPosition
+  /**
+   * Получает время, чтобы вывести его в конце текста. Если есть реакции, получает `undefined`:
+   * время тогда стоит в строке с реакциями внизу пузыря.
+   */
   children: (inlineMeta: ReactNode) => ReactNode
 }
 

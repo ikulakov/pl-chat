@@ -71,7 +71,7 @@ export type MediaTimelineItem = ImageTimelineItem | FileTimelineItem
 /**
  * Стикер из server-managed каталога. Сознательно НЕ входит в `MediaTimelineItem`: у него нет
  * ни загрузки, ни имени файла, ни вердикта проверки, а байты лежат за публичным адресом без
- * токена. Так стикер даром не попадает в ветки медиа — ни в редьюсере, ни в `getMediaUploadView`,
+ * токена. Так стикер даром не попадает в ветки медиа — ни в редьюсере, ни в `getMediaState`,
  * ни в фолбэке имени файла для цитаты.
  */
 export interface StickerTimelineItem extends BaseTimelineItem {

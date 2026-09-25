@@ -1,33 +1,45 @@
-.message {
+/* .stack — пузырь с кадром без реакций, иначе ряд реакций растягивал бы пузырь. */
+.message,
+.stack {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  padding: 4px 0;
   min-width: 0;
   max-width: 100%;
+}
 
-  &.own {
+.message {
+  &.own,
+  &.own > .stack {
     align-items: flex-end;
   }
 }
 
-/* Ширина оценена по изображению макета; не зависит от размера эмодзи.
-   Ограничение переопределяет max-width общего стиля пузыря. */
-.message > .reply {
-  width: 214px;
-  max-width: 100%;
+/* Картинка и файл: пузырь во всю ширину кадра, шире — только по подписи. Цитата ширину не
+   задаёт (width: 0) и обрезается многоточием, иначе раздула бы пузырь до max-width. */
+.topBubble:not(.narrowReply) {
+  min-width: 100%;
+
+  & > .reply {
+    width: 0;
+    min-width: 100%;
+  }
+}
+
+/* Стикер и крупные эмодзи: кадр прозрачный — пузырь по цитате, не шире 212px (макет).
+   Без процентов: min(212px, 100%) при замере стек принимает за none и раздувается по цитате. */
+.topBubble.narrowReply {
+  max-width: 212px;
 }
 
 .frame {
   position: relative;
   display: flex;
-  align-items: flex-end;
   gap: 8px;
 }
 
-/* Только положение времени в углу рамки; вид подложки — MessageMeta с overlay.
-   display не задаём: абсолютный inline-flex и так становится flex. */
+/* Положение пилюли времени; её вид — MessageMeta с overlay. */
 .meta {
   position: absolute;
   right: 6px;

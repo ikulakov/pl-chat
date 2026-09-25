@@ -35,6 +35,9 @@
 .user {
   /* Время на своём (голубом) пузыре темнее; переменную читает MessageMeta. */
   --meta-color: var(--c-text-message-own-meta);
+  /* Чипы реакций на заливке темнее; переменные читает ReactionBar. */
+  --reaction-bg: var(--c-surface-reaction-on-fill);
+  --reaction-bg-hover: var(--c-surface-reaction-on-fill-hover);
   background: var(--c-surface-message-own);
   color: var(--c-text-primary);
 

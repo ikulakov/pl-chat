@@ -19,7 +19,11 @@ const ALLOWED_PARENT_ORIGIN = /^https:\/\/([a-z0-9-]+\.)*otpbank\.ru$/
  * Можно ли доверять этому origin'у как хосту виджета.
  */
 export function isAllowedParentOrigin(origin: string): boolean {
-  return ALLOWED_PARENT_ORIGIN.test(origin) || (import.meta.env.DEV && origin === DEV_PARENT_ORIGIN)
+  return ALLOWED_PARENT_ORIGIN.test(origin) || isDevParentOrigin(origin)
+}
+
+function isDevParentOrigin(origin: string): boolean {
+  return import.meta.env.DEV && (origin === DEV_PARENT_ORIGIN || origin === window.location.origin)
 }
 
 export interface HostBridge {

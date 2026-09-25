@@ -82,6 +82,8 @@ describe('FileContent', () => {
 
     expect(screen.queryByText(t('chat.upload.error'))).not.toBeInTheDocument()
     expect(screen.getByText('PDF')).toBeInTheDocument()
+    // свой неотправленный файл скачивать незачем, а повтор /send живёт в меню сообщения
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
   it('во время загрузки показывает процент вместо размера и даёт отменить, после — размер без кнопки отмены', () => {
@@ -125,7 +127,7 @@ describe('FileContent', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('клик по чипу скачивает оригинал файла, а не превью', async () => {
+  it('клик по иконке скачивает оригинал файла, а не превью', async () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 
     render(<FileContent item={fileItem({ sendStatus: 'sent' })} />)

@@ -1,12 +1,12 @@
-import { isRetryableFailure, type UploadFailure } from '@/domain/mediaFailure'
 import type { FileTimelineItem } from '@/domain/timeline'
 import { useChatActions } from '@/hooks/useChatActions'
 import { useChatStore } from '@/hooks/useChatStore'
-import { useMediaDownload } from '../../hooks/useMediaDownload'
 import { t } from '@/i18n'
 import { ProgressRing } from '@/shared/ui/ProgressRing'
 import { Spinner } from '@/shared/ui/Spinner'
+import { Tooltip } from '@/shared/ui/Tooltip'
 import { CloseIcon, DownloadIcon, FileDocIcon, RetryIcon } from '@/shared/ui/icons'
+import { assertNever } from '@/shared/utils/assertNever'
 import { cn } from '@/shared/utils/cn'
 import { getFileExtension } from '@/shared/utils/fileExtension'
 import { formatSize } from '@/shared/utils/formatSize'
@@ -14,159 +14,160 @@ import { parseMxcUrl } from '@/shared/utils/mxc'
 import { selectMediaVerdictStatusFor } from '@/store/selectors'
 import type { ReactNode } from 'react'
 import styles from './FileContent.module.css'
-import { MediaCaption } from './MediaCaption'
-import { getMediaUploadView } from '../../utils/mediaUploadView'
+import { useMediaDownload } from '../../hooks/useMediaDownload'
+import { getMediaState, type MediaState } from '../../utils/mediaState'
 
 interface Props {
   item: FileTimelineItem
-  /** Время в конце подписи или строки под именем; нет — оно стоит в футере с реакциями. */
+  /** Время в конце строки под именем. Подпись к файлу рисует оболочка — пузырём над карточкой. */
   inlineMeta?: ReactNode
 }
 
+/** Карточка файла без пузыря: иконка-действие, имя, строка под ним со временем. */
 export function FileContent({ item, inlineMeta }: Props) {
   const { cancelUpload, resendMessage } = useChatActions()
   const { download, isLoading } = useMediaDownload(item)
-  const { uploadPct, failure, uploadFailed } = getMediaUploadView(item)
-  const isUploading = uploadPct !== null
-
-  const { body, filename, info, url } = item.content
+  const { filename, info, url } = item.content
 
   const mediaId = url ? parseMxcUrl(url)?.mediaId : undefined
-  // Отказ проверки терминален: файл уже не скачается, ретраить нечего — чип не кликабелен.
-  const isRejected = useChatStore(selectMediaVerdictStatusFor(mediaId)) === 'rejected'
+  const verdict = useChatStore(selectMediaVerdictStatusFor(mediaId))
+  const state = getMediaState(item, verdict === 'rejected')
 
-  const hasCaption = body.length > 0
+  const isFailed = state.status === 'uploadFailed'
+  const isRejected = state.status === 'rejected'
+  const fileHint = getFileExtension(filename).toUpperCase() || formatSize(info.size)
 
-  const extension = getFileExtension(filename).toUpperCase()
-  const fileHint = extension || formatSize(info.size)
-
-  // Причину не разворачиваем: пользователю она ничего не меняет — что делать, говорит само
-  // действие рядом (повтор либо «убрать»). Различает случаи только текст aria-label кнопки.
-  // Причины отказа проверки сервер не присылает намеренно — берём общую формулировку.
-  const subline = isRejected
-    ? t('chat.media.rejected')
-    : uploadFailed
-      ? t('chat.upload.error')
-      : isUploading
-        ? t('composer.upload.progress', { percent: uploadPct })
-        : fileHint
-
-  const chipBody = (
-    <span className={cn(styles.info, isRejected && styles.rejected)}>
-      <span className={styles.filename}>{filename}</span>
-      <span className={styles.subline}>
-        <span
-          className={cn(
-            styles.size,
-            isUploading && styles.progress,
-            (uploadFailed || isRejected) && styles.failed,
-            // причина отказа — фраза, ей нужен перенос, а не обрезка как у «PDF»/размера
-            isRejected && styles.reason,
-          )}
-        >
-          {subline}
-        </span>
-        {!hasCaption && inlineMeta}
-      </span>
-    </span>
-  )
-
-  return (
-    <div className={styles.wrap}>
-      {isUploading ? (
-        // Во время заливки чип не кликабелен целиком: внутри уже есть кнопка отмены,
-        // а вложенные <button> невалидны.
-        <div className={styles.chip}>
+  const renderAction = (): ReactNode => {
+    switch (state.status) {
+      case 'uploading':
+        return (
           <button
             type="button"
             className={styles.cancelBox}
             aria-label={t('chat.action.cancelUpload')}
             onClick={() => cancelUpload(item.localId)}
           >
-            <ProgressRing percent={uploadPct} />
+            <ProgressRing percent={state.pct} />
             <CloseIcon size={12} />
           </button>
-          {chipBody}
-        </div>
-      ) : uploadFailed ? (
-        <div className={styles.chip}>
-          {renderFailureAction(
-            failure,
-            () => resendMessage(item.localId),
-            () => cancelUpload(item.localId),
-          )}
-          {chipBody}
-        </div>
-      ) : isRejected ? (
-        // Отказ проверки: чип не кликабелен вовсе, скачивать нечего — сервер уже сказал «нет».
-        <div className={styles.chip}>
+        )
+      case 'uploadFailed':
+        return state.retryable ? (
+          <button
+            type="button"
+            className={styles.actionBox}
+            aria-label={t('chat.action.retryUpload')}
+            onClick={() => resendMessage(item.localId)}
+          >
+            <RetryIcon size={24} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={styles.actionBox}
+            aria-label={t('chat.action.removeFile')}
+            onClick={() => cancelUpload(item.localId)}
+          >
+            <CloseIcon size={24} />
+          </button>
+        )
+      case 'available':
+        return (
+          <button
+            type="button"
+            className={styles.downloadButton}
+            aria-label={t('chat.media.download', { name: filename })}
+            onClick={download}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Spinner size="icon" />
+            ) : (
+              /* На ховере иконки документ подменяется стрелкой скачивания. */
+              <>
+                <span
+                  className={styles.restIcon}
+                  aria-hidden
+                >
+                  <FileDocIcon />
+                </span>
+                <span
+                  className={styles.hoverIcon}
+                  aria-hidden
+                >
+                  <DownloadIcon />
+                </span>
+              </>
+            )}
+          </button>
+        )
+      // Действия нет — иконка просто обозначает файл; отбракованный гаснет вместе с именем.
+      case 'rejected':
+      case 'sendFailed':
+        return (
           <span
-            className={cn(styles.iconBox, styles.rejected)}
+            className={cn(styles.iconBox, isRejected && styles.rejected)}
             aria-hidden
           >
-            <FileDocIcon size={20} />
+            <FileDocIcon />
           </span>
-          {chipBody}
-        </div>
-      ) : (
-        <button
-          type="button"
-          className={styles.chipButton}
-          aria-label={t('chat.media.download', { name: filename })}
-          onClick={download}
-          disabled={isLoading}
+        )
+      default:
+        return assertNever(state)
+    }
+  }
+
+  return (
+    <div className={cn(styles.chip, isFailed && styles.chipFailed)}>
+      {renderAction()}
+      <span className={cn(styles.info, isRejected && styles.rejected)}>
+        {/* В карточке 164px имя почти всегда обрезано — полное показываем подсказкой. */}
+        <Tooltip
+          label={filename}
+          truncatedOnly
         >
-          {isLoading ? (
-            // Тот же слот, где во время заливки крутится кольцо прогресса: состояния файла
-            // читаются в одном месте — заливка, скачивание, покой.
-            <span className={styles.iconBox}>
-              <Spinner size="icon" />
-            </span>
-          ) : (
-            /* Две иконки сразу: на ховере документ подменяется стрелкой скачивания.
-               Переключение чистым CSS — состояние ховера не должно рендерить ряд заново. */
+          {(tooltipProps) => (
             <span
-              className={styles.iconBox}
-              aria-hidden
+              className={styles.filename}
+              {...tooltipProps}
             >
-              <span className={styles.restIcon}>
-                <FileDocIcon size={20} />
-              </span>
-              <span className={styles.hoverIcon}>
-                <DownloadIcon size={20} />
-              </span>
+              {filename}
             </span>
           )}
-          {chipBody}
-        </button>
-      )}
-      {hasCaption && (
-        <MediaCaption
-          body={body}
-          inlineMeta={inlineMeta}
-        />
-      )}
+        </Tooltip>
+        <span className={styles.subline}>
+          <span
+            className={cn(
+              styles.size,
+              (isFailed || isRejected) && styles.failed,
+              // причина отказа — фраза, ей нужен перенос, а не обрезка как у «PDF»/размера
+              isRejected && styles.reason,
+            )}
+          >
+            {getSubline(state, fileHint)}
+          </span>
+          {inlineMeta}
+        </span>
+      </span>
     </div>
   )
 }
 
-// Повтор предлагаем только там, где он что-то изменит: отказ fileguard'а (тип, имя, размер)
-// детерминирован, и единственное осмысленное действие — убрать черновик из ленты.
-function renderFailureAction(
-  failure: UploadFailure | undefined,
-  onRetry: () => void,
-  onRemove: () => void,
-) {
-  const retryable = isRetryableFailure(failure)
-
-  return (
-    <button
-      type="button"
-      className={styles.actionBox}
-      aria-label={retryable ? t('chat.action.retryUpload') : t('chat.action.removeFile')}
-      onClick={retryable ? onRetry : onRemove}
-    >
-      {retryable ? <RetryIcon size={20} /> : <CloseIcon size={20} />}
-    </button>
-  )
+// Причину сбоя не разворачиваем: пользователю она ничего не меняет — что делать, говорит само
+// действие рядом (повтор либо «убрать»). Различает случаи только текст aria-label кнопки.
+// Причины отказа проверки сервер не присылает намеренно — берём общую формулировку.
+function getSubline(state: MediaState, fileHint: string): string {
+  switch (state.status) {
+    case 'uploading':
+      return t('composer.upload.progress', { percent: state.pct })
+    case 'uploadFailed':
+      return t('chat.upload.error')
+    case 'rejected':
+      return t('chat.media.rejected')
+    case 'sendFailed':
+    case 'available':
+      return fileHint
+    default:
+      return assertNever(state)
+  }
 }

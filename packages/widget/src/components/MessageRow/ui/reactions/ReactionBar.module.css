@@ -12,11 +12,15 @@
   height: 24px;
   padding: 4px 8px;
   border-radius: var(--radius-md);
-  background: var(--c-surface-secondary);
+  /* Фон зависит от того, что под чипом: голубой пузырь своего сообщения задаёт свой через
+     переменные (BubbleLayout), на белом пузыре оператора и на панели — нейтральный. */
+  background: var(--reaction-bg, var(--c-surface-reaction));
   transition: background var(--dur-fast);
+  -webkit-user-select: none;
+  user-select: none;
 
-  &.own {
-    background: var(--c-surface-accent-soft);
+  &:hover {
+    background: var(--reaction-bg-hover, var(--c-surface-reaction-hover));
   }
 }
 
@@ -27,7 +31,7 @@
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 16px;
 }
 
